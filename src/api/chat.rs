@@ -132,6 +132,7 @@ impl ChatApi {
                     message: format!("LinesCodec error: {}", e),
                     metadata: None,
                 })?;
+
                 if line.trim().is_empty() {
                     continue;
                 }
@@ -140,9 +141,13 @@ impl ChatApi {
                     if data_part == "[DONE]" {
                         break;
                     }
+
                     match serde_json::from_str::<ChatCompletionChunk>(data_part) {
                         Ok(chunk) => yield chunk,
-                        Err(_err) => continue,
+                        Err(err) => {
+                            tracing::error!("Stream error: {}", err); 
+                            continue;
+                        },
                     }
                 } else if line.starts_with(":") {
                     // Ignore SSE comment lines.
