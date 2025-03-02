@@ -58,6 +58,20 @@ pub struct Choice {
     pub native_finish_reason: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct ChoiceStream {
+    pub index: u32,
+    pub delta: StreamDelta,
+    pub finish_reason: Option<String>,
+    pub native_finish_reason: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct StreamDelta {
+    pub role: String,
+    pub content: String,
+}
+
 /// Usage data returned from the API.
 #[derive(Debug, Deserialize)]
 pub struct Usage {
@@ -80,5 +94,6 @@ pub struct ChatCompletionResponse {
 #[derive(Debug, Deserialize)]
 pub struct ChatCompletionChunk {
     pub id: String,
-    pub choices: Vec<Choice>,
+    pub choices: Vec<ChoiceStream>,
+    pub usage: Option<Usage>,
 }
