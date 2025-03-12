@@ -51,7 +51,7 @@ pub struct ChatCompletionRequest {
 
 #[derive(Debug, Serialize)]
 pub struct ResponseFormat {
-    r#type: String 
+    pub r#type: String 
 }
 
 /// A choice returned by the chat API.
