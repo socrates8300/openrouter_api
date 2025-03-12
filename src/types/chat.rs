@@ -1,5 +1,6 @@
 use crate::models::tool::ToolCall;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 /// Defines the role of a chat message (user, assistant, or system).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -52,7 +53,15 @@ pub struct ChatCompletionRequest {
 #[derive(Debug, Serialize)]
 pub struct ResponseFormat {
     #[serde(rename = "type")]
-    pub format_type: String 
+    pub format_type: String,
+    pub json_schema: Option<JsonSchema>
+}
+
+#[derive(Debug, Serialize)]
+pub struct JsonSchema {
+    pub name: String,
+    pub strict: bool,
+    pub schema: Value
 }
 
 /// A choice returned by the chat API.
