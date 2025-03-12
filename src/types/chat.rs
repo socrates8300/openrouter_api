@@ -1,5 +1,6 @@
 use crate::models::tool::ToolCall;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 /// Defines the role of a chat message (user, assistant, or system).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -34,7 +35,7 @@ pub struct ChatCompletionRequest {
     pub stream: Option<bool>,
     /// (Optional) Stub for response_format.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub response_format: Option<String>,
+    pub response_format: Option<ResponseFormat>,
     /// (Optional) Tool calling field. Now uses our production‑ready tool types.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tools: Option<Vec<crate::models::tool::Tool>>,
@@ -49,6 +50,20 @@ pub struct ChatCompletionRequest {
     pub transforms: Option<Vec<String>>,
 }
 
+#[derive(Debug, Serialize)]
+pub struct ResponseFormat {
+    #[serde(rename = "type")]
+    pub format_type: String,
+    pub json_schema: Option<JsonSchema>
+}
+
+#[derive(Debug, Serialize)]
+pub struct JsonSchema {
+    pub name: String,
+    pub strict: bool,
+    pub schema: Value
+}
+
 /// A choice returned by the chat API.
 #[derive(Debug, Deserialize)]
 pub struct Choice {
@@ -56,6 +71,20 @@ pub struct Choice {
     pub finish_reason: Option<String>,
     #[serde(rename = "native_finish_reason")]
     pub native_finish_reason: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ChoiceStream {
+    pub index: u32,
+    pub delta: StreamDelta,
+    pub finish_reason: Option<String>,
+    pub native_finish_reason: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct StreamDelta {
+    pub role: String,
+    pub content: String,
 }
 
 /// Usage data returned from the API.
@@ -80,5 +109,6 @@ pub struct ChatCompletionResponse {
 #[derive(Debug, Deserialize)]
 pub struct ChatCompletionChunk {
     pub id: String,
-    pub choices: Vec<Choice>,
+    pub choices: Vec<ChoiceStream>,
+    pub usage: Option<Usage>,
 }
