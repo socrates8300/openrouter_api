@@ -34,7 +34,7 @@ pub struct ChatCompletionRequest {
     pub stream: Option<bool>,
     /// (Optional) Stub for response_format.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub response_format: Option<String>,
+    pub response_format: Option<ResponseFormat>,
     /// (Optional) Tool calling field. Now uses our production‑ready tool types.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tools: Option<Vec<crate::models::tool::Tool>>,
@@ -47,6 +47,11 @@ pub struct ChatCompletionRequest {
     /// (Optional) Message transforms.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transforms: Option<Vec<String>>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ResponseFormat {
+    r#type: String 
 }
 
 /// A choice returned by the chat API.
