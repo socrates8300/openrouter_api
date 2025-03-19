@@ -40,7 +40,7 @@ pub struct ChatCompletionRequest {
     pub tools: Option<Vec<crate::models::tool::Tool>>,
     /// (Optional) Stub for provider preferences.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub provider: Option<String>,
+    pub provider: Option<super::ProviderPreferences>,
     /// (Optional) Fallback models.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub models: Option<Vec<String>>,
