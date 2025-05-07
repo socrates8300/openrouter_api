@@ -1,7 +1,7 @@
 //! Authentication utilities for managing API keys and authorization tokens.
 
 use crate::error::{Error, Result};
-use dotenv::dotenv;
+use dotenvy::dotenv;
 use std::env;
 
 /// Attempts to load an API key from environment variables.
