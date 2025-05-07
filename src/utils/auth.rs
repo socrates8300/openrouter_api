@@ -1,11 +1,16 @@
 //! Authentication utilities for managing API keys and authorization tokens.
 
 use crate::error::{Error, Result};
+use dotenv::dotenv;
 use std::env;
 
 /// Attempts to load an API key from environment variables.
 /// Checks for OPENROUTER_API_KEY and OR_API_KEY.
+/// Also loads from .env file if present.
 pub fn load_api_key_from_env() -> Result<String> {
+    // Load from .env file if present
+    dotenv().ok();
+
     // Try to read the API key from common environment variables
     if let Ok(key) = env::var("OPENROUTER_API_KEY") {
         if !key.trim().is_empty() {
