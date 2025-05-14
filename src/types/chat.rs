@@ -54,6 +54,7 @@ pub struct ChatCompletionRequest {
 pub struct ResponseFormat {
     #[serde(rename = "type")]
     pub format_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub json_schema: Option<JsonSchema>
 }
 
