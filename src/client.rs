@@ -245,11 +245,15 @@ impl OpenRouterClient<Ready> {
         for choice in &response.choices {
             if let Some(tool_calls) = &choice.message.tool_calls {
                 for tc in tool_calls {
-                    if tc.kind != "function" {
-                        return Err(Error::SchemaValidationError(format!(
-                            "Invalid tool call kind: {}. Expected 'function'",
-                            tc.kind
-                        )));
+                    // When streaming, the first chunk only will contain "function".
+                    // See: https://platform.openai.com/docs/guides/function-calling?api-mode=chat#streaming
+                    if let Some(kind) = &tc.kind {
+                        if kind != "function" {
+                            return Err(Error::SchemaValidationError(format!(
+                                "Invalid tool call kind: {}. Expected 'function'",
+                                kind
+                            )));
+                        }
                     }
                 }
             }

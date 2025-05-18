@@ -49,7 +49,7 @@ pub enum Tool {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FunctionCall {
     /// The name of the function to call.
-    pub name: String,
+    pub name: Option<String>,
     /// A JSON string representing the arguments for the function call.
     pub arguments: String,
 }
@@ -61,10 +61,12 @@ pub struct FunctionCall {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolCall {
     /// A unique identifier for the tool call.
-    pub id: String,
-    /// The type of call. It must be "function" for function calls.
+    pub id: Option<String>,
+    /// The index of the tool call in the list of tool calls
+    pub index: u32,
+    /// The type of call. When streaming, the first chunk only will contain "function".
     #[serde(rename = "type")]
-    pub kind: String,
+    pub kind: Option<String>,
     /// The details of the function call, including its function name and arguments.
     #[serde(rename = "function")]
     pub function_call: FunctionCall,

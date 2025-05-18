@@ -84,8 +84,9 @@ pub struct ChoiceStream {
 
 #[derive(Debug, Deserialize)]
 pub struct StreamDelta {
-    pub role: String,
-    pub content: String,
+    pub role: Option<String>,
+    pub content: Option<String>,
+    pub tool_calls: Option<Vec<ToolCall>>,
 }
 
 /// Usage data returned from the API.
