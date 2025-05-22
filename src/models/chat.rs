@@ -34,9 +34,10 @@ impl From<ChatMessage> for crate::types::chat::Message {
         };
         Self {
             role: role_str,
-            content: chat_msg.content,
+            content: Some(chat_msg.content),
             name: None,
             tool_calls: None,
+            tool_call_id: None,
         }
     }
 }

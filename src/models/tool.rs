@@ -63,7 +63,8 @@ pub struct ToolCall {
     /// A unique identifier for the tool call.
     pub id: Option<String>,
     /// The index of the tool call in the list of tool calls
-    pub index: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub index: Option<u32>,
     /// The type of call. When streaming, the first chunk only will contain "function".
     #[serde(rename = "type")]
     pub kind: Option<String>,

@@ -46,7 +46,7 @@ mod integration_tests {
             model: "openai/gpt-4o".to_string(),
             messages: vec![Message {
                 role: "user".to_string(),
-                content: "What is a phantom type in Rust?".to_string(),
+                content: Some("What is a phantom type in Rust?".to_string()),
                 name: None,
                 tool_calls: None,
             }],

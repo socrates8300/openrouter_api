@@ -105,11 +105,17 @@ impl ChatApi {
             })?;
             req_body["stream"] = serde_json::Value::Bool(true);
 
-            // Issue the POST request with error-for-status checking.
-            let response = client
+            tracing::debug!("req_body: {:?}", req_body);
+
+            let req_builder = client
                 .post(url)
                 .headers(config.build_headers()?)
-                .json(&req_body)
+                .json(&req_body);
+
+            tracing::debug!("req_builder: {:?}", req_builder);
+
+            // Issue the POST request with error-for-status checking.
+            let response = req_builder
                 .send()
                 .await?
                 .error_for_status()
