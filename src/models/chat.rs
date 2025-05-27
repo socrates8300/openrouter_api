@@ -37,6 +37,7 @@ impl From<ChatMessage> for crate::types::chat::Message {
             content: chat_msg.content,
             name: None,
             tool_calls: None,
+            tool_call_id: None,
         }
     }
 }

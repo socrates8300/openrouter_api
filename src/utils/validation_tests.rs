@@ -12,6 +12,7 @@ mod tests {
                 role: "user".to_string(),
                 content: "Hello, world!".to_string(),
                 name: None,
+                tool_call_id: None,
                 tool_calls: None,
             }],
             stream: None,
@@ -97,6 +98,7 @@ mod tests {
             role: "assistant".to_string(),
             content: "Hello! How can I help you?".to_string(),
             name: None,
+            tool_call_id: None,
             tool_calls: None,
         });
         let result = validate_chat_request(&request);
@@ -144,6 +146,7 @@ mod tests {
                     i
                 ),
                 name: None,
+                tool_call_id: None,
                 tool_calls: None,
             });
         }
@@ -179,18 +182,21 @@ mod tests {
                     role: "system".to_string(),
                     content: "You are a helpful assistant.".to_string(),
                     name: None,
+                    tool_call_id: None,
                     tool_calls: None,
                 },
                 Message {
                     role: "user".to_string(),
                     content: "What is the weather like today?".to_string(),
                     name: Some("user_123".to_string()),
+                    tool_call_id: None,
                     tool_calls: None,
                 },
                 Message {
                     role: "assistant".to_string(),
                     content: "I don't have access to real-time weather data.".to_string(),
                     name: None,
+                    tool_call_id: None,
                     tool_calls: None,
                 },
             ],
