@@ -243,11 +243,18 @@ impl ChatApi {
                     match serde_json::from_str::<ChatCompletionChunk>(data_part) {
                         Ok(chunk) => yield chunk,
                         Err(e) => {
-                            // Log parsing error with redacted data but continue processing stream
-                            eprintln!("Streaming parse error: {}", create_safe_error_message(
-                                &format!("Failed to parse chunk: {}. Data: {}", e, data_part),
+                            let error_msg = create_safe_error_message(
+                                &format!("Failed to parse streaming chunk: {}. Data: {}", e, data_part),
                                 "Streaming chunk parse error"
-                            ));
+                            );
+                            
+                            // Use tracing if available, otherwise fall back to eprintln
+                            #[cfg(feature = "tracing")]
+                            tracing::error!("Streaming parse error: {}", error_msg);
+                            
+                            #[cfg(not(feature = "tracing"))]
+                            eprintln!("Streaming parse error: {}", error_msg);
+                            
                             continue;
                         }
                     }

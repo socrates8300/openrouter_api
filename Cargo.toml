@@ -1,6 +1,6 @@
 [package]
 name = "openrouter_api"
-version = "0.1.5"
+version = "0.1.6"
 edition = "2021"
 authors = ["James Ray<openrouter.aea1p@passmail.net>"]
 description = "A Rust client library for the OpenRouter API"
@@ -24,6 +24,7 @@ tokio-util = { version = "0.7", features = ["codec", "io"] }
 uuid = "1.16.0"
 zeroize = { version = "1.8", features = ["derive"] }
 regex = "1.11"
+tracing = { version = "0.1", optional = true }
 
 [dev-dependencies]
 tokio-test = "0.4"
@@ -34,6 +35,7 @@ test-case = "3.3"
 default = ["rustls"]
 rustls = ["reqwest/rustls-tls"]
 native-tls = ["reqwest/native-tls"]
+tracing = ["dep:tracing"]
 
 [package.metadata.docs.rs]
 all-features = true

@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.6] - 2025-01-14
+
+### 🐛 Critical Bug Fixes
+
+- **CRITICAL**: Fixed `ChatCompletionRequest.provider` field type from `Option<String>` to `Option<ProviderPreferences>`
+  - This was causing 400 errors when provider preferences were supplied
+  - The API expects an object but was receiving a string
+  - Now correctly serializes provider preferences as JSON objects
+- **CRITICAL**: Fixed streaming chat completions with proper OpenRouter response format
+  - Added new `ChoiceStream` and `StreamDelta` types for streaming responses
+  - Added optional `Usage` field to `ChatCompletionChunk` for final usage statistics
+  - Improved error logging with optional tracing support
+  - Streaming responses now correctly parse OpenRouter's delta format instead of expecting full messages
+
+### ✨ New Features
+
+- **Tracing Support**: Added optional `tracing` feature for enhanced error logging
+- **Enhanced Streaming**: Complete overhaul of streaming types to match OpenRouter API format
+- **Usage Tracking**: Stream consumers can now access token usage from final chunks
+
+### 📖 Documentation
+
+- Updated streaming examples in README to show proper delta handling and usage tracking
+- Added feature documentation for optional tracing support
+- Enhanced CHANGELOG with detailed migration information
+
+---
+
 ## [0.1.5] - 2025-01-14
 
 ### 🔒 Security Enhancements
@@ -46,6 +74,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🐛 Bug Fixes
 
+- **CRITICAL**: Fixed `ChatCompletionRequest.provider` field type from `Option<String>` to `Option<ProviderPreferences>`
+  - This was causing 400 errors when provider preferences were supplied
+  - The API expects an object but was receiving a string
+  - Now correctly serializes provider preferences as JSON objects
+- **CRITICAL**: Fixed streaming chat completions with proper OpenRouter response format
+  - Added new `ChoiceStream` and `StreamDelta` types for streaming responses
+  - Added optional `Usage` field to `ChatCompletionChunk` for final usage statistics
+  - Improved error logging with optional tracing support
+  - Streaming responses now correctly parse OpenRouter's delta format instead of expecting full messages
 - Fixed test failures in client configuration validation
 - Corrected error type expectations in URL validation tests
 - Resolved clippy warnings and formatting issues

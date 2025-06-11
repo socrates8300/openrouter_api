@@ -293,4 +293,112 @@ mod tests {
         assert_eq!(response.results.len(), 2);
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_chat_completion_with_provider_preferences() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::models::provider_preferences::{DataCollection, ProviderPreferences, ProviderSort};
+        use crate::types::chat::{ChatCompletionRequest, Message};
+
+        // Create provider preferences
+        let preferences = ProviderPreferences {
+            order: Some(vec!["OpenAI".to_string(), "Anthropic".to_string()]),
+            allow_fallbacks: Some(true),
+            require_parameters: Some(false),
+            data_collection: Some(DataCollection::Deny),
+            ignore: Some(vec!["Azure".to_string()]),
+            quantizations: None,
+            sort: Some(ProviderSort::Throughput),
+        };
+
+        // Create a chat completion request with provider preferences
+        let request = ChatCompletionRequest {
+            model: "openai/gpt-4o".to_string(),
+            messages: vec![Message {
+                role: "user".to_string(),
+                content: "Hello with provider preferences!".to_string(),
+                name: None,
+                tool_calls: None,
+            }],
+            stream: None,
+            response_format: None,
+            tools: None,
+            provider: Some(preferences),
+            models: None,
+            transforms: None,
+        };
+
+        // Serialize to JSON to verify the structure
+        let json = serde_json::to_string_pretty(&request)?;
+        println!("Chat request with provider preferences: {}", json);
+
+        // Verify that the provider field is serialized as an object, not a string
+        let parsed: serde_json::Value = serde_json::from_str(&json)?;
+        let provider_field = parsed.get("provider").expect("Provider field should exist");
+        
+        // Ensure it's an object, not a string
+        assert!(provider_field.is_object(), "Provider field should be an object");
+        
+        // Verify specific fields
+        let order = provider_field.get("order").expect("Order field should exist");
+        assert!(order.is_array(), "Order should be an array");
+        
+        let allow_fallbacks = provider_field.get("allowFallbacks").expect("allowFallbacks field should exist");
+        assert!(allow_fallbacks.is_boolean(), "allowFallbacks should be boolean");
+        
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_streaming_chunk_deserialization() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::types::chat::ChatCompletionChunk;
+
+        // Test typical streaming response
+        let streaming_chunk_json = r#"{
+            "id": "chatcmpl-123",
+            "object": "chat.completion.chunk",
+            "created": 1677652288,
+            "model": "openai/gpt-4o",
+            "choices": [{
+                "index": 0,
+                "delta": {
+                    "content": "Hello"
+                },
+                "finish_reason": null
+            }]
+        }"#;
+
+        let chunk: ChatCompletionChunk = serde_json::from_str(streaming_chunk_json)?;
+        assert_eq!(chunk.id, "chatcmpl-123");
+        assert_eq!(chunk.choices.len(), 1);
+        assert_eq!(chunk.choices[0].delta.content, Some("Hello".to_string()));
+        assert!(chunk.usage.is_none());
+
+        // Test final chunk with usage
+        let final_chunk_json = r#"{
+            "id": "chatcmpl-123",
+            "object": "chat.completion.chunk",
+            "created": 1677652288,
+            "model": "openai/gpt-4o",
+            "choices": [{
+                "index": 0,
+                "delta": {},
+                "finish_reason": "stop"
+            }],
+            "usage": {
+                "prompt_tokens": 10,
+                "completion_tokens": 5,
+                "total_tokens": 15
+            }
+        }"#;
+
+        let final_chunk: ChatCompletionChunk = serde_json::from_str(final_chunk_json)?;
+        assert_eq!(final_chunk.choices[0].finish_reason, Some("stop".to_string()));
+        assert!(final_chunk.usage.is_some());
+        let usage = final_chunk.usage.unwrap();
+        assert_eq!(usage.prompt_tokens, 10);
+        assert_eq!(usage.completion_tokens, 5);
+        assert_eq!(usage.total_tokens, 15);
+
+        Ok(())
+    }
 }

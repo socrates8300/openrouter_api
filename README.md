@@ -48,7 +48,15 @@ Add the following to your project's `Cargo.toml`:
 
 ```bash
 cargo add openrouter_api
+
+# With optional tracing support for better error logging
+cargo add openrouter_api --features tracing
 ```
+
+**Available Features:**
+- `rustls` (default): Use rustls for TLS
+- `native-tls`: Use system TLS
+- `tracing`: Enhanced error logging with tracing support
 
 Ensure that you have Rust installed (tested with Rust v1.83.0) and that you're using Cargo for building and testing.
 
@@ -309,13 +317,23 @@ async fn main() -> Result<()> {
     let chat_api = client.chat()?;
     let mut stream = chat_api.chat_completion_stream(request);
 
-    // Process the stream
+    // Process the stream - accumulating content and tracking usage
+    let mut total_content = String::new();
     while let Some(chunk) = stream.next().await {
         match chunk {
             Ok(c) => {
                 if let Some(choice) = c.choices.first() {
-                    print!("{}", choice.message.content);
-                    std::io::stdout().flush().unwrap();
+                    if let Some(content) = &choice.delta.content {
+                        print!("{}", content);
+                        total_content.push_str(content);
+                        std::io::stdout().flush().unwrap();
+                    }
+                }
+                
+                // Check for usage information in final chunk
+                if let Some(usage) = c.usage {
+                    println!("\nUsage: {} prompt + {} completion = {} total tokens", 
+                        usage.prompt_tokens, usage.completion_tokens, usage.total_tokens);
                 }
             },
             Err(e) => eprintln!("Error during streaming: {}", e),
@@ -404,7 +422,7 @@ Distributed under either the MIT license or the Apache License, Version 2.0. See
 
 # OpenRouter API Rust Crate Documentation
 
-_**Version:** 0.1.5 • **License:** MIT / Apache‑2.0_
+_**Version:** 0.1.6 • **License:** MIT / Apache‑2.0_
 
 The `openrouter_api` crate is a comprehensive client for interacting with the [OpenRouter API](https://openrouter.ai/docs) and [Model Context Protocol](https://modelcontextprotocol.io/) servers. It provides strongly‑typed endpoints for chat completions, text completions, web search, and MCP connections. The crate is built using asynchronous Rust and leverages advanced patterns for safe and flexible API usage.
 
