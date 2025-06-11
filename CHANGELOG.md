@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.4] - 2025-01-14
+## [0.1.5] - 2025-01-14
 
 ### 🔒 Security Enhancements
 
@@ -66,6 +66,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved inline code documentation
 - Added security considerations and best practices
 - Enhanced usage examples for all major features
+
+---
+
+## [0.1.4] - 2024-12-XX
+
+### Added
+- Core security and quality infrastructure implementation
+- Initial comprehensive testing framework
+- Basic developer experience improvements
+
+### Changed
+- Enhanced type-state builder pattern for better ergonomics
+- Improved error handling and validation
+
+### Fixed
+- Security vulnerabilities in API key handling
+- Memory safety issues in streaming responses
 
 ---
 

@@ -1,6 +1,6 @@
 [package]
 name = "openrouter_api"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2021"
 authors = ["James Ray<openrouter.aea1p@passmail.net>"]
 description = "A Rust client library for the OpenRouter API"

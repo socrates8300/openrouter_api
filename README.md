@@ -404,7 +404,7 @@ Distributed under either the MIT license or the Apache License, Version 2.0. See
 
 # OpenRouter API Rust Crate Documentation
 
-_**Version:** 0.1.4 • **License:** MIT / Apache‑2.0_
+_**Version:** 0.1.5 • **License:** MIT / Apache‑2.0_
 
 The `openrouter_api` crate is a comprehensive client for interacting with the [OpenRouter API](https://openrouter.ai/docs) and [Model Context Protocol](https://modelcontextprotocol.io/) servers. It provides strongly‑typed endpoints for chat completions, text completions, web search, and MCP connections. The crate is built using asynchronous Rust and leverages advanced patterns for safe and flexible API usage.
 
