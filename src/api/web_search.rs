@@ -1,8 +1,9 @@
-//// File: openrouter_api/src/api/web_search.rs
+/// Web search API implementation
 use crate::{
     client::ClientConfig,
     error::{Error, Result},
     types::web_search::{WebSearchRequest, WebSearchResponse},
+    utils::security::create_safe_error_message,
 };
 use reqwest::Client;
 use serde::de::DeserializeOwned;
@@ -43,9 +44,11 @@ impl WebSearchApi {
             .await?;
 
         if !response.status().is_success() {
+            let status_code = response.status().as_u16();
+            let body = response.text().await?;
             return Err(Error::ApiError {
-                code: response.status().as_u16(),
-                message: response.text().await?,
+                code: status_code,
+                message: create_safe_error_message(&body, "Web search API request failed"),
                 metadata: None,
             });
         }
@@ -64,7 +67,7 @@ impl WebSearchApi {
         if !status.is_success() {
             return Err(Error::ApiError {
                 code: status.as_u16(),
-                message: body.clone(),
+                message: create_safe_error_message(&body, "Web search response error"),
                 metadata: None,
             });
         }
@@ -77,7 +80,10 @@ impl WebSearchApi {
         }
         serde_json::from_str::<T>(&body).map_err(|e| Error::ApiError {
             code: status.as_u16(),
-            message: format!("Failed to decode JSON: {}. Body was: {}", e, body),
+            message: create_safe_error_message(
+                &format!("Failed to decode JSON: {}. Body was: {}", e, body),
+                "Web search JSON parsing error",
+            ),
             metadata: None,
         })
     }

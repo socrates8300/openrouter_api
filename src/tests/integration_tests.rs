@@ -1,12 +1,6 @@
-//// File: openrouter_api/src/tests/integration_tests.rs
-/*
-   src/tests/integration_tests.rs
-
-   Integration tests for the OpenRouter client.
-*/
-
+/// Integration tests for the OpenRouter client.
 #[cfg(test)]
-mod integration_tests {
+mod tests {
     use crate::client::{OpenRouterClient, RetryConfig, Unconfigured};
     #[allow(unused_imports)]
     use crate::models::chat::{ChatMessage, ChatRole};
@@ -118,7 +112,10 @@ mod integration_tests {
         // Create a dummy client in Ready state to call our validation helper.
         let client = OpenRouterClient::<crate::client::Ready> {
             config: crate::client::ClientConfig {
-                api_key: Some("dummy".into()),
+                api_key: Some(
+                    crate::client::SecureApiKey::new("sk-1234567890abcdef1234567890abcdef")
+                        .unwrap(),
+                ),
                 base_url: Url::parse("https://dummy/").unwrap(),
                 http_referer: None,
                 site_title: None,
@@ -160,7 +157,7 @@ mod integration_tests {
         )?;
 
         // Verify that the deserialization worked correctly.
-        assert!(response.choices.len() > 0);
+        assert!(!response.choices.is_empty());
         assert_eq!(response.choices[0].finish_reason.as_deref(), Some("stop"));
         assert!(response.choices[0].text.contains("Once upon a time"));
 
@@ -198,7 +195,10 @@ mod integration_tests {
         // Create a dummy client to perform validation.
         let client = OpenRouterClient::<crate::client::Ready> {
             config: crate::client::ClientConfig {
-                api_key: Some("dummy".into()),
+                api_key: Some(
+                    crate::client::SecureApiKey::new("sk-1234567890abcdef1234567890abcdef")
+                        .unwrap(),
+                ),
                 base_url: Url::parse("https://dummy/").unwrap(),
                 http_referer: None,
                 site_title: None,

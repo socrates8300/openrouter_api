@@ -2,6 +2,7 @@
 use crate::client::ClientConfig;
 use crate::error::{Error, Result};
 use crate::types::completion::{CompletionRequest, CompletionResponse};
+use crate::utils::security::create_safe_error_message;
 use reqwest::Client;
 
 /// API endpoint for text completions.
@@ -52,7 +53,7 @@ impl CompletionApi {
         if !status.is_success() {
             return Err(Error::ApiError {
                 code: status.as_u16(),
-                message: body.clone(),
+                message: create_safe_error_message(&body, "Completion API request failed"),
                 metadata: None,
             });
         }
@@ -68,7 +69,10 @@ impl CompletionApi {
         // Deserialize the body.
         serde_json::from_str::<CompletionResponse>(&body).map_err(|e| Error::ApiError {
             code: status.as_u16(),
-            message: format!("Failed to decode JSON: {}. Body was: {}", e, body),
+            message: create_safe_error_message(
+                &format!("Failed to decode JSON: {}. Body was: {}", e, body),
+                "Completion JSON parsing error",
+            ),
             metadata: None,
         })
     }

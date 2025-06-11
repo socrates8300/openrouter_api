@@ -11,4 +11,3 @@ pub use completion::CompletionApi;
 pub use models::ModelsApi;
 pub use structured::StructuredApi;
 pub use web_search::WebSearchApi;
-

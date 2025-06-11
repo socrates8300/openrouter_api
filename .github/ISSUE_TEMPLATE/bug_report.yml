@@ -1,0 +1,127 @@
+name: Bug Report
+description: Report a bug or unexpected behavior
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a bug! Please fill out the information below to help us understand and reproduce the issue.
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission Checklist
+      description: Please verify the following before submitting
+      options:
+        - label: I searched existing issues to avoid duplicates
+          required: true
+        - label: I read the documentation and this isn't a usage question
+          required: true
+        - label: I can reproduce this issue consistently
+          required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is
+      placeholder: Describe what happened vs what you expected
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Step-by-step instructions to reproduce the bug
+      placeholder: |
+        1. Create client with...
+        2. Call method...
+        3. Observe error...
+    validations:
+      required: true
+
+  - type: textarea
+    id: code-sample
+    attributes:
+      label: Code Sample
+      description: Minimal code that reproduces the issue
+      render: rust
+      placeholder: |
+        use openrouter_api::*;
+        
+        #[tokio::main]
+        async fn main() -> Result<(), Box<dyn std::error::Error>> {
+            // Your code here
+            Ok(())
+        }
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What you expected to happen
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened (include error messages)
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Crate Version
+      description: Version of openrouter_api you're using
+      placeholder: "0.1.4"
+    validations:
+      required: true
+
+  - type: input
+    id: rust-version
+    attributes:
+      label: Rust Version
+      description: Output of `rustc --version`
+      placeholder: "rustc 1.70.0"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating System
+      description: OS and version
+      placeholder: "macOS 13.4, Ubuntu 22.04, Windows 11"
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Any other context about the problem
+      placeholder: |
+        - Does this happen with specific models/providers?
+        - Are you using any special configuration?
+        - Any relevant logs or debugging information?
+
+  - type: checkboxes
+    id: category
+    attributes:
+      label: Bug Category
+      description: Check all that apply
+      options:
+        - label: Authentication/API keys
+        - label: HTTP requests/responses
+        - label: Streaming functionality
+        - label: Error handling
+        - label: Type-state builder pattern
+        - label: MCP (Model Context Protocol)
+        - label: Documentation
+        - label: Performance
+        - label: Security

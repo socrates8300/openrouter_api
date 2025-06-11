@@ -1,4 +1,4 @@
-//// File: openrouter_api/src/types/web_search.rs
+/// Web search request and response types
 use serde::{Deserialize, Serialize};
 
 /// Request type for performing a web search.

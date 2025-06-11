@@ -7,23 +7,23 @@ use std::collections::HashMap;
 pub struct ModelCoverageProfile {
     /// Primary model to use for requests
     pub primary: String,
-    
+
     /// Ordered list of fallback models if primary is unavailable
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fallbacks: Option<Vec<String>>,
-    
+
     /// Whether to enable automatic fallbacks based on provider availability
     #[serde(skip_serializing_if = "Option::is_none")]
     pub auto_fallback: Option<bool>,
-    
+
     /// Maximum latency threshold in milliseconds before trying fallbacks
     #[serde(skip_serializing_if = "Option::is_none")]
     pub latency_threshold_ms: Option<u32>,
-    
+
     /// Whether to fail fast if primary model is unavailable
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fail_fast: Option<bool>,
-    
+
     /// Provider-specific options for this profile
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provider_options: Option<HashMap<String, serde_json::Value>>,
@@ -35,13 +35,13 @@ pub struct ModelCoverageProfile {
 pub enum PredefinedModelCoverageProfile {
     /// Optimizes for lowest latency across available models
     LowestLatency,
-    
+
     /// Optimizes for lowest cost across available models
     LowestCost,
-    
+
     /// Optimizes for highest quality across available models
     HighestQuality,
-    
+
     /// Custom configuration using specified models
     Custom(ModelCoverageProfile),
 }
@@ -51,7 +51,7 @@ pub enum PredefinedModelCoverageProfile {
 pub struct RouterConfig {
     /// The model coverage profile to use
     pub profile: PredefinedModelCoverageProfile,
-    
+
     /// Additional provider preferences
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provider_preferences: Option<crate::types::provider::ProviderPreferences>,
@@ -76,7 +76,7 @@ impl ModelGroups {
             provider_options: None,
         }
     }
-    
+
     /// Models optimized for code generation and understanding
     pub fn code() -> ModelCoverageProfile {
         ModelCoverageProfile {
@@ -91,7 +91,7 @@ impl ModelGroups {
             provider_options: None,
         }
     }
-    
+
     /// Models optimized for long context windows
     pub fn long_context() -> ModelCoverageProfile {
         ModelCoverageProfile {
@@ -107,4 +107,3 @@ impl ModelGroups {
         }
     }
 }
-

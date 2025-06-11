@@ -8,13 +8,13 @@ use thiserror::Error;
 pub struct ApiErrorDetails {
     /// Error code (e.g., "insufficient_quota")
     pub code: Option<String>,
-    
+
     /// HTTP status code
     pub status: Option<u16>,
-    
+
     /// Provider-specific error details
     pub provider: Option<serde_json::Value>,
-    
+
     /// Additional error metadata
     pub metadata: Option<serde_json::Value>,
 }
@@ -57,10 +57,7 @@ pub enum Error {
     StreamingError(String),
 
     #[error("Context length exceeded for model {model}: {message}")]
-    ContextLengthExceeded {
-        model: String,
-        message: String,
-    },
+    ContextLengthExceeded { model: String, message: String },
 
     #[error("Timeout error: {0}")]
     TimeoutError(String),
@@ -76,7 +73,7 @@ impl Error {
     pub async fn from_response(response: Response) -> Result<Self> {
         let status = response.status().as_u16();
         let text = response.text().await.unwrap_or_default();
-        
+
         // Try to parse structured API error response
         if let Ok(api_error) = serde_json::from_str::<ApiErrorDetails>(&text) {
             return Ok(Error::ApiError {
@@ -85,12 +82,12 @@ impl Error {
                 metadata: Some(serde_json::to_value(api_error).unwrap_or_default()),
             });
         }
-        
+
         // Handle rate limiting specifically
         if status == 429 {
             return Ok(Error::RateLimitExceeded(text));
         }
-        
+
         Ok(Error::ApiError {
             code: status,
             message: text,
@@ -99,3 +96,5 @@ impl Error {
     }
 }
 
+#[cfg(test)]
+mod tests;

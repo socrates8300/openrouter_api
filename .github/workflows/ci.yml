@@ -1,0 +1,155 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  quality-gates:
+    name: Quality Gates
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt, clippy
+    
+    - name: Cache Cargo registry
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-registry-
+    
+    - name: Cache Cargo build
+      uses: actions/cache@v4
+      with:
+        path: target/
+        key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-build-
+    
+    - name: Make pre-quality script executable
+      run: chmod +x ./scripts/pre_quality.sh
+    
+    - name: Run quality gates
+      run: ./scripts/pre_quality.sh
+
+  test-matrix:
+    name: Test Matrix
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        rust: [stable, beta]
+        exclude:
+          # Reduce CI load by testing beta only on Ubuntu
+          - os: windows-latest
+            rust: beta
+          - os: macos-latest
+            rust: beta
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust ${{ matrix.rust }}
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: ${{ matrix.rust }}
+    
+    - name: Cache dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ matrix.os }}-${{ matrix.rust }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+    
+    - name: Run tests
+      run: cargo test --verbose
+    
+    - name: Run tests with all features
+      run: cargo test --all-features --verbose
+
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install cargo-audit
+      run: cargo install cargo-audit
+    
+    - name: Run security audit
+      run: cargo audit
+
+  msrv:
+    name: Minimum Supported Rust Version
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust 1.70.0
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: 1.70.0
+    
+    - name: Check MSRV
+      run: cargo check --verbose
+
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+    
+    - name: Build documentation
+      run: cargo doc --no-deps --document-private-items
+    
+    - name: Test documentation
+      run: cargo test --doc
+
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: llvm-tools-preview
+    
+    - name: Install cargo-llvm-cov
+      run: cargo install cargo-llvm-cov
+    
+    - name: Generate coverage report
+      run: cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        files: lcov.info
+        fail_ci_if_error: false

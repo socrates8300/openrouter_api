@@ -1,7 +1,7 @@
 use crate::client::ClientConfig;
 use crate::error::{Error, Result};
 use crate::types::chat::{ChatCompletionChunk, ChatCompletionRequest, ChatCompletionResponse};
-use crate::utils::validation;
+use crate::utils::{security::create_safe_error_message, validation};
 use async_stream::try_stream;
 use futures::stream::Stream;
 use futures::StreamExt;
@@ -13,6 +13,10 @@ use std::time::Duration;
 use tokio::time::sleep;
 use tokio_util::codec::{FramedRead, LinesCodec};
 use tokio_util::io::StreamReader;
+
+// Streaming safety limits to prevent memory exhaustion
+const MAX_LINE_LENGTH: usize = 64 * 1024; // 64KB per line
+const MAX_TOTAL_CHUNKS: usize = 10_000; // Maximum chunks per stream
 
 pub struct ChatApi {
     pub client: Client,
@@ -35,7 +39,7 @@ impl ChatApi {
         // Validate the request
         validation::validate_chat_request(&request)?;
         validation::check_token_limits(&request)?;
-        
+
         // Build the complete URL for the chat completions endpoint.
         let url = self
             .config
@@ -46,11 +50,11 @@ impl ChatApi {
                 message: format!("Invalid URL: {}", e),
                 metadata: None,
             })?;
-        
+
         // Initialize retry counter and backoff duration
         let mut retry_count = 0;
         let mut backoff_ms = self.config.retry_config.initial_backoff_ms;
-        
+
         let response = loop {
             // Issue the POST request with appropriate headers and JSON body.
             let response = self
@@ -60,15 +64,20 @@ impl ChatApi {
                 .json(&request)
                 .send()
                 .await?;
-                
+
             let status = response.status();
-            
+
             // Check if we should retry based on status code
-            if self.config.retry_config.retry_on_status_codes.contains(&status.as_u16()) 
-               && retry_count < self.config.retry_config.max_retries {
+            if self
+                .config
+                .retry_config
+                .retry_on_status_codes
+                .contains(&status.as_u16())
+                && retry_count < self.config.retry_config.max_retries
+            {
                 // Increment retry counter and exponential backoff
                 retry_count += 1;
-                
+
                 // Log retry attempt
                 eprintln!(
                     "Retrying request ({}/{}) after {} ms due to status code {}",
@@ -77,19 +86,16 @@ impl ChatApi {
                     backoff_ms,
                     status.as_u16()
                 );
-                
+
                 // Wait before retrying
                 sleep(Duration::from_millis(backoff_ms)).await;
-                
+
                 // Calculate next backoff with exponential increase
-                backoff_ms = std::cmp::min(
-                    backoff_ms * 2,
-                    self.config.retry_config.max_backoff_ms
-                );
-                
+                backoff_ms = std::cmp::min(backoff_ms * 2, self.config.retry_config.max_backoff_ms);
+
                 continue;
             }
-            
+
             break response;
         };
 
@@ -117,12 +123,16 @@ impl ChatApi {
         }
 
         // Deserialize the JSON response into ChatCompletionResponse.
-        let chat_response = serde_json::from_str::<ChatCompletionResponse>(&body).map_err(|e| Error::ApiError {
-            code: status.as_u16(),
-            message: format!("Failed to decode JSON: {}. Body was: {}", e, body),
-            metadata: None,
-        })?;
-        
+        let chat_response =
+            serde_json::from_str::<ChatCompletionResponse>(&body).map_err(|e| Error::ApiError {
+                code: status.as_u16(),
+                message: create_safe_error_message(
+                    &format!("Failed to decode JSON: {}. Body was: {}", e, body),
+                    "Chat completion JSON parsing error",
+                ),
+                metadata: None,
+            })?;
+
         // Validate any tool calls in the response
         for choice in &chat_response.choices {
             if let Some(tool_calls) = &choice.message.tool_calls {
@@ -136,7 +146,7 @@ impl ChatApi {
                 }
             }
         }
-        
+
         Ok(chat_response)
     }
 
@@ -148,12 +158,12 @@ impl ChatApi {
     ) -> Pin<Box<dyn Stream<Item = Result<ChatCompletionChunk>> + Send>> {
         let client = self.client.clone();
         let config = self.config.clone();
-        
+
         // Validate the request before streaming
         if let Err(e) = validation::validate_chat_request(&request) {
             return Box::pin(futures::stream::once(async { Err(e) }));
         }
-        
+
         if let Err(e) = validation::check_token_limits(&request) {
             return Box::pin(futures::stream::once(async { Err(e) }));
         }
@@ -195,24 +205,49 @@ impl ChatApi {
             let stream_reader = StreamReader::new(byte_stream);
             let mut lines = FramedRead::new(stream_reader, LinesCodec::new());
 
+            // Track chunk count for safety
+            let mut chunk_count = 0usize;
+
             while let Some(line_result) = lines.next().await {
                 let line = line_result.map_err(|e| Error::StreamingError(format!("Failed to read stream line: {}", e)))?;
-                
+
+                // Safety check: Line length limit
+                if line.len() > MAX_LINE_LENGTH {
+                    Err(Error::StreamingError(format!(
+                        "Line too long: {} bytes (max: {})",
+                        line.len(),
+                        MAX_LINE_LENGTH
+                    )))?;
+                }
+
+                // Safety check: Chunk count limit
+                chunk_count += 1;
+                if chunk_count > MAX_TOTAL_CHUNKS {
+                    Err(Error::StreamingError(format!(
+                        "Too many chunks: {} (max: {})",
+                        chunk_count,
+                        MAX_TOTAL_CHUNKS
+                    )))?;
+                }
+
                 if line.trim().is_empty() {
                     continue;
                 }
-                
+
                 if line.starts_with("data:") {
                     let data_part = line.trim_start_matches("data:").trim();
                     if data_part == "[DONE]" {
                         break;
                     }
-                    
+
                     match serde_json::from_str::<ChatCompletionChunk>(data_part) {
                         Ok(chunk) => yield chunk,
                         Err(e) => {
-                            // Log parsing error but continue processing stream
-                            eprintln!("Failed to parse chunk: {} - Data: {}", e, data_part);
+                            // Log parsing error with redacted data but continue processing stream
+                            eprintln!("Streaming parse error: {}", create_safe_error_message(
+                                &format!("Failed to parse chunk: {}. Data: {}", e, data_part),
+                                "Streaming chunk parse error"
+                            ));
                             continue;
                         }
                     }
@@ -231,7 +266,7 @@ impl ChatApi {
 
         Box::pin(stream)
     }
-    
+
     /// Simple function to complete a chat with a single user message
     pub async fn simple_completion(&self, model: &str, user_message: &str) -> Result<String> {
         let request = ChatCompletionRequest {
@@ -249,9 +284,9 @@ impl ChatApi {
             models: None,
             transforms: None,
         };
-        
+
         let response = self.chat_completion(request).await?;
-        
+
         if response.choices.is_empty() {
             return Err(Error::ApiError {
                 code: 500,
@@ -259,8 +294,7 @@ impl ChatApi {
                 metadata: None,
             });
         }
-        
+
         Ok(response.choices[0].message.content.clone())
     }
 }
-

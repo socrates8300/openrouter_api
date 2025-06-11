@@ -35,30 +35,30 @@ pub enum ModelFormatting {
 pub struct ModelInfo {
     /// The model identifier.
     pub id: String,
-    
+
     /// The name of the provider for this model.
     pub provider: String,
-    
+
     /// A human-readable name for the model.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
-    
+
     /// Brief description of the model.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
-    
+
     /// The capabilities supported by this model.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub capabilities: Option<Vec<ModelCapability>>,
-    
+
     /// The output formats supported by this model.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub formatting: Option<Vec<ModelFormatting>>,
-    
+
     /// The maximum context length supported by this model.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context_length: Option<u32>,
-    
+
     /// Additional model-specific metadata.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<HashMap<String, serde_json::Value>>,
@@ -69,7 +69,7 @@ pub struct ModelInfo {
 pub struct ModelsRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub capability: Option<ModelCapability>,
-    
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provider: Option<String>,
 }
@@ -80,4 +80,3 @@ pub struct ModelsResponse {
     /// A list of available models.
     pub models: Vec<ModelInfo>,
 }
-

@@ -64,6 +64,12 @@ pub struct ProviderPreferences {
     pub sort: Option<ProviderSort>,
 }
 
+impl Default for ProviderPreferences {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ProviderPreferences {
     /// Creates a new empty ProviderPreferences.
     ///

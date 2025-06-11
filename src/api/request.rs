@@ -186,8 +186,8 @@ impl RequestBuilder<Value> {
         preferences.validate()?;
 
         // Serialize to JSON
-        let provider_value = serde_json::to_value(preferences)
-            .map_err(|e| crate::error::Error::SerializationError(e))?;
+        let provider_value =
+            serde_json::to_value(preferences).map_err(crate::error::Error::SerializationError)?;
 
         // Add to the extra params
         if let Value::Object(ref mut map) = self.extra_params {
