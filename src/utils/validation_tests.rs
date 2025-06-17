@@ -121,8 +121,8 @@ mod tests {
     #[test]
     fn test_check_token_limits_very_long_content() {
         let mut request = create_valid_chat_request();
-        // Create a message with approximately 50,000 tokens (rough estimate: 4 chars per token)
-        let long_content = "word ".repeat(50_000);
+        // Create a message with approximately 5,000,000 tokens (rough estimate: 4 chars per token)
+        let long_content = "word ".repeat(5_000_000);
         request.messages[0].content = long_content;
         let result = check_token_limits(&request);
         assert!(result.is_err());
@@ -132,8 +132,8 @@ mod tests {
     fn test_check_token_limits_many_messages() {
         let mut request = create_valid_chat_request();
         // Add many messages with large content to definitely exceed token limit
-        // Each message has ~400 characters = ~100 tokens, need 320+ messages to exceed 32k limit
-        for i in 0..500 {
+        // Each message has ~400 characters = ~100 tokens, need 32000+ messages to exceed 1M limit
+        for i in 0..50000 {
             request.messages.push(Message {
                 role: "user".to_string(),
                 content: format!(
