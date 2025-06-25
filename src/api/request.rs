@@ -59,9 +59,9 @@ pub struct RequestPayload<T: Serialize> {
 /// A unified request builder for non‑interactive endpoints.
 ///
 /// This builder supports configuration for:
-/// - **Structured Outputs:** By invoking [with_structured_output], clients can enable a specific JSON Schema for responses.
-/// - **Tool Calling:** By invoking [with_tools], clients can supply a list of callable tools.
-/// - **Provider Preferences:** By invoking [with_provider_preferences], clients can configure provider routing.
+/// - **Structured Outputs:** By invoking `with_structured_output`, clients can enable a specific JSON Schema for responses.
+/// - **Tool Calling:** By invoking `with_tools`, clients can supply a list of callable tools.
+/// - **Provider Preferences:** By invoking `with_provider_preferences`, clients can configure provider routing.
 pub struct RequestBuilder<T: Serialize> {
     model: String,
     messages: Vec<Message>,
@@ -148,7 +148,7 @@ impl<T: Serialize> RequestBuilder<T> {
 impl RequestBuilder<Value> {
     /// Adds provider preferences into the request payload.
     ///
-    /// This method accepts a strongly‑typed [ProviderPreferences] instance and serializes it
+    /// This method accepts a strongly‑typed `ProviderPreferences` instance and serializes it
     /// into the JSON payload under the "provider" key. It validates the preferences and returns
     /// an error if validation fails.
     ///
