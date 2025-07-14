@@ -27,6 +27,7 @@ pub struct ResponseFormatConfig {
     #[serde(rename = "type")]
     pub format_type: String,
     /// The JSON Schema configuration used to validate the model's response.
+    #[serde(rename = "json_schema")]
     pub json_schema: JsonSchemaConfig,
 }
 

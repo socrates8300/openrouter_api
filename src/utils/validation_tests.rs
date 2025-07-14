@@ -195,7 +195,7 @@ mod tests {
                 },
             ],
             stream: Some(false),
-            response_format: Some("json".to_string()),
+            response_format: None,
             tools: None,
             provider: None,
             models: None,
