@@ -138,7 +138,7 @@ mod tests {
         for i in 0..50000 {
             request.messages.push(Message {
                 role: "user".to_string(),
-                  content: format!(
+                content: format!(
                     "This is message number {i} with a lot of content to consume many tokens. \
                     This content is intentionally verbose and repetitive to ensure we exceed \
                     the token limit for testing purposes. More text here to increase token count. \

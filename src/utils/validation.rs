@@ -48,7 +48,7 @@ fn validate_message(message: &Message, index: usize) -> Result<()> {
 
     // Content validation
     if message.content.trim().is_empty() && message.tool_calls.is_none() {
-          return Err(Error::ConfigError(format!(
+        return Err(Error::ConfigError(format!(
             "Message at index {index} must have either non-empty content or tool_calls"
         )));
     }
@@ -65,7 +65,7 @@ fn validate_message(message: &Message, index: usize) -> Result<()> {
         // Validate each tool call
         for (tc_idx, tc) in tool_calls.iter().enumerate() {
             if tc.id.trim().is_empty() {
-                  return Err(Error::ConfigError(format!(
+                return Err(Error::ConfigError(format!(
                     "Tool call {tc_idx} at message {index} has empty id"
                 )));
             }
@@ -78,7 +78,7 @@ fn validate_message(message: &Message, index: usize) -> Result<()> {
             }
 
             if tc.function_call.name.trim().is_empty() {
-                  return Err(Error::ConfigError(format!(
+                return Err(Error::ConfigError(format!(
                     "Function name in tool call {tc_idx} at message {index} cannot be empty"
                 )));
             }
@@ -101,7 +101,7 @@ fn validate_tools(tools: &[Tool]) -> Result<()> {
         match tool {
             Tool::Function { function } => {
                 if function.name.trim().is_empty() {
-                      return Err(Error::ConfigError(format!(
+                    return Err(Error::ConfigError(format!(
                         "Function name in tool[{i}] cannot be empty"
                     )));
                 }

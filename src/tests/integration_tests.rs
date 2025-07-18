@@ -14,7 +14,6 @@ mod tests {
     use crate::models::tool::{FunctionCall, FunctionDescription, Tool, ToolCall};
     use crate::types::chat::{ChatCompletionRequest, ChatCompletionResponse, Message};
     use serde_json::{json, Value};
-    use std::env;
     use url::Url;
 
     // Helper function to deserialize a ChatCompletionResponse from JSON.
@@ -24,9 +23,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_basic_chat_completion() -> Result<(), Box<dyn std::error::Error>> {
-        // Read the API key from the environment.
-        let api_key = env::var("OPENROUTER_API_KEY")
-            .map_err(|e| format!("OPENROUTER_API_KEY must be set in the environment: {e}"))?;
+        // Use a dummy API key for testing since we're not making real API calls
+        let api_key = "sk-1234567890abcdef1234567890abcdef";
 
         // Build the client: Unconfigured -> NoAuth -> Ready.
         let _client = OpenRouterClient::<Unconfigured>::new()

@@ -127,7 +127,7 @@ impl StructuredApi {
 
         // Deserialize the result into the target type
         serde_json::from_value::<T>(json_result).map_err(|e| {
-              Error::SchemaValidationError(format!(
+            Error::SchemaValidationError(format!(
                 "Failed to deserialize response into target type: {e}"
             ))
         })
@@ -199,9 +199,9 @@ impl StructuredApi {
                 for field in required_arr {
                     if let Some(field_str) = field.as_str() {
                         if !data_obj.contains_key(field_str) {
-                      return Err(Error::SchemaValidationError(format!(
-                        "Required field '{field_str}' is missing"
-                    )));
+                            return Err(Error::SchemaValidationError(format!(
+                                "Required field '{field_str}' is missing"
+                            )));
                         }
                     }
                 }

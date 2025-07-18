@@ -274,7 +274,7 @@ impl OpenRouterClient<Unconfigured> {
     ) -> Result<OpenRouterClient<NoAuth>> {
         let url_str = base_url.into();
         self.config.base_url = Url::parse(&url_str).map_err(|e| {
-              Error::ConfigError(format!(
+            Error::ConfigError(format!(
                 "Invalid base URL '{url_str}': {e}. Expected format: 'https://api.example.com/v1/'"
             ))
         })?;

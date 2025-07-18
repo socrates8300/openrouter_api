@@ -103,7 +103,7 @@ impl ProviderPreferences {
             let mut seen = std::collections::HashSet::new();
             for provider in order {
                 if !seen.insert(provider) {
-                      return Err(Error::ConfigError(format!(
+                    return Err(Error::ConfigError(format!(
                         "Duplicate provider in order list: {provider}"
                     )));
                 }
