@@ -6,7 +6,7 @@ use crate::types::chat::{ChatCompletionRequest, Message};
 use std::collections::HashSet;
 
 /// Maximum allowed tokens in a chat completion request
-const MAX_TOKENS: u32 = 32_000;
+const MAX_TOKENS: u32 = 1_000_000;
 
 /// Validates a chat completion request for common errors.
 pub fn validate_chat_request(request: &ChatCompletionRequest) -> Result<()> {
