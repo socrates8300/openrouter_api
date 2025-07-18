@@ -283,6 +283,7 @@ impl ChatApi {
                 content: user_message.to_string(),
                 name: None,
                 tool_calls: None,
+                tool_call_id: None,
             }],
             stream: None,
             response_format: None,

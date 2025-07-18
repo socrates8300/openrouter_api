@@ -37,13 +37,11 @@ pub fn validate_chat_request(request: &ChatCompletionRequest) -> Result<()> {
 fn validate_message(message: &Message, index: usize) -> Result<()> {
     // Role validation
     match message.role.as_str() {
-        "user" | "assistant" | "system" => {}
-        _ => {
-            return Err(Error::ConfigError(format!(
-                "Invalid role at message[{}]: '{}'. Must be 'user', 'assistant', or 'system'",
-                index, message.role
-            )))
-        }
+        "user" | "assistant" | "system" | "tool" => {}
+        _ => return Err(Error::ConfigError(format!(
+            "Invalid role at message[{}]: '{}'. Must be 'user', 'assistant', 'system', or 'tool'",
+            index, message.role
+        ))),
     }
 
     // Content validation
