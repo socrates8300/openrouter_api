@@ -40,7 +40,7 @@ impl StructuredApi {
             model: model.to_string(),
             messages,
             stream: Some(false),
-            response_format: Some("json_schema".to_string()),
+            response_format: None,
             tools: None,
             provider: None,
             models: None,
