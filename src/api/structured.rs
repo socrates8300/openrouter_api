@@ -54,7 +54,7 @@ impl StructuredApi {
             .join("chat/completions")
             .map_err(|e| Error::ApiError {
                 code: 400,
-                message: format!("Invalid URL: {}", e),
+                message: format!("Invalid URL: {e}"),
                 metadata: None,
             })?;
 
@@ -94,7 +94,7 @@ impl StructuredApi {
             serde_json::from_str(&body).map_err(|e| Error::ApiError {
                 code: status.as_u16(),
                 message: create_safe_error_message(
-                    &format!("Failed to decode JSON: {}. Body was: {}", e, body),
+                    &format!("Failed to decode JSON: {e}. Body was: {body}"),
                     "Structured JSON parsing error",
                 ),
                 metadata: None,
@@ -113,7 +113,7 @@ impl StructuredApi {
 
         // Parse the content as JSON
         let json_result: Value = serde_json::from_str(content).map_err(|e| {
-            Error::SchemaValidationError(format!("Failed to parse response as JSON: {}", e))
+            Error::SchemaValidationError(format!("Failed to parse response as JSON: {e}"))
         })?;
 
         // Basic validation of required fields if strict mode is enabled
@@ -127,9 +127,8 @@ impl StructuredApi {
 
         // Deserialize the result into the target type
         serde_json::from_value::<T>(json_result).map_err(|e| {
-            Error::SchemaValidationError(format!(
-                "Failed to deserialize response into target type: {}",
-                e
+              Error::SchemaValidationError(format!(
+                "Failed to deserialize response into target type: {e}"
             ))
         })
     }
@@ -200,10 +199,9 @@ impl StructuredApi {
                 for field in required_arr {
                     if let Some(field_str) = field.as_str() {
                         if !data_obj.contains_key(field_str) {
-                            return Err(Error::SchemaValidationError(format!(
-                                "Required field '{}' is missing",
-                                field_str
-                            )));
+                      return Err(Error::SchemaValidationError(format!(
+                        "Required field '{field_str}' is missing"
+                    )));
                         }
                     }
                 }

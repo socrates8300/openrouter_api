@@ -30,7 +30,7 @@ impl CompletionApi {
             .join("completions")
             .map_err(|e| Error::ApiError {
                 code: 400,
-                message: format!("Invalid URL for completions: {}", e),
+                message: format!("Invalid URL for completions: {e}"),
                 metadata: None,
             })?;
 
@@ -70,7 +70,7 @@ impl CompletionApi {
         serde_json::from_str::<CompletionResponse>(&body).map_err(|e| Error::ApiError {
             code: status.as_u16(),
             message: create_safe_error_message(
-                &format!("Failed to decode JSON: {}. Body was: {}", e, body),
+                &format!("Failed to decode JSON: {e}. Body was: {body}"),
                 "Completion JSON parsing error",
             ),
             metadata: None,

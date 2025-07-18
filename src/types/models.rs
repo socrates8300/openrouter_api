@@ -158,7 +158,7 @@ mod tests {
         assert_eq!(model_info.pricing.image.as_deref(), Some("0"));
         assert_eq!(model_info.pricing.web_search.as_deref(), Some("0"));
         assert_eq!(model_info.pricing.internal_reasoning.as_deref(), Some("0"));
-        assert_eq!(model_info.top_provider.is_moderated, false);
+        assert!(!model_info.top_provider.is_moderated);
         assert!(model_info.per_request_limits.is_none());
         assert_eq!(
             model_info.supported_parameters,

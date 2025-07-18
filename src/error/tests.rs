@@ -123,7 +123,7 @@ mod tests {
             metadata: None,
         };
 
-        let error_string = format!("{}", error);
+        let error_string = format!("{error}");
         assert!(error_string.contains("500"));
         assert!(error_string.contains("Internal Server Error"));
     }
@@ -131,7 +131,7 @@ mod tests {
     #[test]
     fn test_error_debug() {
         let error = Error::ConfigError("Test error".to_string());
-        let debug_string = format!("{:?}", error);
+        let debug_string = format!("{error:?}");
         assert!(debug_string.contains("ConfigError"));
         assert!(debug_string.contains("Test error"));
     }
@@ -168,11 +168,11 @@ mod tests {
         let inner_error = Error::ConfigError("Invalid configuration".to_string());
         let outer_error = Error::ApiError {
             code: 400,
-            message: format!("Request failed: {}", inner_error),
+            message: format!("Request failed: {inner_error}"),
             metadata: None,
         };
 
-        let error_string = format!("{}", outer_error);
+        let error_string = format!("{outer_error}");
         assert!(error_string.contains("Request failed"));
         assert!(error_string.contains("Invalid configuration"));
     }

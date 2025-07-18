@@ -33,7 +33,7 @@ mod tests {
 
         if let Err(error) = result {
             // Check that it's a ConfigError about missing environment variable
-            let error_msg = format!("{}", error);
+            let error_msg = format!("{error}");
             assert!(error_msg.contains("OPENROUTER_API_KEY"));
             assert!(error_msg.contains("environment"));
         }
@@ -48,7 +48,7 @@ mod tests {
         assert!(result.is_err());
 
         if let Err(error) = result {
-            let error_msg = format!("{}", error);
+            let error_msg = format!("{error}");
             assert!(error_msg.contains("not found") || error_msg.contains("MissingCredential"));
         }
 
@@ -65,7 +65,7 @@ mod tests {
         assert!(result.is_err());
 
         if let Err(error) = result {
-            let error_msg = format!("{}", error);
+            let error_msg = format!("{error}");
             assert!(error_msg.contains("not found") || error_msg.contains("MissingCredential"));
         }
 
@@ -159,7 +159,7 @@ mod tests {
             .map(|i| {
                 let success_count = Arc::clone(&success_count);
                 thread::spawn(move || {
-                    let test_key = format!("sk-thread{}1234567890abcdef1234567890abcdef", i);
+                    let test_key = format!("sk-thread{i}1234567890abcdef1234567890abcdef");
                     if validate_api_key(&test_key).is_ok() {
                         success_count.fetch_add(1, Ordering::SeqCst);
                     }

@@ -48,9 +48,8 @@ fn validate_message(message: &Message, index: usize) -> Result<()> {
 
     // Content validation
     if message.content.trim().is_empty() && message.tool_calls.is_none() {
-        return Err(Error::ConfigError(format!(
-            "Message at index {} must have either non-empty content or tool_calls",
-            index
+          return Err(Error::ConfigError(format!(
+            "Message at index {index} must have either non-empty content or tool_calls"
         )));
     }
 
@@ -66,9 +65,8 @@ fn validate_message(message: &Message, index: usize) -> Result<()> {
         // Validate each tool call
         for (tc_idx, tc) in tool_calls.iter().enumerate() {
             if tc.id.trim().is_empty() {
-                return Err(Error::ConfigError(format!(
-                    "Tool call {} at message {} has empty id",
-                    tc_idx, index
+                  return Err(Error::ConfigError(format!(
+                    "Tool call {tc_idx} at message {index} has empty id"
                 )));
             }
 
@@ -80,9 +78,8 @@ fn validate_message(message: &Message, index: usize) -> Result<()> {
             }
 
             if tc.function_call.name.trim().is_empty() {
-                return Err(Error::ConfigError(format!(
-                    "Function name in tool call {} at message {} cannot be empty",
-                    tc_idx, index
+                  return Err(Error::ConfigError(format!(
+                    "Function name in tool call {tc_idx} at message {index} cannot be empty"
                 )));
             }
         }
@@ -104,9 +101,8 @@ fn validate_tools(tools: &[Tool]) -> Result<()> {
         match tool {
             Tool::Function { function } => {
                 if function.name.trim().is_empty() {
-                    return Err(Error::ConfigError(format!(
-                        "Function name in tool[{}] cannot be empty",
-                        i
+                      return Err(Error::ConfigError(format!(
+                        "Function name in tool[{i}] cannot be empty"
                     )));
                 }
 
@@ -201,9 +197,8 @@ pub fn check_token_limits(request: &ChatCompletionRequest) -> Result<()> {
     if estimated_tokens > MAX_TOKENS {
         return Err(Error::ContextLengthExceeded {
             model: request.model.clone(),
-            message: format!(
-                "Estimated token count ({}) exceeds maximum context length ({})",
-                estimated_tokens, MAX_TOKENS
+              message: format!(
+                "Estimated token count ({estimated_tokens}) exceeds maximum context length ({MAX_TOKENS})"
             ),
         });
     }

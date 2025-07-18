@@ -71,7 +71,7 @@ mod tests {
             let mut request = create_valid_chat_request();
             request.messages[0].role = role.to_string();
             let result = validate_chat_request(&request);
-            assert!(result.is_ok(), "Role '{}' should be valid", role);
+            assert!(result.is_ok(), "Role '{role}' should be valid");
         }
     }
 
@@ -138,12 +138,11 @@ mod tests {
         for i in 0..50000 {
             request.messages.push(Message {
                 role: "user".to_string(),
-                content: format!(
-                    "This is message number {} with a lot of content to consume many tokens. \
+                  content: format!(
+                    "This is message number {i} with a lot of content to consume many tokens. \
                     This content is intentionally verbose and repetitive to ensure we exceed \
                     the token limit for testing purposes. More text here to increase token count. \
-                    Additional padding text to make sure we have enough tokens per message.",
-                    i
+                    Additional padding text to make sure we have enough tokens per message."
                 ),
                 name: None,
                 tool_call_id: None,
