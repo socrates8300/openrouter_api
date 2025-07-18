@@ -296,8 +296,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_chat_completion_with_provider_preferences() -> Result<(), Box<dyn std::error::Error>> {
-        use crate::models::provider_preferences::{DataCollection, ProviderPreferences, ProviderSort};
+    async fn test_chat_completion_with_provider_preferences(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        use crate::models::provider_preferences::{
+            DataCollection, ProviderPreferences, ProviderSort,
+        };
         use crate::types::chat::{ChatCompletionRequest, Message};
 
         // Create provider preferences
@@ -336,17 +339,27 @@ mod tests {
         // Verify that the provider field is serialized as an object, not a string
         let parsed: serde_json::Value = serde_json::from_str(&json)?;
         let provider_field = parsed.get("provider").expect("Provider field should exist");
-        
+
         // Ensure it's an object, not a string
-        assert!(provider_field.is_object(), "Provider field should be an object");
-        
+        assert!(
+            provider_field.is_object(),
+            "Provider field should be an object"
+        );
+
         // Verify specific fields
-        let order = provider_field.get("order").expect("Order field should exist");
+        let order = provider_field
+            .get("order")
+            .expect("Order field should exist");
         assert!(order.is_array(), "Order should be an array");
-        
-        let allow_fallbacks = provider_field.get("allowFallbacks").expect("allowFallbacks field should exist");
-        assert!(allow_fallbacks.is_boolean(), "allowFallbacks should be boolean");
-        
+
+        let allow_fallbacks = provider_field
+            .get("allowFallbacks")
+            .expect("allowFallbacks field should exist");
+        assert!(
+            allow_fallbacks.is_boolean(),
+            "allowFallbacks should be boolean"
+        );
+
         Ok(())
     }
 
@@ -394,7 +407,10 @@ mod tests {
         }"#;
 
         let final_chunk: ChatCompletionChunk = serde_json::from_str(final_chunk_json)?;
-        assert_eq!(final_chunk.choices[0].finish_reason, Some("stop".to_string()));
+        assert_eq!(
+            final_chunk.choices[0].finish_reason,
+            Some("stop".to_string())
+        );
         assert!(final_chunk.usage.is_some());
         let usage = final_chunk.usage.unwrap();
         assert_eq!(usage.prompt_tokens, 10);

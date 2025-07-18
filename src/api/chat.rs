@@ -247,14 +247,14 @@ impl ChatApi {
                                 &format!("Failed to parse streaming chunk: {}. Data: {}", e, data_part),
                                 "Streaming chunk parse error"
                             );
-                            
+
                             // Use tracing if available, otherwise fall back to eprintln
                             #[cfg(feature = "tracing")]
                             tracing::error!("Streaming parse error: {}", error_msg);
-                            
+
                             #[cfg(not(feature = "tracing"))]
                             eprintln!("Streaming parse error: {}", error_msg);
-                            
+
                             continue;
                         }
                     }
