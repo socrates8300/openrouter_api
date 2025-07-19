@@ -1,5 +1,8 @@
 name: CI
 
+# Comprehensive CI workflow for OpenRouter API
+# Ensures code quality, security, and compatibility across platforms
+
 on:
   push:
     branches: [ main ]
