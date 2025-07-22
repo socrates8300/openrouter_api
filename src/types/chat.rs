@@ -1,4 +1,4 @@
-use crate::models::tool::ToolCall;
+use crate::models::tool::{ToolCall, ToolCallChunk};
 use serde::{Deserialize, Serialize};
 
 /// Defines the role of a chat message (user, assistant, or system).
@@ -97,7 +97,7 @@ pub struct StreamDelta {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub content: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tool_calls: Option<Vec<ToolCall>>,
+    pub tool_calls: Option<Vec<ToolCallChunk>>,
 }
 
 /// A streaming chunk for chat completions.
