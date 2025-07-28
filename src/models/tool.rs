@@ -27,6 +27,7 @@ pub struct FunctionDescription {
     /// A JSON Schema object representing the function parameters.
     /// This should be a valid JSON object describing the expected arguments.
     pub parameters: Value,
+    pub strict: Option<bool>,
 }
 
 /// Encapsulates a tool that the model can call.
