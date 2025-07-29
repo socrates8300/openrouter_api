@@ -28,3 +28,4 @@ output.txt
 **/claude.md
 /.rustup
 tarpaulin-report.html
+.DS_Store
