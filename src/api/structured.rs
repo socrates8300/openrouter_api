@@ -62,9 +62,11 @@ impl StructuredApi {
         let mut body = serde_json::to_value(&request).map_err(Error::SerializationError)?;
         body["response_format"] = serde_json::json!({
             "type": "json_schema",
-            "schema": schema_config.schema,
-            "name": schema_config.name,
-            "strict": schema_config.strict
+            "json_schema": {
+                "schema": schema_config.schema,
+                "name": schema_config.name,
+                "strict": schema_config.strict
+            },
         });
 
         // Send the request
