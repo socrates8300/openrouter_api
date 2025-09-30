@@ -27,3 +27,5 @@ output.txt
 **/.claude.md
 **/claude.md
 /.rustup
+tarpaulin-report.html
+.DS_Store
