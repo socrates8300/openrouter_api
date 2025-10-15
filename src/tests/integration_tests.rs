@@ -1069,7 +1069,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_providers_api_basic_functionality() -> Result<(), Box<dyn std::error::Error>> {
-
         let api_key = "sk-1234567890abcdef1234567890abcdef";
 
         let client = OpenRouterClient::<Unconfigured>::new()
@@ -1301,7 +1300,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_models_request_with_new_parameters() -> Result<(), Box<dyn std::error::Error>> {
-        use crate::types::models::{ModelsRequest, ModelCapability, ModelSortOrder};
+        use crate::types::models::{ModelCapability, ModelSortOrder, ModelsRequest};
 
         // Test that we can create a ModelsRequest with all new parameters
         let request = ModelsRequest {
@@ -1336,7 +1335,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_model_info_convenience_methods() -> Result<(), Box<dyn std::error::Error>> {
-        use crate::types::models::{ModelInfo, ArchitectureDetails, PricingInfo, TopProviderInfo};
+        use crate::types::models::{ArchitectureDetails, ModelInfo, PricingInfo, TopProviderInfo};
 
         // Create a test model
         let model = ModelInfo::new(
@@ -1386,7 +1385,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_models_response_convenience_methods() -> Result<(), Box<dyn std::error::Error>> {
-        use crate::types::models::{ModelsResponse, ModelInfo, ArchitectureDetails, PricingInfo, TopProviderInfo};
+        use crate::types::models::{
+            ArchitectureDetails, ModelInfo, ModelsResponse, PricingInfo, TopProviderInfo,
+        };
 
         // Create test models
         let free_model = ModelInfo::new(

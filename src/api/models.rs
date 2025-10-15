@@ -1,6 +1,6 @@
 use crate::client::ClientConfig;
 use crate::error::{Error, Result};
-use crate::types::models::{ModelsRequest, ModelsResponse, ModelInfo};
+use crate::types::models::{ModelInfo, ModelsRequest, ModelsResponse};
 use crate::utils::security::create_safe_error_message;
 use reqwest::Client;
 
@@ -20,30 +20,30 @@ impl ModelsApi {
     }
 
     /// Lists available models, optionally filtered by various criteria.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `request` - Optional ModelsRequest containing filter and sort parameters
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// Returns a `Result` containing the `ModelsResponse` with model information
     /// or an `Error` if the request fails.
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```rust,no_run
     /// use openrouter_api::client::OpenRouterClient;
     /// use openrouter_api::types::models::{ModelsRequest, ModelCapability, ModelSortOrder};
-    /// 
+    ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = OpenRouterClient::from_env()?;
     ///     let models_api = client.models()?;
-    /// 
+    ///
     ///     // List all models
     ///     let all_models = models_api.list_models(None).await?;
-    /// 
+    ///
     ///     // Filter by capability
     ///     let chat_models = models_api.list_models(Some(ModelsRequest {
     ///         capability: Some(ModelCapability::Chat),
@@ -58,7 +58,7 @@ impl ModelsApi {
     ///         sort: Some(ModelSortOrder::Name),
     ///         limit: Some(10),
     ///     })).await?;
-    /// 
+    ///
     ///     // Find free models with vision support
     ///     let free_vision_models = models_api.list_models(Some(ModelsRequest {
     ///         capability: None,
@@ -73,7 +73,7 @@ impl ModelsApi {
     ///         sort: Some(ModelSortOrder::Name),
     ///         limit: None,
     ///     })).await?;
-    /// 
+    ///
     ///     Ok(())
     /// }
     /// ```
@@ -134,21 +134,21 @@ impl ModelsApi {
     }
 
     /// Finds a specific model by its ID
-    /// 
+    ///
     /// This is a convenience method that fetches all models and returns
     /// the one matching the specified ID.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `id` - The ID of the model to retrieve
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// Returns a `Result` containing the `ModelInfo` or an `Error`
     /// if the request fails or the model is not found.
     pub async fn get_model_by_id(&self, id: &str) -> Result<ModelInfo> {
         let models_response = self.list_models(None).await?;
-        
+
         models_response
             .find_by_id(id)
             .cloned()
@@ -156,16 +156,16 @@ impl ModelsApi {
     }
 
     /// Finds models by provider (case-insensitive)
-    /// 
+    ///
     /// This is a convenience method that fetches all models and returns
     /// those matching the specified provider.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `provider` - The provider name to filter by
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// Returns a `Result` containing a vector of `ModelInfo` instances or an `Error`
     /// if the request fails.
     pub async fn get_models_by_provider(&self, provider: &str) -> Result<Vec<ModelInfo>> {
@@ -178,12 +178,12 @@ impl ModelsApi {
     }
 
     /// Finds free models
-    /// 
+    ///
     /// This is a convenience method that fetches all models and returns
     /// only those that are free to use.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// Returns a `Result` containing a vector of `ModelInfo` instances or an `Error`
     /// if the request fails.
     pub async fn get_free_models(&self) -> Result<Vec<ModelInfo>> {
@@ -196,12 +196,12 @@ impl ModelsApi {
     }
 
     /// Finds models that support tools
-    /// 
+    ///
     /// This is a convenience method that fetches all models and returns
     /// only those that support tools/function calling.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// Returns a `Result` containing a vector of `ModelInfo` instances or an `Error`
     /// if the request fails.
     pub async fn get_models_with_tools(&self) -> Result<Vec<ModelInfo>> {
@@ -214,12 +214,12 @@ impl ModelsApi {
     }
 
     /// Finds models that support vision/multimodal
-    /// 
+    ///
     /// This is a convenience method that fetches all models and returns
     /// only those that support vision/multimodal capabilities.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// Returns a `Result` containing a vector of `ModelInfo` instances or an `Error`
     /// if the request fails.
     pub async fn get_models_with_vision(&self) -> Result<Vec<ModelInfo>> {
@@ -232,38 +232,34 @@ impl ModelsApi {
     }
 
     /// Searches models by name or description
-    /// 
+    ///
     /// This is a convenience method that fetches all models and returns
     /// those matching the search query.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `query` - Search query to match against model names, descriptions, and IDs
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// Returns a `Result` containing a vector of `ModelInfo` instances or an `Error`
     /// if the request fails.
     pub async fn search_models(&self, query: &str) -> Result<Vec<ModelInfo>> {
         let models_response = self.list_models(None).await?;
-        Ok(models_response
-            .search(query)
-            .into_iter()
-            .cloned()
-            .collect())
+        Ok(models_response.search(query).into_iter().cloned().collect())
     }
 
     /// Gets models with minimum context length
-    /// 
+    ///
     /// This is a convenience method that fetches all models and returns
     /// only those with at least the specified context length.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `min_context` - Minimum context length required
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// Returns a `Result` containing a vector of `ModelInfo` instances or an `Error`
     /// if the request fails.
     pub async fn get_models_with_min_context(&self, min_context: u32) -> Result<Vec<ModelInfo>> {
@@ -294,11 +290,14 @@ mod tests {
             retry_config: crate::client::RetryConfig::default(),
         };
         let http_client = Client::new();
-        
+
         let models_api = ModelsApi::new(http_client, &config);
-        
+
         // Test that the API was created successfully
-        assert_eq!(models_api.config.base_url.as_str(), "https://openrouter.ai/api/v1/");
+        assert_eq!(
+            models_api.config.base_url.as_str(),
+            "https://openrouter.ai/api/v1/"
+        );
     }
 
     #[tokio::test]
@@ -319,7 +318,7 @@ mod tests {
         // Test that network errors are properly handled
         let result = models_api.list_models(None).await;
         assert!(result.is_err());
-        
+
         // Any error type is acceptable for network failure
         match result.unwrap_err() {
             Error::HttpError(_) | Error::RateLimitExceeded(_) | Error::ApiError { .. } => {

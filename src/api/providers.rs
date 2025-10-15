@@ -45,9 +45,9 @@ impl ProvidersApi {
     ///     // Find a specific provider
     ///     if let Some(openai) = providers_response.find_by_slug("openai") {
     ///         println!("OpenAI provider found: {}", openai.name);
-     ///         if openai.has_privacy_policy() {
-     ///             println!("Privacy policy: {}", openai.privacy_policy_url.as_ref().unwrap());
-     ///         }
+    ///         if openai.has_privacy_policy() {
+    ///             println!("Privacy policy: {}", openai.privacy_policy_url.as_ref().unwrap());
+    ///         }
     ///     }
     ///     
     ///     // Group providers by domain
@@ -378,11 +378,10 @@ mod tests {
         };
         let http_client = Client::new();
 
-        let providers_api = ProvidersApi::new(http_client, &config);
+        let _providers_api = ProvidersApi::new(http_client, &config);
 
         // Test that the API was created successfully
         // We can't test actual API calls without a real server
-        assert!(true);
     }
 
     #[tokio::test]

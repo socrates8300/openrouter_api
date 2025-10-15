@@ -130,18 +130,18 @@ impl ModelInfo {
 
     /// Checks if the model supports vision/multimodal
     pub fn supports_vision(&self) -> bool {
-        self.architecture.input_modalities.contains(&"image".to_string()) ||
-        self.architecture.modality.contains("image")
+        self.architecture
+            .input_modalities
+            .contains(&"image".to_string())
+            || self.architecture.modality.contains("image")
     }
 
     /// Checks if the model supports function calling
     pub fn supports_function_calling(&self) -> bool {
-        self.supported_parameters
-            .as_ref()
-            .map_or(false, |params| {
-                params.contains(&"function_call".to_string()) ||
-                params.contains(&"functions".to_string())
-            })
+        self.supported_parameters.as_ref().map_or(false, |params| {
+            params.contains(&"function_call".to_string())
+                || params.contains(&"functions".to_string())
+        })
     }
 
     /// Gets the prompt price as f64, returns None if parsing fails
@@ -171,7 +171,10 @@ impl ModelInfo {
         // Simple conversion from timestamp to readable format
         let datetime = std::time::UNIX_EPOCH + std::time::Duration::from_secs(self.created as u64);
         // Format as ISO 8601
-        let secs_since_epoch = datetime.duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs();
+        let secs_since_epoch = datetime
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
         format!("{}", secs_since_epoch)
     }
 }
@@ -266,7 +269,8 @@ impl ModelsResponse {
         self.data
             .iter()
             .filter(|model| {
-                model.id.split('/').next().map(|p| p.to_lowercase()) == Some(provider.to_lowercase())
+                model.id.split('/').next().map(|p| p.to_lowercase())
+                    == Some(provider.to_lowercase())
             })
             .collect()
     }
@@ -275,9 +279,7 @@ impl ModelsResponse {
     pub fn find_free_models(&self) -> Vec<&ModelInfo> {
         self.data
             .iter()
-            .filter(|model| {
-                model.pricing.prompt == "0" && model.pricing.completion == "0"
-            })
+            .filter(|model| model.pricing.prompt == "0" && model.pricing.completion == "0")
             .collect()
     }
 
@@ -286,7 +288,8 @@ impl ModelsResponse {
         self.data
             .iter()
             .filter(|model| {
-                model.supported_parameters
+                model
+                    .supported_parameters
                     .as_ref()
                     .map_or(false, |params| params.contains(&"tools".to_string()))
             })
@@ -298,8 +301,11 @@ impl ModelsResponse {
         self.data
             .iter()
             .filter(|model| {
-                model.architecture.input_modalities.contains(&"image".to_string()) ||
-                model.architecture.modality.contains("image")
+                model
+                    .architecture
+                    .input_modalities
+                    .contains(&"image".to_string())
+                    || model.architecture.modality.contains("image")
             })
             .collect()
     }
@@ -314,7 +320,8 @@ impl ModelsResponse {
 
     /// Groups models by provider
     pub fn group_by_provider(&self) -> std::collections::HashMap<String, Vec<&ModelInfo>> {
-        let mut groups: std::collections::HashMap<String, Vec<&ModelInfo>> = std::collections::HashMap::new();
+        let mut groups: std::collections::HashMap<String, Vec<&ModelInfo>> =
+            std::collections::HashMap::new();
         for model in &self.data {
             let provider = model.id.split('/').next().unwrap_or("unknown").to_string();
             groups.entry(provider).or_insert_with(Vec::new).push(model);
@@ -342,7 +349,9 @@ impl ModelsResponse {
         models.sort_by(|a, b| {
             let price_a = a.pricing.prompt.parse::<f64>().unwrap_or(f64::MAX);
             let price_b = b.pricing.prompt.parse::<f64>().unwrap_or(f64::MAX);
-            price_a.partial_cmp(&price_b).unwrap_or(std::cmp::Ordering::Equal)
+            price_a
+                .partial_cmp(&price_b)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
         models
     }
@@ -353,11 +362,13 @@ impl ModelsResponse {
         self.data
             .iter()
             .filter(|model| {
-                model.name.to_lowercase().contains(&query_lower) ||
-                model.description.as_ref()
-                    .map(|d| d.to_lowercase().contains(&query_lower))
-                    .unwrap_or(false) ||
-                model.id.to_lowercase().contains(&query_lower)
+                model.name.to_lowercase().contains(&query_lower)
+                    || model
+                        .description
+                        .as_ref()
+                        .map(|d| d.to_lowercase().contains(&query_lower))
+                        .unwrap_or(false)
+                    || model.id.to_lowercase().contains(&query_lower)
             })
             .collect()
     }
