@@ -813,8 +813,323 @@ mod tests {
 
             let response = GenerationResponse { data };
             assert!((response.effective_cost() - expected_effective).abs() < f64::EPSILON);
-            assert!((response.cost_per_token().unwrap() - (total_cost / 300.0)).abs() < f64::EPSILON);
+            assert!(
+                (response.cost_per_token().unwrap() - (total_cost / 300.0)).abs() < f64::EPSILON
+            );
         }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_analytics_api_integration() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::types::analytics::ActivityResponse;
+
+        // Test activity response deserialization
+        let activity_json = r#"{
+            "data": [
+                {
+                    "date": "2024-01-01",
+                    "model": "openai/gpt-4",
+                    "model_permaslug": "openai-gpt-4",
+                    "endpoint_id": "openai-gpt-4-turbo",
+                    "provider_name": "OpenAI",
+                    "usage": 1.23,
+                    "byok_usage_inference": 0.23,
+                    "requests": 10.0,
+                    "prompt_tokens": 1000.0,
+                    "completion_tokens": 500.0,
+                    "reasoning_tokens": 100.0
+                },
+                {
+                    "date": "2024-01-01",
+                    "model": "anthropic/claude-3-opus",
+                    "model_permaslug": "anthropic-claude-3-opus",
+                    "endpoint_id": "anthropic-claude-3-opus-20240229",
+                    "provider_name": "Anthropic",
+                    "usage": 2.56,
+                    "byok_usage_inference": 0.0,
+                    "requests": 15.0,
+                    "prompt_tokens": 1500.0,
+                    "completion_tokens": 750.0,
+                    "reasoning_tokens": 0.0
+                },
+                {
+                    "date": "2024-01-02",
+                    "model": "openai/gpt-4",
+                    "model_permaslug": "openai-gpt-4",
+                    "endpoint_id": "openai-gpt-4-turbo",
+                    "provider_name": "OpenAI",
+                    "usage": 0.89,
+                    "byok_usage_inference": 0.0,
+                    "requests": 8.0,
+                    "prompt_tokens": 800.0,
+                    "completion_tokens": 400.0,
+                    "reasoning_tokens": 0.0
+                }
+            ]
+        }"#;
+
+        let activity_response: ActivityResponse = serde_json::from_str(activity_json)?;
+        assert_eq!(activity_response.data.len(), 3);
+
+        // Test activity data methods
+        let first_activity = &activity_response.data[0];
+        assert_eq!(first_activity.date, "2024-01-01");
+        assert_eq!(first_activity.model, "openai/gpt-4");
+        assert_eq!(first_activity.provider_name, "OpenAI");
+        assert_eq!(first_activity.usage, 1.23);
+        assert_eq!(first_activity.requests, 10.0);
+        assert_eq!(first_activity.total_tokens(), 1600.0);
+        assert_eq!(first_activity.cost_per_request(), 0.123);
+        assert!(first_activity.has_reasoning());
+        assert!(first_activity.uses_byok());
+        assert!((first_activity.byok_percentage() - 18.7).abs() < 0.1);
+
+        // Test activity response methods
+        assert_eq!(activity_response.for_date("2024-01-01").len(), 2);
+        assert_eq!(activity_response.for_date("2024-01-02").len(), 1);
+        assert_eq!(activity_response.for_model("openai/gpt-4").len(), 2);
+        assert_eq!(activity_response.for_provider("OpenAI").len(), 2);
+
+        let unique_dates = activity_response.unique_dates();
+        assert_eq!(unique_dates.len(), 2);
+        assert!(unique_dates.contains(&"2024-01-01".to_string()));
+        assert!(unique_dates.contains(&"2024-01-02".to_string()));
+
+        let unique_models = activity_response.unique_models();
+        assert_eq!(unique_models.len(), 2);
+        assert!(unique_models.contains(&"openai/gpt-4".to_string()));
+        assert!(unique_models.contains(&"anthropic/claude-3-opus".to_string()));
+
+        assert_eq!(activity_response.total_usage(), 4.68);
+        assert_eq!(activity_response.total_requests(), 33.0);
+        assert_eq!(activity_response.total_prompt_tokens(), 3300.0);
+        assert_eq!(activity_response.total_completion_tokens(), 1650.0);
+        assert_eq!(activity_response.total_reasoning_tokens(), 100.0);
+        assert_eq!(activity_response.total_tokens(), 5050.0);
+
+        // Test sorting methods
+        let sorted_by_date = activity_response.sorted_by_date_desc();
+        assert_eq!(sorted_by_date[0].date, "2024-01-02");
+        assert_eq!(sorted_by_date[1].date, "2024-01-01");
+
+        let sorted_by_usage = activity_response.sorted_by_usage_desc();
+        assert_eq!(sorted_by_usage[0].usage, 2.56);
+        assert_eq!(sorted_by_usage[1].usage, 1.23);
+
+        let sorted_by_requests = activity_response.sorted_by_requests_desc();
+        assert_eq!(sorted_by_requests[0].requests, 15.0);
+        assert_eq!(sorted_by_requests[1].requests, 10.0);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_analytics_request_builder() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::types::analytics::ActivityRequest;
+        use chrono::{DateTime, NaiveDate, Utc};
+
+        // Test basic request
+        let request = ActivityRequest::new();
+        assert!(request.date.is_none());
+
+        // Test with date string
+        let request = ActivityRequest::new().date("2024-01-01");
+        assert_eq!(request.date, Some("2024-01-01".to_string()));
+
+        // Test with NaiveDate
+        let date = NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
+        let request = ActivityRequest::new().date_from_naive_date(date);
+        assert_eq!(request.date, Some("2024-01-01".to_string()));
+
+        // Test with DateTime<Utc>
+        let datetime = DateTime::parse_from_rfc3339("2024-01-01T12:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc);
+        let request = ActivityRequest::new().date_from_datetime(datetime);
+        assert_eq!(request.date, Some("2024-01-01".to_string()));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_analytics_api_client_integration() -> Result<(), Box<dyn std::error::Error>> {
+        // Test that the analytics API can be created from the client
+        let api_key = "sk-1234567890abcdef1234567890abcdef";
+        let client = OpenRouterClient::<Unconfigured>::new()
+            .with_base_url("https://openrouter.ai/api/v1/")?
+            .with_api_key(api_key)?;
+
+        // Test that we can create an analytics API instance
+        let analytics_api = client.analytics()?;
+        assert!(analytics_api.validate_date_format("2024-01-01").is_ok());
+        assert!(analytics_api.validate_date_format("invalid-date").is_err());
+
+        // Test date retention validation
+        let today = chrono::Utc::now().date_naive();
+        let today_str = today.format("%Y-%m-%d").to_string();
+        assert!(analytics_api.is_date_within_retention(&today_str)); // Today should be within retention
+        assert!(!analytics_api.is_date_within_retention("invalid-date"));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_analytics_serialization_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::types::analytics::{ActivityData, ActivityResponse};
+
+        let activity_data = ActivityData {
+            date: "2024-01-01".to_string(),
+            model: "openai/gpt-4".to_string(),
+            model_permaslug: "openai-gpt-4".to_string(),
+            endpoint_id: "openai-gpt-4-turbo".to_string(),
+            provider_name: "OpenAI".to_string(),
+            usage: 1.23,
+            byok_usage_inference: 0.23,
+            requests: 10.0,
+            prompt_tokens: 1000.0,
+            completion_tokens: 500.0,
+            reasoning_tokens: 100.0,
+        };
+
+        // Test serialization
+        let json = serde_json::to_string(&activity_data)?;
+        let deserialized: ActivityData = serde_json::from_str(&json)?;
+
+        // Verify roundtrip
+        assert_eq!(activity_data.date, deserialized.date);
+        assert_eq!(activity_data.model, deserialized.model);
+        assert_eq!(activity_data.usage, deserialized.usage);
+        assert_eq!(activity_data.total_tokens(), deserialized.total_tokens());
+
+        // Test with full response
+        let response = ActivityResponse {
+            data: vec![activity_data.clone()],
+        };
+
+        let response_json = serde_json::to_string(&response)?;
+        let deserialized_response: ActivityResponse = serde_json::from_str(&response_json)?;
+
+        assert_eq!(deserialized_response.data.len(), 1);
+        assert_eq!(deserialized_response.data[0].date, activity_data.date);
+        assert_eq!(deserialized_response.total_usage(), activity_data.usage);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_analytics_cost_calculations() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::types::analytics::{ActivityData, ActivityResponse};
+
+        // Test various cost calculation scenarios
+        let test_cases = vec![
+            // (usage, requests, prompt_tokens, completion_tokens, reasoning_tokens, expected_cost_per_request, expected_cost_per_million_tokens)
+            (1.0, 10.0, 1000.0, 500.0, 0.0, 0.1, 666.67),
+            (2.5, 25.0, 2000.0, 1000.0, 500.0, 0.1, 714.29),
+            (0.5, 5.0, 500.0, 250.0, 0.0, 0.1, 666.67),
+        ];
+
+        for (
+            usage,
+            requests,
+            prompt_tokens,
+            completion_tokens,
+            reasoning_tokens,
+            expected_cost_per_request,
+            expected_cost_per_million_tokens,
+        ) in test_cases
+        {
+            let data = ActivityData {
+                date: "2024-01-01".to_string(),
+                model: "test-model".to_string(),
+                model_permaslug: "test-model".to_string(),
+                endpoint_id: "test-endpoint".to_string(),
+                provider_name: "test-provider".to_string(),
+                usage,
+                byok_usage_inference: 0.0,
+                requests,
+                prompt_tokens,
+                completion_tokens,
+                reasoning_tokens,
+            };
+
+            assert!((data.cost_per_request() - expected_cost_per_request).abs() < 0.001);
+            assert!(
+                (data.cost_per_million_tokens() - expected_cost_per_million_tokens).abs() < 0.01
+            );
+
+            let response = ActivityResponse { data: vec![data] };
+            assert!((response.total_usage() - usage).abs() < 0.001);
+            assert!((response.total_requests() - requests).abs() < 0.001);
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_analytics_edge_cases() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::types::analytics::{ActivityData, ActivityResponse};
+
+        // Test zero requests edge case
+        let zero_requests_data = ActivityData {
+            date: "2024-01-01".to_string(),
+            model: "test-model".to_string(),
+            model_permaslug: "test-model".to_string(),
+            endpoint_id: "test-endpoint".to_string(),
+            provider_name: "test-provider".to_string(),
+            usage: 1.23,
+            byok_usage_inference: 0.0,
+            requests: 0.0, // Zero requests
+            prompt_tokens: 1000.0,
+            completion_tokens: 500.0,
+            reasoning_tokens: 0.0,
+        };
+
+        assert_eq!(zero_requests_data.cost_per_request(), 0.0);
+
+        // Test zero tokens edge case
+        let zero_tokens_data = ActivityData {
+            date: "2024-01-01".to_string(),
+            model: "test-model".to_string(),
+            model_permaslug: "test-model".to_string(),
+            endpoint_id: "test-endpoint".to_string(),
+            provider_name: "test-provider".to_string(),
+            usage: 1.23,
+            byok_usage_inference: 0.0,
+            requests: 10.0,
+            prompt_tokens: 0.0, // Zero tokens
+            completion_tokens: 0.0,
+            reasoning_tokens: 0.0,
+        };
+
+        assert_eq!(zero_tokens_data.cost_per_million_tokens(), 0.0);
+
+        // Test empty response
+        let empty_response = ActivityResponse { data: vec![] };
+        assert_eq!(empty_response.total_usage(), 0.0);
+        assert_eq!(empty_response.total_requests(), 0.0);
+        assert_eq!(empty_response.total_tokens(), 0.0);
+        assert_eq!(empty_response.unique_dates().len(), 0);
+        assert_eq!(empty_response.unique_models().len(), 0);
+        assert_eq!(empty_response.unique_providers().len(), 0);
+
+        // Test BYOK percentage calculations
+        let byok_data = ActivityData {
+            date: "2024-01-01".to_string(),
+            model: "test-model".to_string(),
+            model_permaslug: "test-model".to_string(),
+            endpoint_id: "test-endpoint".to_string(),
+            provider_name: "test-provider".to_string(),
+            usage: 0.0, // Zero total usage
+            byok_usage_inference: 0.0,
+            requests: 10.0,
+            prompt_tokens: 1000.0,
+            completion_tokens: 500.0,
+            reasoning_tokens: 0.0,
+        };
+
+        assert_eq!(byok_data.byok_percentage(), 0.0);
 
         Ok(())
     }

@@ -494,7 +494,22 @@ impl OpenRouterClient<Ready> {
             .http_client
             .clone()
             .ok_or_else(|| Error::ConfigError("HTTP client is missing".into()))?;
-        Ok(crate::api::generation::GenerationApi::new(client, &self.config))
+        Ok(crate::api::generation::GenerationApi::new(
+            client,
+            &self.config,
+        ))
+    }
+
+    /// Provides access to the analytics endpoint.
+    pub fn analytics(&self) -> Result<crate::api::analytics::AnalyticsApi> {
+        let client = self
+            .http_client
+            .clone()
+            .ok_or_else(|| Error::ConfigError("HTTP client is missing".into()))?;
+        Ok(crate::api::analytics::AnalyticsApi::new(
+            client,
+            self.config.clone(),
+        ))
     }
 
     /// Returns a new request builder for chat completions that supports MCP.

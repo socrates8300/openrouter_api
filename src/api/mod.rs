@@ -1,3 +1,4 @@
+pub mod analytics;
 pub mod chat;
 pub mod completion;
 pub mod credits;
@@ -8,6 +9,7 @@ pub mod structured;
 pub mod web_search;
 
 // Re-export commonly used API types
+pub use analytics::AnalyticsApi;
 pub use chat::ChatApi;
 pub use completion::CompletionApi;
 pub use credits::CreditsApi;
