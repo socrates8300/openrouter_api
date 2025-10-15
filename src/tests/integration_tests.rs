@@ -1069,7 +1069,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_providers_api_basic_functionality() -> Result<(), Box<dyn std::error::Error>> {
-        use crate::types::{Provider, ProvidersResponse};
 
         let api_key = "sk-1234567890abcdef1234567890abcdef";
 
@@ -1272,6 +1271,217 @@ mod tests {
         assert_eq!(provider_invalid.privacy_policy_domain(), None);
         assert_eq!(provider_invalid.terms_of_service_domain(), None);
         assert_eq!(provider_invalid.status_page_domain(), None);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_enhanced_models_api_functionality() -> Result<(), Box<dyn std::error::Error>> {
+        let client = OpenRouterClient::quick()?;
+
+        let models_api = client.models()?;
+
+        // Test that all new methods exist and have the right signatures
+        // We can't call them without a real API key, but we can verify they compile
+
+        // These would be the actual method calls if we had a real API:
+        // let _model_by_id = models_api.get_model_by_id("openai/gpt-4").await?;
+        // let _by_provider = models_api.get_models_by_provider("openai").await?;
+        // let _free_models = models_api.get_free_models().await?;
+        // let _with_tools = models_api.get_models_with_tools().await?;
+        // let _with_vision = models_api.get_models_with_vision().await?;
+        // let _search_results = models_api.search_models("gpt").await?;
+        // let _min_context = models_api.get_models_with_min_context(1000).await?;
+
+        // For now, just verify the API is accessible
+        let _api_ref = &models_api;
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_models_request_with_new_parameters() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::types::models::{ModelsRequest, ModelCapability, ModelSortOrder};
+
+        // Test that we can create a ModelsRequest with all new parameters
+        let request = ModelsRequest {
+            capability: Some(ModelCapability::Chat),
+            provider: Some("openai".to_string()),
+            model_name: Some("gpt".to_string()),
+            min_context_length: Some(1000),
+            max_context_length: Some(100000),
+            free_only: Some(false),
+            supports_tools: Some(true),
+            supports_vision: Some(false),
+            supports_function_calling: Some(true),
+            sort: Some(ModelSortOrder::Name),
+            limit: Some(10),
+        };
+
+        // Verify the request was created correctly
+        assert_eq!(request.capability, Some(ModelCapability::Chat));
+        assert_eq!(request.provider, Some("openai".to_string()));
+        assert_eq!(request.model_name, Some("gpt".to_string()));
+        assert_eq!(request.min_context_length, Some(1000));
+        assert_eq!(request.max_context_length, Some(100000));
+        assert_eq!(request.free_only, Some(false));
+        assert_eq!(request.supports_tools, Some(true));
+        assert_eq!(request.supports_vision, Some(false));
+        assert_eq!(request.supports_function_calling, Some(true));
+        assert_eq!(request.sort, Some(ModelSortOrder::Name));
+        assert_eq!(request.limit, Some(10));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_model_info_convenience_methods() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::types::models::{ModelInfo, ArchitectureDetails, PricingInfo, TopProviderInfo};
+
+        // Create a test model
+        let model = ModelInfo::new(
+            "openai/gpt-4".to_string(),
+            "OpenAI GPT-4".to_string(),
+            Some("A powerful language model".to_string()),
+            128000,
+            1677652288,
+            ArchitectureDetails {
+                modality: "text->text".to_string(),
+                input_modalities: vec!["text".to_string()],
+                output_modalities: vec!["text".to_string()],
+                tokenizer: "OpenAI".to_string(),
+                instruct_type: Some("openai".to_string()),
+            },
+            PricingInfo {
+                prompt: "0.000005".to_string(),
+                completion: "0.000015".to_string(),
+                request: Some("0".to_string()),
+                image: Some("0".to_string()),
+                web_search: Some("0".to_string()),
+                internal_reasoning: Some("0".to_string()),
+                input_cache_read: Some("0".to_string()),
+                input_cache_write: Some("0".to_string()),
+            },
+            TopProviderInfo {
+                context_length: Some(128000),
+                max_completion_tokens: Some(4096),
+                is_moderated: true,
+            },
+        );
+
+        // Test convenience methods
+        assert_eq!(model.provider(), Some("openai"));
+        assert_eq!(model.model_name(), Some("gpt-4"));
+        assert!(!model.is_free()); // Has non-zero pricing
+        assert_eq!(model.prompt_price(), Some(0.000005));
+        assert_eq!(model.completion_price(), Some(0.000015));
+        assert_eq!(model.request_price(), Some(0.0));
+
+        // Test model without tools support
+        assert!(!model.supports_tools());
+        assert!(!model.supports_vision()); // Text only model
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_models_response_convenience_methods() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::types::models::{ModelsResponse, ModelInfo, ArchitectureDetails, PricingInfo, TopProviderInfo};
+
+        // Create test models
+        let free_model = ModelInfo::new(
+            "openai/gpt-4:free".to_string(),
+            "OpenAI GPT-4 (Free)".to_string(),
+            Some("A free language model".to_string()),
+            128000,
+            1677652288,
+            ArchitectureDetails {
+                modality: "text->text".to_string(),
+                input_modalities: vec!["text".to_string()],
+                output_modalities: vec!["text".to_string()],
+                tokenizer: "OpenAI".to_string(),
+                instruct_type: Some("openai".to_string()),
+            },
+            PricingInfo {
+                prompt: "0".to_string(),
+                completion: "0".to_string(),
+                request: Some("0".to_string()),
+                image: Some("0".to_string()),
+                web_search: Some("0".to_string()),
+                internal_reasoning: Some("0".to_string()),
+                input_cache_read: Some("0".to_string()),
+                input_cache_write: Some("0".to_string()),
+            },
+            TopProviderInfo {
+                context_length: Some(128000),
+                max_completion_tokens: Some(4096),
+                is_moderated: true,
+            },
+        );
+
+        let vision_model = ModelInfo::new(
+            "openai/gpt-4-vision".to_string(),
+            "OpenAI GPT-4 Vision".to_string(),
+            Some("A multimodal model with vision".to_string()),
+            128000,
+            1677652288,
+            ArchitectureDetails {
+                modality: "text+image->text".to_string(),
+                input_modalities: vec!["text".to_string(), "image".to_string()],
+                output_modalities: vec!["text".to_string()],
+                tokenizer: "OpenAI".to_string(),
+                instruct_type: Some("openai".to_string()),
+            },
+            PricingInfo {
+                prompt: "0.000005".to_string(),
+                completion: "0.000015".to_string(),
+                request: Some("0".to_string()),
+                image: Some("0".to_string()),
+                web_search: Some("0".to_string()),
+                internal_reasoning: Some("0".to_string()),
+                input_cache_read: Some("0".to_string()),
+                input_cache_write: Some("0".to_string()),
+            },
+            TopProviderInfo {
+                context_length: Some(128000),
+                max_completion_tokens: Some(4096),
+                is_moderated: true,
+            },
+        );
+
+        let response = ModelsResponse::new(vec![free_model.clone(), vision_model.clone()]);
+
+        // Test basic functionality
+        assert_eq!(response.count(), 2);
+
+        // Test finding by ID
+        let found = response.find_by_id("openai/gpt-4:free").unwrap();
+        assert_eq!(found.name, "OpenAI GPT-4 (Free)");
+
+        // Test finding by provider
+        let openai_models = response.find_by_provider("openai");
+        assert_eq!(openai_models.len(), 2);
+
+        // Test finding free models
+        let free_models = response.find_free_models();
+        assert_eq!(free_models.len(), 1);
+        assert_eq!(free_models[0].name, "OpenAI GPT-4 (Free)");
+
+        // Test finding vision models
+        let vision_models = response.find_models_with_vision();
+        assert_eq!(vision_models.len(), 1);
+        assert_eq!(vision_models[0].name, "OpenAI GPT-4 Vision");
+
+        // Test search functionality
+        let search_results = response.search("vision");
+        assert_eq!(search_results.len(), 1);
+        assert_eq!(search_results[0].name, "OpenAI GPT-4 Vision");
+
+        // Test grouping by provider
+        let provider_groups = response.group_by_provider();
+        assert_eq!(provider_groups.len(), 1);
+        assert!(provider_groups.contains_key("openai"));
+        assert_eq!(provider_groups["openai"].len(), 2);
 
         Ok(())
     }

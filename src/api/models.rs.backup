@@ -132,154 +132,12 @@ impl ModelsApi {
             metadata: None,
         })
     }
-
-    /// Finds a specific model by its ID
-    /// 
-    /// This is a convenience method that fetches all models and returns
-    /// the one matching the specified ID.
-    /// 
-    /// # Arguments
-    /// 
-    /// * `id` - The ID of the model to retrieve
-    /// 
-    /// # Returns
-    /// 
-    /// Returns a `Result` containing the `ModelInfo` or an `Error`
-    /// if the request fails or the model is not found.
-    pub async fn get_model_by_id(&self, id: &str) -> Result<ModelInfo> {
-        let models_response = self.list_models(None).await?;
-        
-        models_response
-            .find_by_id(id)
-            .cloned()
-            .ok_or_else(|| Error::ModelNotAvailable(format!("Model with ID '{}' not found", id)))
-    }
-
-    /// Finds models by provider (case-insensitive)
-    /// 
-    /// This is a convenience method that fetches all models and returns
-    /// those matching the specified provider.
-    /// 
-    /// # Arguments
-    /// 
-    /// * `provider` - The provider name to filter by
-    /// 
-    /// # Returns
-    /// 
-    /// Returns a `Result` containing a vector of `ModelInfo` instances or an `Error`
-    /// if the request fails.
-    pub async fn get_models_by_provider(&self, provider: &str) -> Result<Vec<ModelInfo>> {
-        let models_response = self.list_models(None).await?;
-        Ok(models_response
-            .find_by_provider(provider)
-            .into_iter()
-            .cloned()
-            .collect())
-    }
-
-    /// Finds free models
-    /// 
-    /// This is a convenience method that fetches all models and returns
-    /// only those that are free to use.
-    /// 
-    /// # Returns
-    /// 
-    /// Returns a `Result` containing a vector of `ModelInfo` instances or an `Error`
-    /// if the request fails.
-    pub async fn get_free_models(&self) -> Result<Vec<ModelInfo>> {
-        let models_response = self.list_models(None).await?;
-        Ok(models_response
-            .find_free_models()
-            .into_iter()
-            .cloned()
-            .collect())
-    }
-
-    /// Finds models that support tools
-    /// 
-    /// This is a convenience method that fetches all models and returns
-    /// only those that support tools/function calling.
-    /// 
-    /// # Returns
-    /// 
-    /// Returns a `Result` containing a vector of `ModelInfo` instances or an `Error`
-    /// if the request fails.
-    pub async fn get_models_with_tools(&self) -> Result<Vec<ModelInfo>> {
-        let models_response = self.list_models(None).await?;
-        Ok(models_response
-            .find_models_with_tools()
-            .into_iter()
-            .cloned()
-            .collect())
-    }
-
-    /// Finds models that support vision/multimodal
-    /// 
-    /// This is a convenience method that fetches all models and returns
-    /// only those that support vision/multimodal capabilities.
-    /// 
-    /// # Returns
-    /// 
-    /// Returns a `Result` containing a vector of `ModelInfo` instances or an `Error`
-    /// if the request fails.
-    pub async fn get_models_with_vision(&self) -> Result<Vec<ModelInfo>> {
-        let models_response = self.list_models(None).await?;
-        Ok(models_response
-            .find_models_with_vision()
-            .into_iter()
-            .cloned()
-            .collect())
-    }
-
-    /// Searches models by name or description
-    /// 
-    /// This is a convenience method that fetches all models and returns
-    /// those matching the search query.
-    /// 
-    /// # Arguments
-    /// 
-    /// * `query` - Search query to match against model names, descriptions, and IDs
-    /// 
-    /// # Returns
-    /// 
-    /// Returns a `Result` containing a vector of `ModelInfo` instances or an `Error`
-    /// if the request fails.
-    pub async fn search_models(&self, query: &str) -> Result<Vec<ModelInfo>> {
-        let models_response = self.list_models(None).await?;
-        Ok(models_response
-            .search(query)
-            .into_iter()
-            .cloned()
-            .collect())
-    }
-
-    /// Gets models with minimum context length
-    /// 
-    /// This is a convenience method that fetches all models and returns
-    /// only those with at least the specified context length.
-    /// 
-    /// # Arguments
-    /// 
-    /// * `min_context` - Minimum context length required
-    /// 
-    /// # Returns
-    /// 
-    /// Returns a `Result` containing a vector of `ModelInfo` instances or an `Error`
-    /// if the request fails.
-    pub async fn get_models_with_min_context(&self, min_context: u32) -> Result<Vec<ModelInfo>> {
-        let models_response = self.list_models(None).await?;
-        Ok(models_response
-            .find_models_with_min_context(min_context)
-            .into_iter()
-            .cloned()
-            .collect())
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::client::SecureApiKey;
+    use crate::utils::auth::SecureApiKey;
     use std::time::Duration;
 
     #[test]
@@ -321,13 +179,246 @@ mod tests {
         assert!(result.is_err());
         
         // Any error type is acceptable for network failure
+        // The important thing is that it doesn't panic and returns an error
         match result.unwrap_err() {
-            Error::HttpError(_) | Error::RateLimitExceeded(_) | Error::ApiError { .. } => {
+            Error::HttpError(_) | Error::RateLimitExceeded(_) => {
                 // Expected error types for network failure
             }
             other => {
-                panic!("Expected network error, got: {:?}", other);
+                println!("Got error: {:?}", other);
+                panic!("Expected HttpError or RateLimitExceeded for network failure, got: {:?}", other);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::utils::auth::SecureApiKey;
+    use std::time::Duration;
+
+    #[test]
+    fn test_models_api_creation() {
+        let config = crate::client::ClientConfig {
+            api_key: Some(SecureApiKey::new("sk-test123456789012345678901234567890").unwrap()),
+            base_url: url::Url::parse("https://openrouter.ai/api/v1/").unwrap(),
+            timeout: Duration::from_secs(30),
+            http_referer: None,
+            site_title: None,
+            user_id: None,
+            retry_config: crate::client::RetryConfig::default(),
+        };
+        let http_client = Client::new();
+        
+        let models_api = ModelsApi::new(http_client, &config);
+        
+        // Test that the API was created successfully
+        assert_eq!(models_api.config.base_url.as_str(), "https://openrouter.ai/api/v1/");
+    }
+
+    #[tokio::test]
+    async fn test_models_api_network_error() {
+        let config = crate::client::ClientConfig {
+            api_key: Some(SecureApiKey::new("sk-test123456789012345678901234567890").unwrap()),
+            base_url: url::Url::parse("https://invalid-url-that-does-not-exist.com/api/v1/")
+                .unwrap(),
+            timeout: Duration::from_secs(1),
+            http_referer: None,
+            site_title: None,
+            user_id: None,
+            retry_config: crate::client::RetryConfig::default(),
+        };
+        let http_client = Client::new();
+        let models_api = ModelsApi::new(http_client, &config);
+
+        // Test that network errors are properly handled
+        let result = models_api.list_models(None).await;
+        assert!(result.is_err());
+        
+        // Any error type is acceptable for network failure
+        // The important thing is that it doesn't panic and returns an error
+        match result.unwrap_err() {
+            Error::HttpError(_) | Error::RateLimitExceeded(_) => {
+                // Expected error types for network failure
+            }
+            other => {
+                println!("Got error: {:?}", other);
+                panic!("Expected HttpError or RateLimitExceeded for network failure, got: {:?}", other);
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_models_convenience_methods_with_empty_response() {
+        let config = crate::client::ClientConfig {
+            api_key: Some(SecureApiKey::new("sk-test123456789012345678901234567890").unwrap()),
+            base_url: url::Url::parse("https://invalid-url-that-does-not-exist.com/api/v1/")
+                .unwrap(),
+            timeout: Duration::from_secs(1),
+            http_referer: None,
+            site_title: None,
+            user_id: None,
+            retry_config: crate::client::RetryConfig::default(),
+        };
+        let http_client = Client::new();
+        let models_api = ModelsApi::new(http_client, &config);
+
+        // All convenience methods should handle network errors gracefully
+        assert!(models_api.get_model_by_id("openai/gpt-4").await.is_err());
+        assert!(models_api.get_models_by_provider("openai").await.is_err());
+        assert!(models_api.get_free_models().await.is_err());
+        assert!(models_api.get_models_with_tools().await.is_err());
+        assert!(models_api.get_models_with_vision().await.is_err());
+        assert!(models_api.search_models("gpt").await.is_err());
+        assert!(models_api.get_models_with_min_context(1000).await.is_err());
+    }
+}
+    }
+
+    #[tokio::test]
+    async fn test_models_convenience_methods_with_empty_response() {
+        let config = crate::client::ClientConfig {
+            api_key: Some(SecureApiKey::new("sk-test123456789012345678901234567890").unwrap()),
+            base_url: url::Url::parse("https://invalid-url-that-does-not-exist.com/api/v1/")
+                .unwrap(),
+            timeout: Duration::from_secs(1),
+            http_referer: None,
+            site_title: None,
+            user_id: None,
+            retry_config: crate::client::RetryConfig::default(),
+        };
+        let http_client = Client::new();
+        let models_api = ModelsApi::new(http_client, &config);
+
+        // All convenience methods should handle network errors gracefully
+        assert!(models_api.get_model_by_id("openai/gpt-4").await.is_err());
+        assert!(models_api.get_models_by_provider("openai").await.is_err());
+        assert!(models_api.get_free_models().await.is_err());
+        assert!(models_api.get_models_with_tools().await.is_err());
+        assert!(models_api.get_models_with_vision().await.is_err());
+        assert!(models_api.search_models("gpt").await.is_err());
+        assert!(models_api.get_models_with_min_context(1000).await.is_err());
+    }
+}
+
+    /// Finds models by provider (case-insensitive)
+    /// 
+    /// This is a convenience method that fetches all models and returns
+    /// those matching the specified provider.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `provider` - The provider name to filter by
+    /// 
+    /// # Returns
+    /// 
+    /// Returns a `Result` containing a vector of `ModelInfo` instances or an `Error`
+    /// if the request fails.
+    pub async fn get_models_by_provider(&self, provider: &str) -> Result<Vec<ModelInfo>, Error> {
+        let models_response = self.list_models(None).await?;
+        Ok(models_response
+            .find_by_provider(provider)
+            .into_iter()
+            .cloned()
+            .collect())
+    }
+
+    /// Finds free models
+    /// 
+    /// This is a convenience method that fetches all models and returns
+    /// only those that are free to use.
+    /// 
+    /// # Returns
+    /// 
+    /// Returns a `Result` containing a vector of `ModelInfo` instances or an `Error`
+    /// if the request fails.
+    pub async fn get_free_models(&self) -> Result<Vec<ModelInfo>, Error> {
+        let models_response = self.list_models(None).await?;
+        Ok(models_response
+            .find_free_models()
+            .into_iter()
+            .cloned()
+            .collect())
+    }
+
+    /// Finds models that support tools
+    /// 
+    /// This is a convenience method that fetches all models and returns
+    /// only those that support tools/function calling.
+    /// 
+    /// # Returns
+    /// 
+    /// Returns a `Result` containing a vector of `ModelInfo` instances or an `Error`
+    /// if the request fails.
+    pub async fn get_models_with_tools(&self) -> Result<Vec<ModelInfo>, Error> {
+        let models_response = self.list_models(None).await?;
+        Ok(models_response
+            .find_models_with_tools()
+            .into_iter()
+            .cloned()
+            .collect())
+    }
+
+    /// Finds models that support vision/multimodal
+    /// 
+    /// This is a convenience method that fetches all models and returns
+    /// only those that support vision/multimodal capabilities.
+    /// 
+    /// # Returns
+    /// 
+    /// Returns a `Result` containing a vector of `ModelInfo` instances or an `Error`
+    /// if the request fails.
+    pub async fn get_models_with_vision(&self) -> Result<Vec<ModelInfo>, Error> {
+        let models_response = self.list_models(None).await?;
+        Ok(models_response
+            .find_models_with_vision()
+            .into_iter()
+            .cloned()
+            .collect())
+    }
+
+    /// Searches models by name or description
+    /// 
+    /// This is a convenience method that fetches all models and returns
+    /// those matching the search query.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `query` - Search query to match against model names, descriptions, and IDs
+    /// 
+    /// # Returns
+    /// 
+    /// Returns a `Result` containing a vector of `ModelInfo` instances or an `Error`
+    /// if the request fails.
+    pub async fn search_models(&self, query: &str) -> Result<Vec<ModelInfo>, Error> {
+        let models_response = self.list_models(None).await?;
+        Ok(models_response
+            .search(query)
+            .into_iter()
+            .cloned()
+            .collect())
+    }
+
+    /// Gets models with minimum context length
+    /// 
+    /// This is a convenience method that fetches all models and returns
+    /// only those with at least the specified context length.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `min_context` - Minimum context length required
+    /// 
+    /// # Returns
+    /// 
+    /// Returns a `Result` containing a vector of `ModelInfo` instances or an `Error`
+    /// if the request fails.
+    pub async fn get_models_with_min_context(&self, min_context: u32) -> Result<Vec<ModelInfo>, Error> {
+        let models_response = self.list_models(None).await?;
+        Ok(models_response
+            .find_models_with_min_context(min_context)
+            .into_iter()
+            .cloned()
+            .collect())
     }
 }
