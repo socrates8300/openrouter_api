@@ -28,6 +28,8 @@ tokio-util = { version = "0.7", features = ["codec", "io"] }
 uuid = "1.16.0"
 zeroize = { version = "1.8", features = ["derive"] }
 regex = "1.11"
+chrono = { version = "0.4", features = ["serde"] }
+urlencoding = "2.1"
 tracing = { version = "0.1", optional = true }
 
 [dev-dependencies]

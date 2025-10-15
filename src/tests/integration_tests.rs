@@ -549,4 +549,249 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_analytics_api_client_integration() -> Result<(), Box<dyn std::error::Error>> {
+        // Test that the analytics API can be created from the client
+        let api_key = "sk-1234567890abcdef1234567890abcdef";
+
+        let client = OpenRouterClient::<Unconfigured>::new()
+            .with_base_url("https://openrouter.ai/api/v1/")?
+            .with_http_referer("https://github.com/your_org/your_repo")
+            .with_site_title("OpenRouter Rust SDK Tests")
+            .with_api_key(api_key)?;
+
+        // Test that we can create an analytics API instance
+        let analytics_api = client.analytics()?;
+        assert!(analytics_api
+            .config
+            .base_url
+            .as_str()
+            .contains("openrouter.ai"));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_analytics_serialization_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::types::analytics::{ActivityData, ActivityRequest, ActivityResponse};
+        use chrono::Utc;
+
+        let original = ActivityResponse {
+            data: vec![
+                ActivityData {
+                    id: "test-123".to_string(),
+                    created_at: Utc::now(),
+                    model: "test-model".to_string(),
+                    total_cost: Some(0.001),
+                    tokens_prompt: Some(10),
+                    tokens_completion: Some(20),
+                    total_tokens: Some(30),
+                    provider: Some("test-provider".to_string()),
+                    streamed: Some(true),
+                    cancelled: Some(false),
+                    web_search: Some(true),
+                    media: Some(false),
+                    reasoning: Some(false),
+                    finish_reason: Some("stop".to_string()),
+                    native_finish_reason: None,
+                    origin: None,
+                    latency: Some(1000),
+                    generation_time: Some(500),
+                    moderation_latency: None,
+                    cache_discount: None,
+                    effective_cost: Some(0.0009),
+                    upstream_id: None,
+                    user_id: None,
+                    http_referer: None,
+                },
+            ],
+            total_count: Some(1),
+            has_more: Some(false),
+        };
+
+        // Serialize to JSON
+        let json_str = serde_json::to_string(&original)?;
+
+        // Deserialize back
+        let deserialized: ActivityResponse = serde_json::from_str(&json_str)?;
+
+        // Verify they're equal
+        assert_eq!(original, deserialized);
+        assert_eq!(deserialized.total_cost(), 0.0009);
+        assert_eq!(deserialized.total_tokens(), 30);
+        assert_eq!(deserialized.success_rate(), 100.0);
+        assert_eq!(deserialized.streaming_rate(), 100.0);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_activity_request_validation() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::types::analytics::ActivityRequest;
+
+        // Valid request
+        let request = ActivityRequest::new()
+            .with_start_date("2024-01-01")
+            .with_end_date("2024-01-31")
+            .with_order("asc");
+        assert!(request.validate().is_ok());
+
+        // Invalid date format
+        let request = ActivityRequest::new().with_start_date("2024/01/01");
+        assert!(request.validate().is_err());
+
+        // Start date after end date
+        let request = ActivityRequest::new()
+            .with_start_date("2024-02-01")
+            .with_end_date("2024-01-31");
+        assert!(request.validate().is_err());
+
+        // Invalid order
+        let request = ActivityRequest::new().with_order("invalid");
+        assert!(request.validate().is_err());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_activity_data_convenience_methods() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::types::analytics::ActivityData;
+        use chrono::Utc;
+
+        let activity = ActivityData {
+            id: "test-123".to_string(),
+            created_at: Utc::now(),
+            model: "test-model".to_string(),
+            total_cost: Some(0.001),
+            tokens_prompt: Some(10),
+            tokens_completion: Some(20),
+            total_tokens: Some(30),
+            provider: Some("test-provider".to_string()),
+            streamed: Some(true),
+            cancelled: Some(false),
+            web_search: Some(true),
+            media: Some(false),
+            reasoning: Some(false),
+            finish_reason: Some("stop".to_string()),
+            native_finish_reason: None,
+            origin: None,
+            latency: Some(1000),
+            generation_time: Some(500),
+            moderation_latency: None,
+            cache_discount: None,
+            effective_cost: Some(0.0009),
+            upstream_id: None,
+            user_id: None,
+            http_referer: None,
+        };
+
+        assert_eq!(activity.cost_per_token(), Some(0.0009 / 30.0));
+        assert_eq!(activity.cost_per_million_tokens(), Some(0.0009 / 30.0 * 1_000_000.0));
+        assert_eq!(activity.latency_seconds(), Some(1.0));
+        assert_eq!(activity.generation_time_seconds(), Some(0.5));
+        assert!(activity.is_successful());
+        assert!(activity.was_streamed());
+        assert!(activity.used_web_search());
+        assert!(!activity.included_media());
+        assert!(!activity.used_reasoning());
+        assert_eq!(activity.final_cost(), Some(0.0009));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_activity_response_aggregations() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::types::analytics::{ActivityData, ActivityResponse};
+        use chrono::Utc;
+
+        let activities = vec![
+            ActivityData {
+                id: "test-1".to_string(),
+                created_at: Utc::now(),
+                model: "model-a".to_string(),
+                total_cost: Some(0.001),
+                total_tokens: Some(100),
+                cancelled: Some(false),
+                streamed: Some(true),
+                web_search: Some(true),
+                media: Some(false),
+                reasoning: Some(false),
+                provider: Some("provider-x".to_string()),
+                latency: Some(1000),
+                ..Default::default()
+            },
+            ActivityData {
+                id: "test-2".to_string(),
+                created_at: Utc::now(),
+                model: "model-b".to_string(),
+                total_cost: Some(0.002),
+                total_tokens: Some(200),
+                cancelled: Some(true),
+                streamed: Some(false),
+                web_search: Some(false),
+                media: Some(true),
+                reasoning: Some(true),
+                provider: Some("provider-y".to_string()),
+                latency: Some(2000),
+                ..Default::default()
+            },
+        ];
+
+        let response = ActivityResponse {
+            data: activities,
+            total_count: Some(2),
+            has_more: Some(false),
+        };
+
+        assert_eq!(response.total_cost(), 0.003);
+        assert_eq!(response.total_tokens(), 300);
+        assert_eq!(response.average_cost_per_request(), Some(0.0015));
+        assert_eq!(response.success_rate(), 50.0);
+        assert_eq!(response.streaming_rate(), 50.0);
+        assert_eq!(response.average_latency_seconds(), Some(1.5));
+
+        let feature_usage = response.feature_usage_percentages();
+        assert_eq!(feature_usage.web_search, 50.0);
+        assert_eq!(feature_usage.media, 50.0);
+        assert_eq!(feature_usage.reasoning, 50.0);
+        assert_eq!(feature_usage.streaming, 50.0);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_analytics_convenience_methods() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::types::analytics::ActivityRequest;
+
+        let api_key = "sk-1234567890abcdef1234567890abcdef";
+
+        let client = OpenRouterClient::<Unconfigured>::new()
+            .with_base_url("https://openrouter.ai/api/v1/")?
+            .with_api_key(api_key)?;
+
+        let analytics = client.analytics()?;
+
+        // Test that convenience methods create valid requests
+        let request = ActivityRequest::new()
+            .with_start_date("2024-01-01")
+            .with_end_date("2024-01-07")
+            .with_model("test-model")
+            .with_provider("test-provider")
+            .with_sort("created_at")
+            .with_order("desc")
+            .with_limit(100)
+            .with_offset(0);
+
+        assert_eq!(request.start_date, Some("2024-01-01".to_string()));
+        assert_eq!(request.end_date, Some("2024-01-07".to_string()));
+        assert_eq!(request.model, Some("test-model".to_string()));
+        assert_eq!(request.provider, Some("test-provider".to_string()));
+        assert_eq!(request.sort, Some("created_at".to_string()));
+        assert_eq!(request.order, Some("desc".to_string()));
+        assert_eq!(request.limit, Some(100));
+        assert_eq!(request.offset, Some(0));
+
+        Ok(())
+    }
 }
