@@ -55,7 +55,7 @@ mod tests {
     fn test_secure_api_key_debug_redaction() {
         let key = "sk-1234567890abcdef1234567890abcdef123456789";
         let secure_key = SecureApiKey::new(key).unwrap();
-        let debug_str = format!("{:?}", secure_key);
+        let debug_str = format!("{secure_key:?}");
         assert!(!debug_str.contains("1234567890abcdef"));
         assert!(debug_str.contains("[REDACTED]"));
     }
@@ -65,7 +65,7 @@ mod tests {
         let key = "sk-1234567890abcdef1234567890abcdef123456789";
         let secure_key = SecureApiKey::new(key).unwrap();
         let bearer = secure_key.to_bearer_header();
-        assert_eq!(bearer, format!("Bearer {}", key));
+        assert_eq!(bearer, format!("Bearer {key}"));
     }
 
     #[test]

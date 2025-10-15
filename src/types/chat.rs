@@ -1,4 +1,4 @@
-use crate::models::tool::ToolCall;
+use crate::models::tool::{ToolCall, ToolCallChunk};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -100,6 +100,8 @@ pub struct Message {
     pub content: MessageContent,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_call_id: Option<String>,
     // Optionally include tool_calls when the assistant message contains a tool call.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_calls: Option<Vec<ToolCall>>,
@@ -175,7 +177,7 @@ impl Message {
 }
 
 /// Chat completion request matching the OpenRouter API schema.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct ChatCompletionRequest {
     /// The model ID to use.
     pub model: String,
@@ -186,7 +188,7 @@ pub struct ChatCompletionRequest {
     pub stream: Option<bool>,
     /// (Optional) Response format for structured outputs.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub response_format: Option<serde_json::Value>,
+    pub response_format: Option<crate::api::request::ResponseFormatConfig>,
     /// (Optional) Tool calling field. Now uses our production‑ready tool types.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tools: Option<Vec<crate::models::tool::Tool>>,
@@ -370,7 +372,7 @@ pub struct StreamDelta {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub content: Option<MessageContent>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tool_calls: Option<Vec<ToolCall>>,
+    pub tool_calls: Option<Vec<ToolCallChunk>>,
 }
 
 /// A streaming chunk for chat completions.

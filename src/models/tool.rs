@@ -27,6 +27,7 @@ pub struct FunctionDescription {
     /// A JSON Schema object representing the function parameters.
     /// This should be a valid JSON object describing the expected arguments.
     pub parameters: Value,
+    pub strict: Option<bool>,
 }
 
 /// Encapsulates a tool that the model can call.
@@ -68,6 +69,35 @@ pub struct ToolCall {
     /// The details of the function call, including its function name and arguments.
     #[serde(rename = "function")]
     pub function_call: FunctionCall,
+}
+
+/// Represents a chunk of a function call as streamed from the API.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct FunctionCallChunk {
+    /// The name of the function to call. Appears in the first chunk for a given function call.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// A JSON string representing the arguments for the function call. Can be streamed in parts.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub arguments: Option<String>,
+}
+
+/// Represents a chunk of a tool call as streamed from the API.
+/// Fields are optional to accommodate partial data.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolCallChunk {
+    /// The index of the tool call in the list of tool calls.
+    pub index: u32,
+    /// A unique identifier for the tool call. Appears in the first chunk for a given tool call.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    /// The type of call. It must be "function" for function calls.
+    #[serde(rename = "type")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+    /// The details of the function call, including its function name and arguments.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub function: Option<FunctionCallChunk>,
 }
 
 /// Represents a tool selection option when the model must choose among available tools.

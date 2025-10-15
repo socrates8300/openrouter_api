@@ -5,9 +5,11 @@ mod tests {
     use crate::utils::auth::{
         load_api_key_from_env, load_secure_api_key_from_env, validate_api_key,
     };
+    use serial_test::serial;
     use std::env;
 
     #[test]
+    #[serial]
     fn test_load_api_key_from_env_success() {
         // Ensure clean state first
         env::remove_var("OPENROUTER_API_KEY");
@@ -28,6 +30,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_load_api_key_from_env_missing() {
         // Ensure the environment variable is not set
         env::remove_var("OPENROUTER_API_KEY");
@@ -37,13 +40,14 @@ mod tests {
 
         if let Err(error) = result {
             // Check that it's a ConfigError about missing environment variable
-            let error_msg = format!("{}", error);
+            let error_msg = format!("{error}");
             assert!(error_msg.contains("OPENROUTER_API_KEY"));
             assert!(error_msg.contains("environment"));
         }
     }
 
     #[test]
+    #[serial]
     fn test_load_api_key_from_env_empty() {
         // Set environment variable to empty string
         env::set_var("OPENROUTER_API_KEY", "");
@@ -52,7 +56,7 @@ mod tests {
         assert!(result.is_err());
 
         if let Err(error) = result {
-            let error_msg = format!("{}", error);
+            let error_msg = format!("{error}");
             assert!(error_msg.contains("not found") || error_msg.contains("MissingCredential"));
         }
 
@@ -61,6 +65,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_load_api_key_from_env_whitespace() {
         // Set environment variable to whitespace only
         env::set_var("OPENROUTER_API_KEY", "   \n\t   ");
@@ -69,7 +74,7 @@ mod tests {
         assert!(result.is_err());
 
         if let Err(error) = result {
-            let error_msg = format!("{}", error);
+            let error_msg = format!("{error}");
             assert!(error_msg.contains("not found") || error_msg.contains("MissingCredential"));
         }
 
@@ -78,6 +83,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_load_api_key_returns_raw_value() {
         // Set environment variable with surrounding whitespace
         env::set_var(
@@ -98,6 +104,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_load_api_key_with_newlines() {
         // Set environment variable with newlines (which can happen in some CI environments)
         env::set_var(
@@ -115,6 +122,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_load_api_key_preserves_internal_content() {
         // Test that internal content is preserved (no trimming within the key)
         let test_key = "sk-test123_with-special.chars890abcdef";
@@ -134,6 +142,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_api_key_integration_with_client() {
         // Integration test: load API key and use it with client
         use crate::client::{OpenRouterClient, Unconfigured};
@@ -172,7 +181,7 @@ mod tests {
             .map(|i| {
                 let success_count = Arc::clone(&success_count);
                 thread::spawn(move || {
-                    let test_key = format!("sk-thread{}1234567890abcdef1234567890abcdef", i);
+                    let test_key = format!("sk-thread{i}1234567890abcdef1234567890abcdef");
                     if validate_api_key(&test_key).is_ok() {
                         success_count.fetch_add(1, Ordering::SeqCst);
                     }
@@ -219,6 +228,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_load_secure_api_key_from_env_success() {
         env::set_var(
             "OPENROUTER_API_KEY",
@@ -239,6 +249,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_load_secure_api_key_from_env_invalid() {
         env::set_var("OPENROUTER_API_KEY", "invalid-key");
 
@@ -250,6 +261,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_load_secure_api_key_from_env_missing() {
         env::remove_var("OPENROUTER_API_KEY");
         env::remove_var("OR_API_KEY");
@@ -259,6 +271,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_or_api_key_fallback() {
         // Remove the primary env var and set the fallback
         env::remove_var("OPENROUTER_API_KEY");
@@ -273,6 +286,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_or_api_key_priority() {
         // Both env vars set, should prefer OPENROUTER_API_KEY
         env::set_var("OPENROUTER_API_KEY", "sk-primary-key-1234567890abcdef");

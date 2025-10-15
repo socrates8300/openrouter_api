@@ -238,6 +238,50 @@ async fn main() -> Result<()> {
 }
 ```
 
+#### Model Context Protocol (MCP) Client Example
+
+```rust
+use openrouter_api::{MCPClient, Result};
+use openrouter_api::mcp_types::{
+    ClientCapabilities, GetResourceParams, ToolCallParams,
+    MCP_PROTOCOL_VERSION
+};
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    // Create a new MCP client
+    let client = MCPClient::new("https://mcp-server.example.com/mcp")?;
+    
+    // Initialize the client with client capabilities
+    let server_capabilities = client.initialize(ClientCapabilities {
+        protocolVersion: MCP_PROTOCOL_VERSION.to_string(),
+        supportsSampling: Some(true),
+    }).await?;
+    
+    println!("Connected to MCP server with capabilities: {:?}", server_capabilities);
+    
+    // Get a resource from the MCP server
+    let resource = client.get_resource(GetResourceParams {
+        id: "document-123".to_string(),
+        parameters: None,
+    }).await?;
+    
+    println!("Retrieved resource: {}", resource.content);
+    
+    // Call a tool on the MCP server
+    let result = client.tool_call(ToolCallParams {
+        id: "search-tool".to_string(),
+        parameters: serde_json::json!({
+            "query": "Rust programming"
+        }),
+    }).await?;
+    
+    println!("Tool call result: {:?}", result.result);
+    
+    Ok(())
+}
+```
+
 #### Text Completion Example
 
 ```rust

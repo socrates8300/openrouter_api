@@ -20,7 +20,7 @@ impl MCPClient {
     /// Create a new MCP client for the given server URL.
     pub fn new(server_url: impl AsRef<str>) -> Result<Self> {
         let server_url = Url::parse(server_url.as_ref())
-            .map_err(|e| Error::ConfigError(format!("Invalid server URL: {}", e)))?;
+            .map_err(|e| Error::ConfigError(format!("Invalid server URL: {e}")))?;
 
         Ok(Self {
             client: reqwest::Client::new(),
@@ -37,7 +37,7 @@ impl MCPClient {
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
             .as_nanos();
-        format!("req-{}", timestamp)
+        format!("req-{timestamp}")
     }
 
     /// Initialize the connection to the MCP server.

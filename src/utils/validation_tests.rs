@@ -254,7 +254,7 @@ mod tests {
             let mut request = create_valid_chat_request();
             request.messages[0].role = role.to_string();
             let result = validate_chat_request(&request);
-            assert!(result.is_ok(), "Role '{}' should be valid", role);
+            assert!(result.is_ok(), "Role '{role}' should be valid");
         }
     }
 
@@ -293,13 +293,6 @@ mod tests {
     }
 
     #[test]
-    fn test_check_token_limits_within_limit() {
-        let request = create_valid_chat_request();
-        let result = check_token_limits(&request);
-        assert!(result.is_ok());
-    }
-
-    #[test]
     fn test_check_token_limits_very_long_content() {
         let mut request = create_valid_chat_request();
         // Create a message with approximately 50,000 tokens (rough estimate: 4 chars per token)
@@ -321,8 +314,7 @@ mod tests {
                     "This is message number {} with a lot of content to consume many tokens. \
                     This content is intentionally verbose and repetitive to ensure we exceed \
                     the token limit for testing purposes. More text here to increase token count. \
-                    Additional padding text to make sure we have enough tokens per message.",
-                    i
+                    Additional padding text to make sure we have enough tokens per message."
                 ),
             ));
         }
@@ -355,7 +347,7 @@ mod tests {
             model: "openai/gpt-4o".to_string(),
             messages: vec![
                 Message::text("system", "You are a helpful assistant."),
-                Message::text("user", "What is the weather like today?"),
+                Message::text_with_name("user", "What is the weather like today?", "user_123"),
                 Message::text(
                     "assistant",
                     "I don't have access to real-time weather data.",

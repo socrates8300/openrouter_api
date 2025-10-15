@@ -104,8 +104,7 @@ impl ProviderPreferences {
             for provider in order {
                 if !seen.insert(provider) {
                     return Err(Error::ConfigError(format!(
-                        "Duplicate provider in order list: {}",
-                        provider
+                        "Duplicate provider in order list: {provider}"
                     )));
                 }
             }

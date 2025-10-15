@@ -28,7 +28,7 @@ impl ModelsApi {
             .join("models")
             .map_err(|e| Error::ApiError {
                 code: 400,
-                message: format!("Invalid URL for models endpoint: {}", e),
+                message: format!("Invalid URL for models endpoint: {e}"),
                 metadata: None,
             })?;
 
@@ -69,7 +69,7 @@ impl ModelsApi {
         serde_json::from_str::<ModelsResponse>(&body).map_err(|e| Error::ApiError {
             code: status.as_u16(),
             message: create_safe_error_message(
-                &format!("Failed to decode JSON: {}. Body was: {}", e, body),
+                &format!("Failed to decode JSON: {e}. Body was: {body}"),
                 "Models JSON parsing error",
             ),
             metadata: None,

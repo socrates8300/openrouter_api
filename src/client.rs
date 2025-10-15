@@ -105,24 +105,24 @@ impl ClientConfig {
         let mut headers = HeaderMap::new();
         if let Some(ref key) = self.api_key {
             let auth_header = HeaderValue::from_str(&key.to_bearer_header())
-                .map_err(|e| Error::ConfigError(format!("Invalid API key header format: {}", e)))?;
+                .map_err(|e| Error::ConfigError(format!("Invalid API key header format: {e}")))?;
             headers.insert(AUTHORIZATION, auth_header);
         }
         // Content-Type header is always valid.
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
         if let Some(ref referer) = self.http_referer {
             let ref_value = HeaderValue::from_str(referer)
-                .map_err(|e| Error::ConfigError(format!("Invalid Referer header: {}", e)))?;
+                .map_err(|e| Error::ConfigError(format!("Invalid Referer header: {e}")))?;
             headers.insert("Referer", ref_value);
         }
         if let Some(ref title) = self.site_title {
             let title_value = HeaderValue::from_str(title)
-                .map_err(|e| Error::ConfigError(format!("Invalid Title header: {}", e)))?;
+                .map_err(|e| Error::ConfigError(format!("Invalid Title header: {e}")))?;
             headers.insert("X-Title", title_value);
         }
         if let Some(ref user_id) = self.user_id {
             let user_id_value = HeaderValue::from_str(user_id)
-                .map_err(|e| Error::ConfigError(format!("Invalid User-ID header: {}", e)))?;
+                .map_err(|e| Error::ConfigError(format!("Invalid User-ID header: {e}")))?;
             headers.insert("X-User-ID", user_id_value);
         }
         Ok(headers)
@@ -217,7 +217,7 @@ impl OpenRouterClient<Ready> {
 
 impl OpenRouterClient<Unconfigured> {
     /// Creates a new unconfigured client with default settings.
-    /// Uses the default OpenRouter base URL: https://openrouter.ai/api/v1/
+    /// Uses the default OpenRouter base URL: <https://openrouter.ai/api/v1/>
     pub fn new() -> Self {
         Self {
             config: ClientConfig {
@@ -275,8 +275,7 @@ impl OpenRouterClient<Unconfigured> {
         let url_str = base_url.into();
         self.config.base_url = Url::parse(&url_str).map_err(|e| {
             Error::ConfigError(format!(
-                "Invalid base URL '{}': {}. Expected format: 'https://api.example.com/v1/'",
-                url_str, e
+                "Invalid base URL '{url_str}': {e}. Expected format: 'https://api.example.com/v1/'"
             ))
         })?;
         Ok(self.transition_to_no_auth())
@@ -414,7 +413,7 @@ impl OpenRouterClient<NoAuth> {
 
         let http_client = client_builder
             .build()
-            .map_err(|e| Error::ConfigError(format!("Failed to create HTTP client: {}", e)))?;
+            .map_err(|e| Error::ConfigError(format!("Failed to create HTTP client: {e}")))?;
 
         Ok(OpenRouterClient {
             config: self.config,
@@ -512,7 +511,7 @@ impl OpenRouterClient<Ready> {
                     }
                     Err(e) => {
                         // Log error but continue without provider preferences
-                        eprintln!("Failed to serialize provider preferences: {}", e);
+                        eprintln!("Failed to serialize provider preferences: {e}");
                     }
                 }
             }
@@ -526,7 +525,7 @@ impl OpenRouterClient<Ready> {
                         }
                         Err(e) => {
                             // Log error but continue without fallbacks
-                            eprintln!("Failed to serialize fallback models: {}", e);
+                            eprintln!("Failed to serialize fallback models: {e}");
                         }
                     }
                 }
@@ -560,7 +559,7 @@ impl OpenRouterClient<Ready> {
         serde_json::from_str::<T>(&body).map_err(|e| Error::ApiError {
             code: status.as_u16(),
             message: create_safe_error_message(
-                &format!("Failed to decode JSON: {}. Body was: {}", e, body),
+                &format!("Failed to decode JSON: {e}. Body was: {body}"),
                 "JSON parsing error",
             ),
             metadata: None,

@@ -30,3 +30,8 @@ output.txt
 # Agents.md
 **/AGENTS.md
 **/agents.md
+
+# Rust and toolchain
+/.rustup
+tarpaulin-report.html
+.DS_Store

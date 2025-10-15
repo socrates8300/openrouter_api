@@ -31,7 +31,7 @@ impl WebSearchApi {
             .join("web/search")
             .map_err(|e| Error::ApiError {
                 code: 400,
-                message: format!("Invalid URL for web search: {}", e),
+                message: format!("Invalid URL for web search: {e}"),
                 metadata: None,
             })?;
 
@@ -81,7 +81,7 @@ impl WebSearchApi {
         serde_json::from_str::<T>(&body).map_err(|e| Error::ApiError {
             code: status.as_u16(),
             message: create_safe_error_message(
-                &format!("Failed to decode JSON: {}. Body was: {}", e, body),
+                &format!("Failed to decode JSON: {e}. Body was: {body}"),
                 "Web search JSON parsing error",
             ),
             metadata: None,

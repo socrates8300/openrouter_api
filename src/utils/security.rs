@@ -81,7 +81,7 @@ pub fn redact_json_fields(content: &str) -> String {
 
     for field in &sensitive_fields {
         // Match JSON field patterns: "field": "value" or 'field': 'value'
-        let pattern = format!(r#"(['\"]{}['\"])\s*:\s*(['\"])[^'\"]*(['\"])"#, field);
+        let pattern = format!(r#"(['\"]{field}['\"])\s*:\s*(['\"])[^'\"]*(['\"])"#);
         if let Ok(regex) = Regex::new(&pattern) {
             redacted = regex
                 .replace_all(&redacted, "${1}: ${2}***REDACTED***${3}")
@@ -97,7 +97,7 @@ pub fn create_safe_error_message(original_error: &str, context: &str) -> String 
     let redacted = redact_sensitive_content(original_error);
     let json_safe = redact_json_fields(&redacted);
 
-    format!("{}: {}", context, json_safe)
+    format!("{context}: {json_safe}")
 }
 
 #[cfg(test)]

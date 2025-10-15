@@ -76,7 +76,7 @@ impl StructuredApi {
             .join("chat/completions")
             .map_err(|e| Error::ApiError {
                 code: 400,
-                message: format!("Invalid URL: {}", e),
+                message: format!("Invalid URL: {e}"),
                 metadata: None,
             })?;
 
@@ -84,9 +84,11 @@ impl StructuredApi {
         let mut body = serde_json::to_value(&request).map_err(Error::SerializationError)?;
         body["response_format"] = serde_json::json!({
             "type": "json_schema",
-            "schema": schema_config.schema,
-            "name": schema_config.name,
-            "strict": schema_config.strict
+            "json_schema": {
+                "schema": schema_config.schema,
+                "name": schema_config.name,
+                "strict": schema_config.strict
+            },
         });
 
         // Send the request
@@ -116,7 +118,7 @@ impl StructuredApi {
             serde_json::from_str(&body).map_err(|e| Error::ApiError {
                 code: status.as_u16(),
                 message: create_safe_error_message(
-                    &format!("Failed to decode JSON: {}. Body was: {}", e, body),
+                    &format!("Failed to decode JSON: {e}. Body was: {body}"),
                     "Structured JSON parsing error",
                 ),
                 metadata: None,
@@ -159,8 +161,7 @@ impl StructuredApi {
         // Deserialize the result into the target type
         serde_json::from_value::<T>(json_result).map_err(|e| {
             Error::SchemaValidationError(format!(
-                "Failed to deserialize response into target type: {}",
-                e
+                "Failed to deserialize response into target type: {e}"
             ))
         })
     }
@@ -232,8 +233,7 @@ impl StructuredApi {
                     if let Some(field_str) = field.as_str() {
                         if !data_obj.contains_key(field_str) {
                             return Err(Error::SchemaValidationError(format!(
-                                "Required field '{}' is missing",
-                                field_str
+                                "Required field '{field_str}' is missing"
                             )));
                         }
                     }

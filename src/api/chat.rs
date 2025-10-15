@@ -49,7 +49,7 @@ impl ChatApi {
             .join("chat/completions")
             .map_err(|e| Error::ApiError {
                 code: 400,
-                message: format!("Invalid URL: {}", e),
+                message: format!("Invalid URL: {e}"),
                 metadata: None,
             })?;
 
@@ -129,7 +129,7 @@ impl ChatApi {
             serde_json::from_str::<ChatCompletionResponse>(&body).map_err(|e| Error::ApiError {
                 code: status.as_u16(),
                 message: create_safe_error_message(
-                    &format!("Failed to decode JSON: {}. Body was: {}", e, body),
+                    &format!("Failed to decode JSON: {e}. Body was: {body}"),
                     "Chat completion JSON parsing error",
                 ),
                 metadata: None,
@@ -174,14 +174,14 @@ impl ChatApi {
             // Build the URL for the chat completions endpoint.
             let url = config.base_url.join("chat/completions").map_err(|e| Error::ApiError {
                 code: 400,
-                message: format!("Invalid URL: {}", e),
+                message: format!("Invalid URL: {e}"),
                 metadata: None,
             })?;
 
             // Serialize the request with streaming enabled.
             let mut req_body = serde_json::to_value(&request).map_err(|e| Error::ApiError {
                 code: 500,
-                message: format!("Request serialization error: {}", e),
+                message: format!("Request serialization error: {e}"),
                 metadata: None,
             })?;
             req_body["stream"] = serde_json::Value::Bool(true);
@@ -211,7 +211,7 @@ impl ChatApi {
             let mut chunk_count = 0usize;
 
             while let Some(line_result) = lines.next().await {
-                let line = line_result.map_err(|e| Error::StreamingError(format!("Failed to read stream line: {}", e)))?;
+                let line = line_result.map_err(|e| Error::StreamingError(format!("Failed to read stream line: {e}")))?;
 
                 // Safety check: Line length limit
                 if line.len() > MAX_LINE_LENGTH {
@@ -225,10 +225,8 @@ impl ChatApi {
                 // Safety check: Chunk count limit
                 chunk_count += 1;
                 if chunk_count > MAX_TOTAL_CHUNKS {
-                    Err(Error::StreamingError(format!(
-                        "Too many chunks: {} (max: {})",
-                        chunk_count,
-                        MAX_TOTAL_CHUNKS
+                      Err(Error::StreamingError(format!(
+                        "Too many chunks: {chunk_count} (max: {MAX_TOTAL_CHUNKS})"
                     )))?;
                 }
 
@@ -246,7 +244,7 @@ impl ChatApi {
                         Ok(chunk) => yield chunk,
                         Err(e) => {
                             let error_msg = create_safe_error_message(
-                                &format!("Failed to parse streaming chunk: {}. Data: {}", e, data_part),
+                                &format!("Failed to parse streaming chunk: {e}. Data: {data_part}"),
                                 "Streaming chunk parse error"
                             );
 
