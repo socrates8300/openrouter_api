@@ -74,7 +74,7 @@ impl AnalyticsApi {
     ///     let model_groups = response.group_by_model();
     ///     for (model, activities) in model_groups {
     ///         let stats = response.model_stats(&model);
-    ///         println!("Model {}: {} requests, ${:.6} total cost", 
+    ///         println!("Model {}: {} requests, ${:.6} total cost",
     ///                  model, stats.request_count, stats.total_cost);
     ///     }
     ///     
@@ -446,7 +446,10 @@ mod tests {
             .with_provider("provider/test");
 
         assert!(request.validate().is_ok());
-        assert_eq!(request.model, Some("model with spaces & symbols".to_string()));
+        assert_eq!(
+            request.model,
+            Some("model with spaces & symbols".to_string())
+        );
         assert_eq!(request.provider, Some("provider/test".to_string()));
     }
 }

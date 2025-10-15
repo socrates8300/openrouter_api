@@ -271,11 +271,12 @@ impl ActivityResponse {
 
     /// Returns the average latency in seconds
     pub fn average_latency_seconds(&self) -> Option<f64> {
-        let latencies: Vec<f64> = self.data
+        let latencies: Vec<f64> = self
+            .data
             .iter()
             .filter_map(|d| d.latency_seconds())
             .collect();
-        
+
         if latencies.is_empty() {
             None
         } else {
@@ -307,7 +308,10 @@ impl ActivityResponse {
     pub fn group_by_model(&self) -> HashMap<String, Vec<&ActivityData>> {
         let mut groups: HashMap<String, Vec<&ActivityData>> = HashMap::new();
         for activity in &self.data {
-            groups.entry(activity.model.clone()).or_default().push(activity);
+            groups
+                .entry(activity.model.clone())
+                .or_default()
+                .push(activity);
         }
         groups
     }
@@ -325,10 +329,8 @@ impl ActivityResponse {
 
     /// Returns usage statistics for a specific model
     pub fn model_stats(&self, model: &str) -> ModelUsageStats {
-        let model_activities: Vec<&ActivityData> = self.data
-            .iter()
-            .filter(|d| d.model == model)
-            .collect();
+        let model_activities: Vec<&ActivityData> =
+            self.data.iter().filter(|d| d.model == model).collect();
 
         ModelUsageStats {
             model: model.to_string(),
@@ -339,14 +341,20 @@ impl ActivityResponse {
                 None
             } else {
                 Some(
-                    model_activities.iter().filter_map(|d| d.final_cost()).sum::<f64>()
-                        / model_activities.len() as f64
+                    model_activities
+                        .iter()
+                        .filter_map(|d| d.final_cost())
+                        .sum::<f64>()
+                        / model_activities.len() as f64,
                 )
             },
             success_rate: if model_activities.is_empty() {
                 0.0
             } else {
-                let successful = model_activities.iter().filter(|d| d.is_successful()).count();
+                let successful = model_activities
+                    .iter()
+                    .filter(|d| d.is_successful())
+                    .count();
                 successful as f64 / model_activities.len() as f64 * 100.0
             },
         }
@@ -354,7 +362,8 @@ impl ActivityResponse {
 
     /// Returns usage statistics for a specific provider
     pub fn provider_stats(&self, provider: &str) -> ProviderUsageStats {
-        let provider_activities: Vec<&ActivityData> = self.data
+        let provider_activities: Vec<&ActivityData> = self
+            .data
             .iter()
             .filter(|d| d.provider.as_ref().map_or(false, |p| p == provider))
             .collect();
@@ -362,20 +371,32 @@ impl ActivityResponse {
         ProviderUsageStats {
             provider: provider.to_string(),
             request_count: provider_activities.len(),
-            total_cost: provider_activities.iter().filter_map(|d| d.final_cost()).sum(),
-            total_tokens: provider_activities.iter().filter_map(|d| d.total_tokens).sum(),
+            total_cost: provider_activities
+                .iter()
+                .filter_map(|d| d.final_cost())
+                .sum(),
+            total_tokens: provider_activities
+                .iter()
+                .filter_map(|d| d.total_tokens)
+                .sum(),
             average_cost_per_request: if provider_activities.is_empty() {
                 None
             } else {
                 Some(
-                    provider_activities.iter().filter_map(|d| d.final_cost()).sum::<f64>()
-                        / provider_activities.len() as f64
+                    provider_activities
+                        .iter()
+                        .filter_map(|d| d.final_cost())
+                        .sum::<f64>()
+                        / provider_activities.len() as f64,
                 )
             },
             success_rate: if provider_activities.is_empty() {
                 0.0
             } else {
-                let successful = provider_activities.iter().filter(|d| d.is_successful()).count();
+                let successful = provider_activities
+                    .iter()
+                    .filter(|d| d.is_successful())
+                    .count();
                 successful as f64 / provider_activities.len() as f64 * 100.0
             },
         }
@@ -394,9 +415,11 @@ impl ActivityResponse {
 
         let total = self.data.len() as f64;
         FeatureUsagePercentages {
-            web_search: self.data.iter().filter(|d| d.used_web_search()).count() as f64 / total * 100.0,
+            web_search: self.data.iter().filter(|d| d.used_web_search()).count() as f64 / total
+                * 100.0,
             media: self.data.iter().filter(|d| d.included_media()).count() as f64 / total * 100.0,
-            reasoning: self.data.iter().filter(|d| d.used_reasoning()).count() as f64 / total * 100.0,
+            reasoning: self.data.iter().filter(|d| d.used_reasoning()).count() as f64 / total
+                * 100.0,
             streaming: self.data.iter().filter(|d| d.was_streamed()).count() as f64 / total * 100.0,
         }
     }

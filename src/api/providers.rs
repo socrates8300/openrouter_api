@@ -1,6 +1,6 @@
-use crate::error::Error;
-use crate::types::{ProvidersResponse, Provider};
 use crate::client::ClientConfig;
+use crate::error::Error;
+use crate::types::{Provider, ProvidersResponse};
 use reqwest::Client;
 
 /// API client for provider-related operations
@@ -19,20 +19,20 @@ impl ProvidersApi {
     }
 
     /// Retrieves a list of all available providers
-    /// 
+    ///
     /// Returns information about providers available through the OpenRouter API,
     /// including their policies and status information.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// Returns a `Result` containing the `ProvidersResponse` with provider information
     /// or an `Error` if the request fails.
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```rust,no_run
     /// use openrouter_api::client::OpenRouterClient;
-    /// 
+    ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = OpenRouterClient::from_env()?;
@@ -45,9 +45,9 @@ impl ProvidersApi {
     ///     // Find a specific provider
     ///     if let Some(openai) = providers_response.find_by_slug("openai") {
     ///         println!("OpenAI provider found: {}", openai.name);
-    ///         if openai.has_privacy_policy() {
-    ///             println!("Privacy policy: {}", openai.privacy_policy_url.unwrap());
-    ///         }
+     ///         if openai.has_privacy_policy() {
+     ///             println!("Privacy policy: {}", openai.privacy_policy_url.as_ref().unwrap());
+     ///         }
     ///     }
     ///     
     ///     // Group providers by domain
@@ -62,7 +62,8 @@ impl ProvidersApi {
     pub async fn get_providers(&self) -> Result<ProvidersResponse, Error> {
         let url = format!("{}/providers", self.config.base_url);
 
-        let response = self.client
+        let response = self
+            .client
             .get(&url)
             .headers(self.config.build_headers()?)
             .send()
@@ -72,31 +73,31 @@ impl ProvidersApi {
             return Err(Error::from_response(response).await?);
         }
 
-        let providers_response: ProvidersResponse = response.json().await
-            .map_err(|e| Error::HttpError(e))?;
+        let providers_response: ProvidersResponse =
+            response.json().await.map_err(|e| Error::HttpError(e))?;
 
         Ok(providers_response)
     }
 
     /// Retrieves a specific provider by slug
-    /// 
+    ///
     /// This is a convenience method that fetches all providers and returns
     /// the one matching the specified slug.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `slug` - The slug identifier of the provider to retrieve
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// Returns a `Result` containing the `Provider` information or an `Error`
     /// if the request fails or the provider is not found.
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```rust,no_run
     /// use openrouter_api::client::OpenRouterClient;
-    /// 
+    ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = OpenRouterClient::from_env()?;
@@ -112,32 +113,34 @@ impl ProvidersApi {
     /// ```
     pub async fn get_provider_by_slug(&self, slug: &str) -> Result<Provider, Error> {
         let providers_response = self.get_providers().await?;
-        
+
         providers_response
             .find_by_slug(slug)
             .cloned()
-            .ok_or_else(|| Error::ModelNotAvailable(format!("Provider with slug '{}' not found", slug)))
+            .ok_or_else(|| {
+                Error::ModelNotAvailable(format!("Provider with slug '{}' not found", slug))
+            })
     }
 
     /// Retrieves a specific provider by name (case-insensitive)
-    /// 
+    ///
     /// This is a convenience method that fetches all providers and returns
     /// the one matching the specified name.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `name` - The name of the provider to retrieve (case-insensitive)
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// Returns a `Result` containing the `Provider` information or an `Error`
     /// if the request fails or the provider is not found.
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```rust,no_run
     /// use openrouter_api::client::OpenRouterClient;
-    /// 
+    ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = OpenRouterClient::from_env()?;
@@ -153,28 +156,30 @@ impl ProvidersApi {
     /// ```
     pub async fn get_provider_by_name(&self, name: &str) -> Result<Provider, Error> {
         let providers_response = self.get_providers().await?;
-        
+
         providers_response
             .find_by_name(name)
             .cloned()
-            .ok_or_else(|| Error::ModelNotAvailable(format!("Provider with name '{}' not found", name)))
+            .ok_or_else(|| {
+                Error::ModelNotAvailable(format!("Provider with name '{}' not found", name))
+            })
     }
 
     /// Retrieves providers that have a privacy policy
-    /// 
+    ///
     /// This is a convenience method that filters providers to only include
     /// those that have a privacy policy URL.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// Returns a `Result` containing a vector of `Provider` instances that
     /// have privacy policies or an `Error` if the request fails.
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```rust,no_run
     /// use openrouter_api::client::OpenRouterClient;
-    /// 
+    ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = OpenRouterClient::from_env()?;
@@ -202,20 +207,20 @@ impl ProvidersApi {
     }
 
     /// Retrieves providers that have terms of service
-    /// 
+    ///
     /// This is a convenience method that filters providers to only include
     /// those that have a terms of service URL.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// Returns a `Result` containing a vector of `Provider` instances that
     /// have terms of service or an `Error` if the request fails.
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```rust,no_run
     /// use openrouter_api::client::OpenRouterClient;
-    /// 
+    ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = OpenRouterClient::from_env()?;
@@ -243,20 +248,20 @@ impl ProvidersApi {
     }
 
     /// Retrieves providers that have a status page
-    /// 
+    ///
     /// This is a convenience method that filters providers to only include
     /// those that have a status page URL.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// Returns a `Result` containing a vector of `Provider` instances that
     /// have status pages or an `Error` if the request fails.
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```rust,no_run
     /// use openrouter_api::client::OpenRouterClient;
-    /// 
+    ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = OpenRouterClient::from_env()?;
@@ -284,20 +289,20 @@ impl ProvidersApi {
     }
 
     /// Retrieves all provider slugs sorted alphabetically
-    /// 
+    ///
     /// This is a convenience method that returns all provider slugs
     /// in alphabetical order.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// Returns a `Result` containing a vector of provider slugs or an `Error`
     /// if the request fails.
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```rust,no_run
     /// use openrouter_api::client::OpenRouterClient;
-    /// 
+    ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = OpenRouterClient::from_env()?;
@@ -319,20 +324,20 @@ impl ProvidersApi {
     }
 
     /// Retrieves all provider names sorted alphabetically
-    /// 
+    ///
     /// This is a convenience method that returns all provider names
     /// in alphabetical order.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// Returns a `Result` containing a vector of provider names or an `Error`
     /// if the request fails.
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```rust,no_run
     /// use openrouter_api::client::OpenRouterClient;
-    /// 
+    ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = OpenRouterClient::from_env()?;
@@ -372,9 +377,9 @@ mod tests {
             retry_config: RetryConfig::default(),
         };
         let http_client = Client::new();
-        
+
         let providers_api = ProvidersApi::new(http_client, &config);
-        
+
         // Test that the API was created successfully
         // We can't test actual API calls without a real server
         assert!(true);
@@ -384,7 +389,8 @@ mod tests {
     async fn test_providers_api_network_error() {
         let config = ClientConfig {
             api_key: Some(SecureApiKey::new("sk-test123456789012345678901234567890").unwrap()),
-            base_url: url::Url::parse("https://invalid-url-that-does-not-exist.com/api/v1/").unwrap(),
+            base_url: url::Url::parse("https://invalid-url-that-does-not-exist.com/api/v1/")
+                .unwrap(),
             timeout: std::time::Duration::from_secs(1),
             http_referer: None,
             site_title: None,
@@ -397,7 +403,7 @@ mod tests {
         // Test that network errors are properly handled
         let result = providers_api.get_providers().await;
         assert!(result.is_err());
-        
+
         // Any error type is acceptable for network failure
         // The important thing is that it doesn't panic and returns an error
         match result.unwrap_err() {
@@ -406,7 +412,10 @@ mod tests {
             }
             other => {
                 println!("Got error: {:?}", other);
-                panic!("Expected HttpError or RateLimitExceeded for network failure, got: {:?}", other);
+                panic!(
+                    "Expected HttpError or RateLimitExceeded for network failure, got: {:?}",
+                    other
+                );
             }
         }
     }
@@ -415,7 +424,8 @@ mod tests {
     async fn test_provider_convenience_methods_with_empty_response() {
         let config = ClientConfig {
             api_key: Some(SecureApiKey::new("sk-test123456789012345678901234567890").unwrap()),
-            base_url: url::Url::parse("https://invalid-url-that-does-not-exist.com/api/v1/").unwrap(),
+            base_url: url::Url::parse("https://invalid-url-that-does-not-exist.com/api/v1/")
+                .unwrap(),
             timeout: std::time::Duration::from_secs(1),
             http_referer: None,
             site_title: None,
@@ -428,9 +438,18 @@ mod tests {
         // All convenience methods should handle network errors gracefully
         assert!(providers_api.get_provider_by_slug("openai").await.is_err());
         assert!(providers_api.get_provider_by_name("OpenAI").await.is_err());
-        assert!(providers_api.get_providers_with_privacy_policy().await.is_err());
-        assert!(providers_api.get_providers_with_terms_of_service().await.is_err());
-        assert!(providers_api.get_providers_with_status_page().await.is_err());
+        assert!(providers_api
+            .get_providers_with_privacy_policy()
+            .await
+            .is_err());
+        assert!(providers_api
+            .get_providers_with_terms_of_service()
+            .await
+            .is_err());
+        assert!(providers_api
+            .get_providers_with_status_page()
+            .await
+            .is_err());
         assert!(providers_api.get_provider_slugs().await.is_err());
         assert!(providers_api.get_provider_names().await.is_err());
     }

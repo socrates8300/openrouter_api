@@ -6,16 +6,16 @@ use std::collections::HashMap;
 pub struct Provider {
     /// The display name of the provider
     pub name: String,
-    
+
     /// The unique slug identifier for the provider
     pub slug: String,
-    
+
     /// URL to the provider's privacy policy (may be null)
     pub privacy_policy_url: Option<String>,
-    
+
     /// URL to the provider's terms of service (may be null)
     pub terms_of_service_url: Option<String>,
-    
+
     /// URL to the provider's status page (may be null)
     pub status_page_url: Option<String>,
 }
@@ -106,28 +106,31 @@ impl ProvidersResponse {
 
     /// Finds a provider by name (case-insensitive)
     pub fn find_by_name(&self, name: &str) -> Option<&Provider> {
-        self.data.iter().find(|provider| {
-            provider.name.to_lowercase() == name.to_lowercase()
-        })
+        self.data
+            .iter()
+            .find(|provider| provider.name.to_lowercase() == name.to_lowercase())
     }
 
     /// Returns providers that have a privacy policy
     pub fn with_privacy_policy(&self) -> Vec<&Provider> {
-        self.data.iter()
+        self.data
+            .iter()
             .filter(|provider| provider.has_privacy_policy())
             .collect()
     }
 
     /// Returns providers that have terms of service
     pub fn with_terms_of_service(&self) -> Vec<&Provider> {
-        self.data.iter()
+        self.data
+            .iter()
             .filter(|provider| provider.has_terms_of_service())
             .collect()
     }
 
     /// Returns providers that have a status page
     pub fn with_status_page(&self) -> Vec<&Provider> {
-        self.data.iter()
+        self.data
+            .iter()
             .filter(|provider| provider.has_status_page())
             .collect()
     }
@@ -135,24 +138,27 @@ impl ProvidersResponse {
     /// Groups providers by domain (extracted from URLs)
     pub fn group_by_domain(&self) -> HashMap<String, Vec<&Provider>> {
         let mut groups: HashMap<String, Vec<&Provider>> = HashMap::new();
-        
+
         for provider in &self.data {
             // Try to extract domain from any available URL
-            let domain = provider.privacy_policy_domain()
+            let domain = provider
+                .privacy_policy_domain()
                 .or_else(|| provider.terms_of_service_domain())
                 .or_else(|| provider.status_page_domain())
                 .unwrap_or_else(|| "unknown".to_string());
-            
+
             let provider_list = groups.entry(domain).or_insert_with(Vec::new);
             provider_list.push(provider);
         }
-        
+
         groups
     }
 
     /// Returns provider slugs sorted alphabetically
     pub fn sorted_slugs(&self) -> Vec<String> {
-        let mut slugs: Vec<String> = self.data.iter()
+        let mut slugs: Vec<String> = self
+            .data
+            .iter()
             .map(|provider| provider.slug.clone())
             .collect();
         slugs.sort_unstable();
@@ -161,7 +167,9 @@ impl ProvidersResponse {
 
     /// Returns provider names sorted alphabetically
     pub fn sorted_names(&self) -> Vec<String> {
-        let mut names: Vec<String> = self.data.iter()
+        let mut names: Vec<String> = self
+            .data
+            .iter()
             .map(|provider| provider.name.clone())
             .collect();
         names.sort_unstable();
@@ -225,12 +233,15 @@ mod tests {
         ];
 
         let response = ProvidersResponse::new(providers);
-        
+
         assert_eq!(response.count(), 2);
         assert_eq!(response.find_by_slug("openai").unwrap().name, "OpenAI");
-        assert_eq!(response.find_by_name("anthropic").unwrap().slug, "anthropic");
+        assert_eq!(
+            response.find_by_name("anthropic").unwrap().slug,
+            "anthropic"
+        );
         assert!(response.find_by_slug("nonexistent").is_none());
-        
+
         assert_eq!(response.with_privacy_policy().len(), 2);
         assert_eq!(response.with_terms_of_service().len(), 1);
         assert_eq!(response.with_status_page().len(), 0);
@@ -246,7 +257,10 @@ mod tests {
             None,
         );
 
-        assert_eq!(provider.privacy_policy_domain(), Some("openai.com".to_string()));
+        assert_eq!(
+            provider.privacy_policy_domain(),
+            Some("openai.com".to_string())
+        );
         assert_eq!(provider.terms_of_service_domain(), None);
     }
 
@@ -271,7 +285,7 @@ mod tests {
 
         let response = ProvidersResponse::new(providers);
         let groups = response.group_by_domain();
-        
+
         assert_eq!(groups.get("openai.com").unwrap().len(), 1);
         assert_eq!(groups.get("anthropic.com").unwrap().len(), 1);
     }

@@ -20,16 +20,16 @@ impl GenerationApi {
     }
 
     /// Retrieves metadata about a specific generation request.
-    /// 
+    ///
     /// This endpoint returns detailed information about a generation including
     /// cost, token usage, latency, provider information, and more.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `id` - The unique identifier of the generation to retrieve
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// Returns a `GenerationResponse` containing comprehensive metadata about the generation:
     /// - Basic info: id, model, created_at, origin
     /// - Cost info: total_cost, cache_discount, effective_cost
@@ -38,18 +38,18 @@ impl GenerationApi {
     /// - Provider details: provider_name, upstream_id
     /// - Features: streamed, cancelled, web_search, media, reasoning
     /// - Finish reasons: finish_reason, native_finish_reason
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// Returns an error if:
     /// - The generation ID is empty or invalid
     /// - The API request fails (network issues, authentication, etc.)
     /// - The generation is not found
     /// - The response cannot be parsed
     /// - The server returns an error status code
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```rust,no_run
     /// use openrouter_api::OpenRouterClient;
     ///
@@ -167,7 +167,7 @@ mod tests {
 
         let client = Client::new();
         let generation_api = GenerationApi::new(client, &config);
-        
+
         assert!(generation_api.config.api_key.is_some());
     }
 
@@ -191,21 +191,15 @@ mod tests {
 
         // Test empty ID
         let rt = tokio::runtime::Runtime::new().unwrap();
-        let result = rt.block_on(async {
-            generation_api.get_generation("").await
-        });
+        let result = rt.block_on(async { generation_api.get_generation("").await });
         assert!(result.is_err());
 
         // Test whitespace-only ID
-        let result = rt.block_on(async {
-            generation_api.get_generation("   ").await
-        });
+        let result = rt.block_on(async { generation_api.get_generation("   ").await });
         assert!(result.is_err());
 
         // Test valid ID (this will fail with network error, but not validation error)
-        let result = rt.block_on(async {
-            generation_api.get_generation("gen-valid123").await
-        });
+        let result = rt.block_on(async { generation_api.get_generation("gen-valid123").await });
         assert!(result.is_err()); // Network error, not validation error
     }
 }

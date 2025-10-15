@@ -813,7 +813,9 @@ mod tests {
 
             let response = GenerationResponse { data };
             assert!((response.effective_cost() - expected_effective).abs() < f64::EPSILON);
-            assert!((response.cost_per_token().unwrap() - (total_cost / 300.0)).abs() < f64::EPSILON);
+            assert!(
+                (response.cost_per_token().unwrap() - (total_cost / 300.0)).abs() < f64::EPSILON
+            );
         }
 
         Ok(())
@@ -847,34 +849,32 @@ mod tests {
         use chrono::Utc;
 
         let original = ActivityResponse {
-            data: vec![
-                ActivityData {
-                    id: "test-123".to_string(),
-                    created_at: Utc::now(),
-                    model: "test-model".to_string(),
-                    total_cost: Some(0.001),
-                    tokens_prompt: Some(10),
-                    tokens_completion: Some(20),
-                    total_tokens: Some(30),
-                    provider: Some("test-provider".to_string()),
-                    streamed: Some(true),
-                    cancelled: Some(false),
-                    web_search: Some(true),
-                    media: Some(false),
-                    reasoning: Some(false),
-                    finish_reason: Some("stop".to_string()),
-                    native_finish_reason: None,
-                    origin: None,
-                    latency: Some(1000),
-                    generation_time: Some(500),
-                    moderation_latency: None,
-                    cache_discount: None,
-                    effective_cost: Some(0.0009),
-                    upstream_id: None,
-                    user_id: None,
-                    http_referer: None,
-                },
-            ],
+            data: vec![ActivityData {
+                id: "test-123".to_string(),
+                created_at: Utc::now(),
+                model: "test-model".to_string(),
+                total_cost: Some(0.001),
+                tokens_prompt: Some(10),
+                tokens_completion: Some(20),
+                total_tokens: Some(30),
+                provider: Some("test-provider".to_string()),
+                streamed: Some(true),
+                cancelled: Some(false),
+                web_search: Some(true),
+                media: Some(false),
+                reasoning: Some(false),
+                finish_reason: Some("stop".to_string()),
+                native_finish_reason: None,
+                origin: None,
+                latency: Some(1000),
+                generation_time: Some(500),
+                moderation_latency: None,
+                cache_discount: None,
+                effective_cost: Some(0.0009),
+                upstream_id: None,
+                user_id: None,
+                http_referer: None,
+            }],
             total_count: Some(1),
             has_more: Some(false),
         };
@@ -1082,12 +1082,11 @@ mod tests {
         // Test that the providers API is accessible
         // Note: We can't test actual API calls without a real key and network access
         // but we can verify the API structure and method signatures
-        
+
         // Test that the method exists and returns the right type
-        let _providers_result: Result<crate::types::ProvidersResponse, Box<dyn std::error::Error>> = futures::future::ready(
-            Ok(crate::types::ProvidersResponse::new(vec![]))
-        ).await;
-        
+        let _providers_result: Result<crate::types::ProvidersResponse, Box<dyn std::error::Error>> =
+            futures::future::ready(Ok(crate::types::ProvidersResponse::new(vec![]))).await;
+
         Ok(())
     }
 
@@ -1109,9 +1108,18 @@ mod tests {
         assert!(provider.has_privacy_policy());
         assert!(provider.has_terms_of_service());
         assert!(provider.has_status_page());
-        assert_eq!(provider.privacy_policy_domain(), Some("openai.com".to_string()));
-        assert_eq!(provider.terms_of_service_domain(), Some("openai.com".to_string()));
-        assert_eq!(provider.status_page_domain(), Some("status.openai.com".to_string()));
+        assert_eq!(
+            provider.privacy_policy_domain(),
+            Some("openai.com".to_string())
+        );
+        assert_eq!(
+            provider.terms_of_service_domain(),
+            Some("openai.com".to_string())
+        );
+        assert_eq!(
+            provider.status_page_domain(),
+            Some("status.openai.com".to_string())
+        );
 
         // Test provider without URLs
         let minimal_provider = Provider::new(
@@ -1164,11 +1172,11 @@ mod tests {
 
         // Test basic functionality
         assert_eq!(response.count(), 3);
-        
+
         // Test finding by slug
         let openai = response.find_by_slug("openai").unwrap();
         assert_eq!(openai.name, "OpenAI");
-        
+
         let nonexistent = response.find_by_slug("nonexistent");
         assert!(nonexistent.is_none());
 
@@ -1209,7 +1217,7 @@ mod tests {
 
         // Test that all methods exist and have the right signatures
         // We can't call them without a real API key, but we can verify they compile
-        
+
         // These would be the actual method calls if we had a real API:
         // let _all_providers = providers_api.get_providers().await?;
         // let _by_slug = providers_api.get_provider_by_slug("openai").await?;
@@ -1222,7 +1230,7 @@ mod tests {
 
         // For now, just verify the API is accessible
         let _api_ref = &providers_api;
-        
+
         Ok(())
     }
 
@@ -1239,9 +1247,18 @@ mod tests {
             Some("https://status.example.com".to_string()),
         );
 
-        assert_eq!(provider.privacy_policy_domain(), Some("example.com".to_string()));
-        assert_eq!(provider.terms_of_service_domain(), Some("example.com".to_string()));
-        assert_eq!(provider.status_page_domain(), Some("status.example.com".to_string()));
+        assert_eq!(
+            provider.privacy_policy_domain(),
+            Some("example.com".to_string())
+        );
+        assert_eq!(
+            provider.terms_of_service_domain(),
+            Some("example.com".to_string())
+        );
+        assert_eq!(
+            provider.status_page_domain(),
+            Some("status.example.com".to_string())
+        );
 
         // Test with invalid URLs (should return None for domain extraction)
         let provider_invalid = Provider::new(
