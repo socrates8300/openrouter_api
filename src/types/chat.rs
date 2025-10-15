@@ -105,9 +105,6 @@ pub struct Message {
     // Optionally include tool_calls when the assistant message contains a tool call.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_calls: Option<Vec<ToolCall>>,
-    // Tool call ID for tool role messages
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tool_call_id: Option<String>,
 }
 
 impl Message {

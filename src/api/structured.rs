@@ -2,7 +2,7 @@
 
 use crate::client::ClientConfig;
 use crate::error::{Error, Result};
-use crate::models::structured::JsonSchemaConfig;
+use crate::models::structured::{JsonSchemaConfig, JsonSchemaDefinition};
 use crate::types::chat::{ChatCompletionRequest, ChatCompletionResponse, Message, MessageContent};
 use crate::utils::security::create_safe_error_message;
 use reqwest::Client;
@@ -40,9 +40,19 @@ impl StructuredApi {
             model: model.to_string(),
             messages,
             stream: Some(false),
-            response_format: Some(serde_json::json!({
-                "type": "json_schema"
-            })),
+            response_format: Some(crate::api::request::ResponseFormatConfig {
+                format_type: "json_schema".to_string(),
+                json_schema: JsonSchemaConfig {
+                    name: "structured_output".to_string(),
+                    strict: false,
+                    schema: JsonSchemaDefinition {
+                        schema_type: "object".to_string(),
+                        properties: serde_json::Map::new(),
+                        required: None,
+                        additional_properties: None,
+                    },
+                },
+            }),
             tools: None,
             tool_choice: None,
             provider: None,

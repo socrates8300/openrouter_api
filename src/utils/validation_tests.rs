@@ -2,6 +2,7 @@
 
 #[cfg(test)]
 mod tests {
+    use crate::models::structured::{JsonSchemaConfig, JsonSchemaDefinition};
     use crate::types::chat::{
         ChatCompletionRequest, ContentPart, ImageContent, ImageDetail, ImageUrl, Message,
         MessageContent, PredictionConfig, RouteStrategy, StopSequence, TextContent, VerbosityLevel,
@@ -62,9 +63,19 @@ mod tests {
                 Message::text("user", "Hello!"),
             ],
             stream: Some(false),
-            response_format: Some(serde_json::json!({
-                "type": "json_object"
-            })),
+            response_format: Some(crate::api::request::ResponseFormatConfig {
+                format_type: "json_object".to_string(),
+                json_schema: JsonSchemaConfig {
+                    name: "json_object".to_string(),
+                    strict: false,
+                    schema: JsonSchemaDefinition {
+                        schema_type: "object".to_string(),
+                        properties: serde_json::Map::new(),
+                        required: None,
+                        additional_properties: None,
+                    },
+                },
+            }),
             tools: None,
             tool_choice: Some(serde_json::json!("auto")),
             provider: None,
@@ -295,8 +306,8 @@ mod tests {
     #[test]
     fn test_check_token_limits_very_long_content() {
         let mut request = create_valid_chat_request();
-        // Create a message with approximately 50,000 tokens (rough estimate: 4 chars per token)
-        let long_content = "word ".repeat(50_000);
+        // Create a message with approximately 5 million tokens to exceed 1M limit (rough estimate: 4 chars per token)
+        let long_content = "word ".repeat(5_000_000); // 30M characters = ~7.5M tokens
         request.messages[0].content = MessageContent::Text(long_content);
         let result = check_token_limits(&request);
         assert!(result.is_err());
@@ -305,16 +316,17 @@ mod tests {
     #[test]
     fn test_check_token_limits_many_messages() {
         let mut request = create_valid_chat_request();
-        // Add many messages with large content to definitely exceed token limit
-        // Each message has ~400 characters = ~100 tokens, need 320+ messages to exceed 32k limit
-        for i in 0..500 {
+        // Add many messages with large content to definitely exceed 1M token limit
+        // Each message has ~400 characters = ~100 tokens, need 10,000+ messages to exceed 1M limit
+        for i in 0..15_000 {
             request.messages.push(Message::text(
                 "user",
                 format!(
                     "This is message number {} with a lot of content to consume many tokens. \
                     This content is intentionally verbose and repetitive to ensure we exceed \
                     the token limit for testing purposes. More text here to increase token count. \
-                    Additional padding text to make sure we have enough tokens per message."
+                    Additional padding text to make sure we have enough tokens per message.",
+                    i
                 ),
             ));
         }
@@ -353,7 +365,19 @@ mod tests {
                     "I don't have access to real-time weather data.",
                 ),
             ],
-            response_format: Some(serde_json::Value::String("json".to_string())),
+            response_format: Some(crate::api::request::ResponseFormatConfig {
+                format_type: "json_object".to_string(),
+                json_schema: JsonSchemaConfig {
+                    name: "json".to_string(),
+                    strict: false,
+                    schema: JsonSchemaDefinition {
+                        schema_type: "object".to_string(),
+                        properties: serde_json::Map::new(),
+                        required: None,
+                        additional_properties: None,
+                    },
+                },
+            }),
             ..create_valid_chat_request()
         };
 
