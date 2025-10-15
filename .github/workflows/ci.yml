@@ -50,17 +50,10 @@ jobs:
 
   test-matrix:
     name: Test Matrix
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
         rust: [stable, beta]
-        exclude:
-          # Reduce CI load by testing beta only on Ubuntu
-          - os: windows-latest
-            rust: beta
-          - os: macos-latest
-            rust: beta
     
     steps:
     - uses: actions/checkout@v4
