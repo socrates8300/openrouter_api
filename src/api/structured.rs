@@ -2,8 +2,8 @@
 
 use crate::client::ClientConfig;
 use crate::error::{Error, Result};
-use crate::models::structured::JsonSchemaConfig;
-use crate::types::chat::{ChatCompletionRequest, ChatCompletionResponse, Message};
+use crate::models::structured::{JsonSchemaConfig, JsonSchemaDefinition};
+use crate::types::chat::{ChatCompletionRequest, ChatCompletionResponse, Message, MessageContent};
 use crate::utils::security::create_safe_error_message;
 use reqwest::Client;
 use serde::de::DeserializeOwned;
@@ -40,11 +40,43 @@ impl StructuredApi {
             model: model.to_string(),
             messages,
             stream: Some(false),
-            response_format: None,
+            response_format: Some(crate::api::request::ResponseFormatConfig {
+                format_type: "json_schema".to_string(),
+                json_schema: JsonSchemaConfig {
+                    name: "structured_output".to_string(),
+                    strict: false,
+                    schema: JsonSchemaDefinition {
+                        schema_type: "object".to_string(),
+                        properties: serde_json::Map::new(),
+                        required: None,
+                        additional_properties: None,
+                    },
+                },
+            }),
             tools: None,
+            tool_choice: None,
             provider: None,
             models: None,
             transforms: None,
+            route: None,
+            user: None,
+            max_tokens: None,
+            temperature: None,
+            top_p: None,
+            top_k: None,
+            frequency_penalty: None,
+            presence_penalty: None,
+            repetition_penalty: None,
+            min_p: None,
+            top_a: None,
+            seed: None,
+            stop: None,
+            logit_bias: None,
+            logprobs: None,
+            top_logprobs: None,
+            prediction: None,
+            parallel_tool_calls: None,
+            verbosity: None,
         };
 
         // Build the complete URL for the chat completions endpoint.
@@ -111,11 +143,20 @@ impl StructuredApi {
             });
         }
 
-        let content = &chat_response.choices[0].message.content;
+        let content_str = match &chat_response.choices[0].message.content {
+            MessageContent::Text(content) => content,
+            MessageContent::Parts(_) => {
+                return Err(Error::ApiError {
+                    code: status.as_u16(),
+                    message: "Unexpected multimodal content in structured response".into(),
+                    metadata: None,
+                });
+            }
+        };
 
         // Parse the content as JSON
-        let json_result: Value = serde_json::from_str(content).map_err(|e| {
-            Error::SchemaValidationError(format!("Failed to parse response as JSON: {e}"))
+        let json_result: Value = serde_json::from_str(content_str).map_err(|e| {
+            Error::SchemaValidationError(format!("Failed to parse response as JSON: {}", e))
         })?;
 
         // Basic validation of required fields if strict mode is enabled
