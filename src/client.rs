@@ -479,6 +479,15 @@ impl OpenRouterClient<Ready> {
         ))
     }
 
+    /// Provides access to the credits endpoint.
+    pub fn credits(&self) -> Result<crate::api::credits::CreditsApi> {
+        let client = self
+            .http_client
+            .clone()
+            .ok_or_else(|| Error::ConfigError("HTTP client is missing".into()))?;
+        Ok(crate::api::credits::CreditsApi::new(client, &self.config))
+    }
+
     /// Returns a new request builder for chat completions that supports MCP.
     pub fn chat_request_builder(
         &self,

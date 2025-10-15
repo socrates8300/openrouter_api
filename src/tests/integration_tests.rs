@@ -453,4 +453,100 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_credits_api_integration() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::types::credits::{CreditsData, CreditsResponse};
+
+        // Test credits response deserialization
+        let credits_json = r#"{
+            "data": {
+                "total_credits": 150.75,
+                "total_usage": 45.25
+            }
+        }"#;
+
+        let credits_response: CreditsResponse = serde_json::from_str(credits_json)?;
+        assert_eq!(credits_response.total_credits(), 150.75);
+        assert_eq!(credits_response.total_usage(), 45.25);
+        assert_eq!(credits_response.remaining_credits(), 105.50);
+        assert!(credits_response.has_credits());
+        assert!((credits_response.usage_percentage() - 0.300).abs() < 0.001);
+
+        // Test credits data methods
+        let credits_data = CreditsData {
+            total_credits: 200.0,
+            total_usage: 50.0,
+        };
+        assert_eq!(credits_data.remaining(), 150.0);
+        assert!(credits_data.has_credits());
+        assert_eq!(credits_data.usage_percentage(), 0.25);
+
+        // Test edge cases
+        let zero_credits = CreditsData {
+            total_credits: 0.0,
+            total_usage: 0.0,
+        };
+        assert_eq!(zero_credits.remaining(), 0.0);
+        assert!(!zero_credits.has_credits());
+        assert_eq!(zero_credits.usage_percentage(), 0.0);
+
+        let over_usage = CreditsData {
+            total_credits: 100.0,
+            total_usage: 120.0,
+        };
+        assert_eq!(over_usage.remaining(), -20.0);
+        assert!(!over_usage.has_credits());
+        assert_eq!(over_usage.usage_percentage(), 1.2);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_credits_api_client_integration() -> Result<(), Box<dyn std::error::Error>> {
+        // Test that the credits API can be created from the client
+        let api_key = "sk-1234567890abcdef1234567890abcdef";
+
+        let client = OpenRouterClient::<Unconfigured>::new()
+            .with_base_url("https://openrouter.ai/api/v1/")?
+            .with_http_referer("https://github.com/your_org/your_repo")
+            .with_site_title("OpenRouter Rust SDK Tests")
+            .with_api_key(api_key)?;
+
+        // Test that we can create a credits API instance
+        let credits_api = client.credits()?;
+        assert!(credits_api
+            .config
+            .base_url
+            .as_str()
+            .contains("openrouter.ai"));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_credits_serialization_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::types::credits::{CreditsData, CreditsResponse};
+
+        let original = CreditsResponse {
+            data: CreditsData {
+                total_credits: 99.99,
+                total_usage: 33.33,
+            },
+        };
+
+        // Serialize to JSON
+        let json_str = serde_json::to_string(&original)?;
+
+        // Deserialize back
+        let deserialized: CreditsResponse = serde_json::from_str(&json_str)?;
+
+        // Verify they're equal
+        assert_eq!(original, deserialized);
+        assert_eq!(deserialized.total_credits(), 99.99);
+        assert_eq!(deserialized.total_usage(), 33.33);
+        assert_eq!(deserialized.remaining_credits(), 66.66);
+
+        Ok(())
+    }
 }
