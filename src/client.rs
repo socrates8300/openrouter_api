@@ -497,6 +497,15 @@ impl OpenRouterClient<Ready> {
         Ok(crate::api::analytics::AnalyticsApi::new(client, &self.config))
     }
 
+    /// Provides access to the providers endpoint.
+    pub fn providers(&self) -> Result<crate::api::providers::ProvidersApi> {
+        let client = self
+            .http_client
+            .clone()
+            .ok_or_else(|| Error::ConfigError("HTTP client is missing".into()))?;
+        Ok(crate::api::providers::ProvidersApi::new(client, &self.config))
+    }
+
     /// Provides access to the generation endpoint.
     pub fn generation(&self) -> Result<crate::api::generation::GenerationApi> {
         let client = self
