@@ -77,7 +77,7 @@ impl GenerationData {
         let prompt = self.native_tokens_prompt.unwrap_or(0);
         let completion = self.native_tokens_completion.unwrap_or(0);
         let reasoning = self.native_tokens_reasoning.unwrap_or(0);
-        
+
         if prompt == 0 && completion == 0 && reasoning == 0 {
             None
         } else {
@@ -107,7 +107,8 @@ impl GenerationData {
 
     /// Get cost per token (if token count is available).
     pub fn cost_per_token(&self) -> Option<f64> {
-        self.total_tokens().map(|tokens| self.total_cost / tokens as f64)
+        self.total_tokens()
+            .map(|tokens| self.total_cost / tokens as f64)
     }
 
     /// Get latency in seconds (if available).
