@@ -549,4 +549,273 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_generation_api_integration() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::types::generation::{GenerationData, GenerationResponse};
+
+        // Test generation response deserialization
+        let generation_json = r#"{
+            "data": {
+                "id": "gen-123456789",
+                "upstream_id": "upstream-abc123",
+                "total_cost": 0.025,
+                "cache_discount": 0.005,
+                "upstream_inference_cost": 0.020,
+                "created_at": "2024-01-15T10:30:00Z",
+                "model": "openai/gpt-4",
+                "app_id": 12345,
+                "streamed": true,
+                "cancelled": false,
+                "provider_name": "OpenAI",
+                "latency": 1500,
+                "moderation_latency": 100,
+                "generation_time": 1200,
+                "finish_reason": "stop",
+                "native_finish_reason": "stop",
+                "tokens_prompt": 50,
+                "tokens_completion": 100,
+                "native_tokens_prompt": 50,
+                "native_tokens_completion": 100,
+                "native_tokens_reasoning": 25,
+                "num_media_prompt": 2,
+                "num_media_completion": 0,
+                "num_search_results": 5,
+                "origin": "api",
+                "usage": 0.025,
+                "is_byok": false
+            }
+        }"#;
+
+        let generation_response: GenerationResponse = serde_json::from_str(generation_json)?;
+        assert_eq!(generation_response.id(), "gen-123456789");
+        assert_eq!(generation_response.model(), "openai/gpt-4");
+        assert_eq!(generation_response.total_cost(), 0.025);
+        assert_eq!(generation_response.effective_cost(), 0.020);
+        assert!(generation_response.is_successful());
+        assert!(generation_response.was_streamed());
+        assert_eq!(generation_response.total_tokens(), Some(150));
+        assert!(generation_response.used_web_search());
+        assert!(generation_response.included_media());
+        assert!(generation_response.used_reasoning());
+
+        // Test generation data methods
+        let generation_data = GenerationData {
+            id: "gen-test".to_string(),
+            upstream_id: None,
+            total_cost: 0.01,
+            cache_discount: None,
+            upstream_inference_cost: None,
+            created_at: "2024-01-15T10:30:00Z".to_string(),
+            model: "openai/gpt-3.5-turbo".to_string(),
+            app_id: None,
+            streamed: Some(false),
+            cancelled: Some(false),
+            provider_name: Some("OpenAI".to_string()),
+            latency: Some(800),
+            moderation_latency: None,
+            generation_time: Some(600),
+            finish_reason: Some("stop".to_string()),
+            native_finish_reason: Some("stop".to_string()),
+            tokens_prompt: Some(20),
+            tokens_completion: Some(30),
+            native_tokens_prompt: Some(20),
+            native_tokens_completion: Some(30),
+            native_tokens_reasoning: None,
+            num_media_prompt: None,
+            num_media_completion: None,
+            num_search_results: None,
+            origin: "api".to_string(),
+            usage: 0.01,
+            is_byok: false,
+        };
+
+        assert_eq!(generation_data.total_tokens(), Some(50));
+        assert_eq!(generation_data.total_native_tokens(), Some(50));
+        assert!(generation_data.is_successful());
+        assert!(!generation_data.was_streamed());
+        assert_eq!(generation_data.effective_cost(), 0.01);
+        assert_eq!(generation_data.cost_per_token(), Some(0.01 / 50.0));
+        assert_eq!(generation_data.latency_seconds(), Some(0.8));
+        assert_eq!(generation_data.generation_time_seconds(), Some(0.6));
+        assert!(!generation_data.used_web_search());
+        assert!(!generation_data.included_media());
+        assert!(!generation_data.used_reasoning());
+
+        // Test edge cases
+        let minimal_generation = GenerationData {
+            id: "gen-minimal".to_string(),
+            upstream_id: None,
+            total_cost: 0.005,
+            cache_discount: None,
+            upstream_inference_cost: None,
+            created_at: "2024-01-15T10:30:00Z".to_string(),
+            model: "openai/gpt-3.5-turbo".to_string(),
+            app_id: None,
+            streamed: None,
+            cancelled: None,
+            provider_name: None,
+            latency: None,
+            moderation_latency: None,
+            generation_time: None,
+            finish_reason: None,
+            native_finish_reason: None,
+            tokens_prompt: None,
+            tokens_completion: None,
+            native_tokens_prompt: None,
+            native_tokens_completion: None,
+            native_tokens_reasoning: None,
+            num_media_prompt: None,
+            num_media_completion: None,
+            num_search_results: None,
+            origin: "api".to_string(),
+            usage: 0.005,
+            is_byok: false,
+        };
+
+        assert_eq!(minimal_generation.total_tokens(), None);
+        assert_eq!(minimal_generation.total_native_tokens(), None);
+        assert!(minimal_generation.is_successful());
+        assert!(!minimal_generation.was_streamed());
+        assert_eq!(minimal_generation.effective_cost(), 0.005);
+        assert_eq!(minimal_generation.cost_per_token(), None);
+        assert!(!minimal_generation.used_web_search());
+        assert!(!minimal_generation.included_media());
+        assert!(!minimal_generation.used_reasoning());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_generation_api_client_integration() -> Result<(), Box<dyn std::error::Error>> {
+        // Test that the generation API can be created from the client
+        let api_key = "sk-1234567890abcdef1234567890abcdef";
+
+        let client = OpenRouterClient::<Unconfigured>::new()
+            .with_base_url("https://openrouter.ai/api/v1/")?
+            .with_http_referer("https://github.com/your_org/your_repo")
+            .with_site_title("OpenRouter Rust SDK Tests")
+            .with_api_key(api_key)?;
+
+        // Test that we can create a generation API instance
+        let generation_api = client.generation()?;
+        assert!(generation_api
+            .config
+            .base_url
+            .as_str()
+            .contains("openrouter.ai"));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_generation_serialization_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::types::generation::{GenerationData, GenerationResponse};
+
+        let original = GenerationResponse {
+            data: GenerationData {
+                id: "gen-roundtrip".to_string(),
+                upstream_id: Some("upstream-456".to_string()),
+                total_cost: 0.015,
+                cache_discount: Some(0.002),
+                upstream_inference_cost: Some(0.013),
+                created_at: "2024-01-15T11:00:00Z".to_string(),
+                model: "anthropic/claude-3-opus".to_string(),
+                app_id: Some(67890),
+                streamed: Some(true),
+                cancelled: Some(false),
+                provider_name: Some("Anthropic".to_string()),
+                latency: Some(2000),
+                moderation_latency: Some(150),
+                generation_time: Some(1800),
+                finish_reason: Some("stop".to_string()),
+                native_finish_reason: Some("end_turn".to_string()),
+                tokens_prompt: Some(100),
+                tokens_completion: Some(200),
+                native_tokens_prompt: Some(100),
+                native_tokens_completion: Some(200),
+                native_tokens_reasoning: Some(50),
+                num_media_prompt: Some(1),
+                num_media_completion: Some(0),
+                num_search_results: Some(3),
+                origin: "api".to_string(),
+                usage: 0.015,
+                is_byok: false,
+            },
+        };
+
+        // Serialize to JSON
+        let json_str = serde_json::to_string(&original)?;
+
+        // Deserialize back
+        let deserialized: GenerationResponse = serde_json::from_str(&json_str)?;
+
+        // Verify they're equal
+        assert_eq!(original, deserialized);
+        assert_eq!(deserialized.id(), "gen-roundtrip");
+        assert_eq!(deserialized.model(), "anthropic/claude-3-opus");
+        assert_eq!(deserialized.total_cost(), 0.015);
+        assert_eq!(deserialized.effective_cost(), 0.013);
+        assert_eq!(deserialized.total_tokens(), Some(300));
+        assert!(deserialized.used_web_search());
+        assert!(deserialized.included_media());
+        assert!(deserialized.used_reasoning());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_generation_cost_calculations() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::types::generation::{GenerationData, GenerationResponse};
+
+        // Test cost calculations with various scenarios
+        let scenarios = vec![
+            // (total_cost, cache_discount, expected_effective)
+            (0.100, Some(0.020), 0.080),
+            (0.050, None, 0.050),
+            (0.075, Some(0.075), 0.000), // Full discount
+            (0.200, Some(0.025), 0.175),
+        ];
+
+        for (total_cost, cache_discount, expected_effective) in scenarios {
+            let data = GenerationData {
+                id: "gen-cost-test".to_string(),
+                upstream_id: None,
+                total_cost,
+                cache_discount,
+                upstream_inference_cost: None,
+                created_at: "2024-01-15T10:30:00Z".to_string(),
+                model: "openai/gpt-4".to_string(),
+                app_id: None,
+                streamed: None,
+                cancelled: None,
+                provider_name: None,
+                latency: None,
+                moderation_latency: None,
+                generation_time: None,
+                finish_reason: None,
+                native_finish_reason: None,
+                tokens_prompt: Some(100),
+                tokens_completion: Some(200),
+                native_tokens_prompt: Some(100),
+                native_tokens_completion: Some(200),
+                native_tokens_reasoning: None,
+                num_media_prompt: None,
+                num_media_completion: None,
+                num_search_results: None,
+                origin: "api".to_string(),
+                usage: total_cost,
+                is_byok: false,
+            };
+
+            assert!((data.effective_cost() - expected_effective).abs() < f64::EPSILON);
+            assert!((data.cost_per_token().unwrap() - (total_cost / 300.0)).abs() < f64::EPSILON);
+
+            let response = GenerationResponse { data };
+            assert!((response.effective_cost() - expected_effective).abs() < f64::EPSILON);
+            assert!((response.cost_per_token().unwrap() - (total_cost / 300.0)).abs() < f64::EPSILON);
+        }
+
+        Ok(())
+    }
 }
