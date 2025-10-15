@@ -28,6 +28,9 @@ A production-ready Rust client for the OpenRouter API with comprehensive securit
 - **Structured Outputs:** JSON Schema validation for structured response formats
 - **Web Search:** Type-safe web search API integration
 - **Provider Preferences:** Configure model routing, fallbacks, and provider selection
+- **Analytics API:** Comprehensive activity data retrieval with filtering and pagination
+- **Providers API:** Provider information management with search and filtering
+- **Enhanced Models API:** Advanced model discovery with filtering, sorting, and search
 
 ### 📡 **Model Context Protocol (MCP)**
 - **MCP Client:** Full JSON-RPC client implementation for the [Model Context Protocol](https://modelcontextprotocol.io/)
@@ -238,50 +241,6 @@ async fn main() -> Result<()> {
 }
 ```
 
-#### Model Context Protocol (MCP) Client Example
-
-```rust
-use openrouter_api::{MCPClient, Result};
-use openrouter_api::mcp_types::{
-    ClientCapabilities, GetResourceParams, ToolCallParams,
-    MCP_PROTOCOL_VERSION
-};
-
-#[tokio::main]
-async fn main() -> Result<()> {
-    // Create a new MCP client
-    let client = MCPClient::new("https://mcp-server.example.com/mcp")?;
-    
-    // Initialize the client with client capabilities
-    let server_capabilities = client.initialize(ClientCapabilities {
-        protocolVersion: MCP_PROTOCOL_VERSION.to_string(),
-        supportsSampling: Some(true),
-    }).await?;
-    
-    println!("Connected to MCP server with capabilities: {:?}", server_capabilities);
-    
-    // Get a resource from the MCP server
-    let resource = client.get_resource(GetResourceParams {
-        id: "document-123".to_string(),
-        parameters: None,
-    }).await?;
-    
-    println!("Retrieved resource: {}", resource.content);
-    
-    // Call a tool on the MCP server
-    let result = client.tool_call(ToolCallParams {
-        id: "search-tool".to_string(),
-        parameters: serde_json::json!({
-            "query": "Rust programming"
-        }),
-    }).await?;
-    
-    println!("Tool call result: {:?}", result.result);
-    
-    Ok(())
-}
-```
-
 #### Text Completion Example
 
 ```rust
@@ -388,6 +347,210 @@ async fn main() -> Result<()> {
 }
 ```
 
+#### Analytics API Example
+
+```rust
+use openrouter_api::{OpenRouterClient, utils, Result};
+use openrouter_api::types::analytics::{AnalyticsQuery, ActivityType, DateRange};
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    // Load API key from environment
+    let api_key = utils::load_api_key_from_env()?;
+    
+    // Build the client
+    let client = OpenRouterClient::new()
+        .with_base_url("https://openrouter.ai/api/v1/")?
+        .with_api_key(api_key)?;
+
+    // Get the analytics API
+    let analytics_api = client.analytics()?;
+
+    // Example 1: Get all activity data with pagination
+    let mut all_activities = Vec::new();
+    let mut page = 1;
+    
+    loop {
+        let query = AnalyticsQuery::new()
+            .with_page(page)
+            .with_per_page(100);
+            
+        let response = analytics_api.query(query).await?;
+        all_activities.extend(response.data);
+        
+        if response.data.len() < 100 {
+            break; // Last page
+        }
+        page += 1;
+    }
+    
+    println!("Retrieved {} total activities", all_activities.len());
+
+    // Example 2: Filter by specific activity types
+    let chat_query = AnalyticsQuery::new()
+        .with_activity_type(vec![ActivityType::ChatCompletion])
+        .with_per_page(50);
+        
+    let chat_response = analytics_api.query(chat_query).await?;
+    println!("Found {} chat completion activities", chat_response.data.len());
+
+    // Example 3: Get activity within a date range
+    let date_range_query = AnalyticsQuery::new()
+        .with_date_range(DateRange::Custom {
+            start: "2024-01-01".to_string(),
+            end: "2024-01-31".to_string(),
+        });
+        
+    let january_response = analytics_api.query(date_range_query).await?;
+    println!("January activities: {}", january_response.data.len());
+
+    // Example 4: Get usage statistics
+    let usage_stats = analytics_api.usage().await?;
+    println!("Total requests: {}", usage_stats.total_requests);
+    println!("Total tokens: {}", usage_stats.total_tokens);
+
+    // Example 5: Get daily activity for the last 7 days
+    let daily_activity = analytics_api.daily_activity().await?;
+    for day in daily_activity {
+        println!("{}: {} requests, {} tokens", 
+            day.date, day.request_count, day.token_count);
+    }
+
+    Ok(())
+}
+```
+
+#### Providers API Example
+
+```rust
+use openrouter_api::{OpenRouterClient, utils, Result};
+use openrouter_api::types::providers::{ProvidersQuery, ProviderSort};
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    // Load API key from environment
+    let api_key = utils::load_api_key_from_env()?;
+    
+    // Build the client
+    let client = OpenRouterClient::new()
+        .with_base_url("https://openrouter.ai/api/v1/")?
+        .with_api_key(api_key)?;
+
+    // Get the providers API
+    let providers_api = client.providers()?;
+
+    // Example 1: List all available providers
+    let all_providers = providers_api.list().await?;
+    println!("Found {} providers", all_providers.len());
+    
+    for provider in &all_providers {
+        println!("{}: {} models", provider.name, provider.model_count);
+    }
+
+    // Example 2: Search for specific providers
+    let search_query = ProvidersQuery::new()
+        .with_search("openai")
+        .with_sort(ProviderSort::Name);
+        
+    let search_results = providers_api.search(search_query).await?;
+    println!("Found {} providers matching 'openai'", search_results.len());
+
+    // Example 3: Get provider by name
+    if let Some(openai) = providers_api.get_by_name("OpenAI").await? {
+        println!("OpenAI provider details:");
+        println!("  Models: {}", openai.model_count);
+        println!("  Status: {:?}", openai.status);
+        
+        // Extract domain from provider's first model URL
+        if let Some(first_model) = openai.models.first() {
+            if let Some(domain) = first_model.extract_domain() {
+                println!("  Domain: {}", domain);
+            }
+        }
+    }
+
+    // Example 4: Get providers with specific capabilities
+    let capability_query = ProvidersQuery::new()
+        .with_capability("chat");
+        
+    let chat_providers = providers_api.query(capability_query).await?;
+    println!("{} providers support chat", chat_providers.len());
+
+    Ok(())
+}
+```
+
+#### Enhanced Models API Example
+
+```rust
+use openrouter_api::{OpenRouterClient, utils, Result};
+use openrouter_api::types::models::{ModelsQuery, ModelSort, ModelArchitecture};
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    // Load API key from environment
+    let api_key = utils::load_api_key_from_env()?;
+    
+    // Build the client
+    let client = OpenRouterClient::new()
+        .with_base_url("https://openrouter.ai/api/v1/")?
+        .with_api_key(api_key)?;
+
+    // Get the models API
+    let models_api = client.models()?;
+
+    // Example 1: List all available models
+    let all_models = models_api.list().await?;
+    println!("Found {} models", all_models.len());
+
+    // Example 2: Search for models with specific capabilities
+    let search_query = ModelsQuery::new()
+        .with_search("gpt-4")
+        .with_capability("chat")
+        .with_sort(ModelSort::Name);
+        
+    let search_results = models_api.search(search_query).await?;
+    println!("Found {} GPT-4 models with chat capability", search_results.len());
+
+    // Example 3: Filter by architecture
+    let architecture_query = ModelsQuery::new()
+        .with_architecture(ModelArchitecture::Transformer);
+        
+    let transformer_models = models_api.query(architecture_query).await?;
+    println!("Found {} transformer models", transformer_models.len());
+
+    // Example 4: Get models by provider
+    let openai_models = models_api.get_by_provider("OpenAI").await?;
+    println!("OpenAI has {} models", openai_models.len());
+
+    // Example 5: Filter by context length
+    let context_query = ModelsQuery::new()
+        .with_min_context_length(32000)
+        .with_max_context_length(128000);
+        
+    let high_context_models = models_api.query(context_query).await?;
+    println!("Found {} models with 32k-128k context", high_context_models.len());
+
+    // Example 6: Get free models
+    let free_models = models_api.get_free_models().await?;
+    println!("Found {} free models", free_models.len());
+
+    // Example 7: Get model details
+    if let Some(gpt4) = models_api.get_by_id("openai/gpt-4").await? {
+        println!("GPT-4 Details:");
+        println!("  Name: {}", gpt4.name);
+        println!("  Context Length: {}", gpt4.context_length);
+        println!("  Pricing: ${}/1M tokens", gpt4.pricing.prompt);
+        
+        if let Some(description) = gpt4.description {
+            println!("  Description: {}", description);
+        }
+    }
+
+    Ok(())
+}
+```
+
 ## Model Context Protocol (MCP) Client
 
 The library includes a client implementation for the [Model Context Protocol](https://modelcontextprotocol.io/), which is an open protocol that standardizes how applications provide context to LLMs.
@@ -433,10 +596,13 @@ This is a production-ready library with comprehensive functionality:
 - **Tool Calling:** Function calling with validation
 - **Structured Outputs:** JSON Schema validation
 - **Provider Preferences:** Model routing and fallback configuration
+- **Analytics API:** Comprehensive activity data retrieval with filtering and pagination
+- **Providers API:** Provider information management with search and filtering
+- **Enhanced Models API:** Advanced model discovery with filtering, sorting, and search
 - **Model Context Protocol:** Complete MCP client implementation
 
 ### ✅ **Quality Infrastructure (Completed)**
-- **100% Test Coverage:** 80+ comprehensive unit and integration tests
+- **100% Test Coverage:** 147 comprehensive unit and integration tests
 - **Security Auditing:** Automated security vulnerability scanning
 - **CI/CD Pipeline:** GitHub Actions with quality gates
 - **Documentation:** Complete API documentation with examples
@@ -447,12 +613,14 @@ This is a production-ready library with comprehensive functionality:
 - **Flexible Configuration:** Timeout, retry, and header management
 - **Error Handling:** Comprehensive error types with context
 - **Memory Safety:** Automatic sensitive data cleanup
+- **Advanced Filtering:** Sophisticated query builders for analytics, providers, and models
+- **Convenience Methods:** Helper methods for common operations like domain extraction
 
 ### 🔄 **Future Enhancements**
-- **Models Listing:** Endpoint to list available models
 - **Credits API:** Account credit and usage tracking
 - **Performance Optimizations:** Connection pooling and caching
 - **Extended MCP Features:** Additional MCP protocol capabilities
+- **Generation API Enhancements:** Additional generation endpoints and features
 
 ## Contributing
 
