@@ -1,6 +1,8 @@
 use crate::client::ClientConfig;
 use crate::error::{Error, Result};
-use crate::types::chat::{ChatCompletionChunk, ChatCompletionRequest, ChatCompletionResponse};
+use crate::types::chat::{
+    ChatCompletionChunk, ChatCompletionRequest, ChatCompletionResponse, Message, MessageContent,
+};
 use crate::utils::{security::create_safe_error_message, validation};
 use async_stream::try_stream;
 use futures::stream::Stream;
@@ -201,7 +203,7 @@ impl ChatApi {
                 })?;
 
             // Process the bytes stream as an asynchronous line stream.
-            let byte_stream = response.bytes_stream().map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e));
+            let byte_stream = response.bytes_stream().map_err(std::io::Error::other);
             let stream_reader = StreamReader::new(byte_stream);
             let mut lines = FramedRead::new(stream_reader, LinesCodec::new());
 
@@ -247,14 +249,14 @@ impl ChatApi {
                                 &format!("Failed to parse streaming chunk: {}. Data: {}", e, data_part),
                                 "Streaming chunk parse error"
                             );
-                            
+
                             // Use tracing if available, otherwise fall back to eprintln
                             #[cfg(feature = "tracing")]
                             tracing::error!("Streaming parse error: {}", error_msg);
-                            
+
                             #[cfg(not(feature = "tracing"))]
                             eprintln!("Streaming parse error: {}", error_msg);
-                            
+
                             continue;
                         }
                     }
@@ -278,30 +280,42 @@ impl ChatApi {
     pub async fn simple_completion(&self, model: &str, user_message: &str) -> Result<String> {
         let request = ChatCompletionRequest {
             model: model.to_string(),
-            messages: vec![crate::types::chat::Message {
-                role: "user".to_string(),
-                content: user_message.to_string(),
-                name: None,
-                tool_calls: None,
-            }],
+            messages: vec![Message::text("user", user_message)],
             stream: None,
             response_format: None,
             tools: None,
+            tool_choice: None,
             provider: None,
             models: None,
             transforms: None,
+            route: None,
+            user: None,
+            max_tokens: None,
+            temperature: None,
+            top_p: None,
+            top_k: None,
+            frequency_penalty: None,
+            presence_penalty: None,
+            repetition_penalty: None,
+            min_p: None,
+            top_a: None,
+            seed: None,
+            stop: None,
+            logit_bias: None,
+            logprobs: None,
+            top_logprobs: None,
+            prediction: None,
+            parallel_tool_calls: None,
+            verbosity: None,
         };
 
         let response = self.chat_completion(request).await?;
 
-        if response.choices.is_empty() {
-            return Err(Error::ApiError {
-                code: 500,
-                message: "No choices returned in response".into(),
-                metadata: None,
-            });
+        match &response.choices[0].message.content {
+            MessageContent::Text(content) => Ok(content.clone()),
+            MessageContent::Parts(_) => Err(Error::ConfigError(
+                "Unexpected multimodal content in simple completion response".into(),
+            )),
         }
-
-        Ok(response.choices[0].message.content.clone())
     }
 }

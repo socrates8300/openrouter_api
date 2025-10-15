@@ -9,6 +9,10 @@ mod tests {
 
     #[test]
     fn test_load_api_key_from_env_success() {
+        // Ensure clean state first
+        env::remove_var("OPENROUTER_API_KEY");
+        env::remove_var("OR_API_KEY");
+
         // Set up a test environment variable
         env::set_var(
             "OPENROUTER_API_KEY",
@@ -103,7 +107,7 @@ mod tests {
 
         let result = load_api_key_from_env();
         assert!(result.is_ok());
-        // Returns raw value including newline
+        // The function returns the raw value, trimming is done in validation
         assert_eq!(result.unwrap(), "sk-test1234567890abcdef1234567890abcdef\n");
 
         // Clean up
@@ -114,6 +118,11 @@ mod tests {
     fn test_load_api_key_preserves_internal_content() {
         // Test that internal content is preserved (no trimming within the key)
         let test_key = "sk-test123_with-special.chars890abcdef";
+
+        // Ensure clean state first
+        env::remove_var("OPENROUTER_API_KEY");
+        env::remove_var("OR_API_KEY");
+
         env::set_var("OPENROUTER_API_KEY", test_key);
 
         let result = load_api_key_from_env();
@@ -128,6 +137,10 @@ mod tests {
     async fn test_api_key_integration_with_client() {
         // Integration test: load API key and use it with client
         use crate::client::{OpenRouterClient, Unconfigured};
+
+        // Ensure clean state first
+        env::remove_var("OPENROUTER_API_KEY");
+        env::remove_var("OR_API_KEY");
 
         env::set_var(
             "OPENROUTER_API_KEY",

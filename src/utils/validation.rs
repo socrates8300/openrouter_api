@@ -2,7 +2,7 @@
 
 use crate::error::{Error, Result};
 use crate::models::tool::Tool;
-use crate::types::chat::{ChatCompletionRequest, Message};
+use crate::types::chat::{ChatCompletionRequest, ContentPart, Message, MessageContent};
 use std::collections::HashSet;
 
 /// Maximum allowed tokens in a chat completion request
@@ -20,6 +20,9 @@ pub fn validate_chat_request(request: &ChatCompletionRequest) -> Result<()> {
         return Err(Error::ConfigError("Messages array cannot be empty".into()));
     }
 
+    // Validate sampling parameters
+    validate_sampling_parameters(request)?;
+
     // Validate message roles
     for (i, msg) in request.messages.iter().enumerate() {
         validate_message(msg, i)?;
@@ -33,26 +36,116 @@ pub fn validate_chat_request(request: &ChatCompletionRequest) -> Result<()> {
     Ok(())
 }
 
+/// Validates sampling parameters for valid ranges.
+fn validate_sampling_parameters(request: &ChatCompletionRequest) -> Result<()> {
+    // Temperature: [0.0, 2.0]
+    if let Some(temp) = request.temperature {
+        if !(0.0..=2.0).contains(&temp) {
+            return Err(Error::ConfigError(format!(
+                "Temperature must be between 0.0 and 2.0, got {}",
+                temp
+            )));
+        }
+    }
+
+    // Top P: (0.0, 1.0]
+    if let Some(top_p) = request.top_p {
+        if top_p <= 0.0 || top_p > 1.0 {
+            return Err(Error::ConfigError(format!(
+                "Top P must be between 0.0 (exclusive) and 1.0 (inclusive), got {}",
+                top_p
+            )));
+        }
+    }
+
+    // Top K: [1, ∞) or 0 (disabled)
+    if let Some(top_k) = request.top_k {
+        if top_k != 0 && top_k < 1 {
+            return Err(Error::ConfigError(format!(
+                "Top K must be 0 (disabled) or >= 1, got {}",
+                top_k
+            )));
+        }
+    }
+
+    // Frequency Penalty: [-2.0, 2.0]
+    if let Some(fp) = request.frequency_penalty {
+        if !(-2.0..=2.0).contains(&fp) {
+            return Err(Error::ConfigError(format!(
+                "Frequency penalty must be between -2.0 and 2.0, got {}",
+                fp
+            )));
+        }
+    }
+
+    // Presence Penalty: [-2.0, 2.0]
+    if let Some(pp) = request.presence_penalty {
+        if !(-2.0..=2.0).contains(&pp) {
+            return Err(Error::ConfigError(format!(
+                "Presence penalty must be between -2.0 and 2.0, got {}",
+                pp
+            )));
+        }
+    }
+
+    // Repetition Penalty: (0.0, 2.0]
+    if let Some(rp) = request.repetition_penalty {
+        if rp <= 0.0 || rp > 2.0 {
+            return Err(Error::ConfigError(format!(
+                "Repetition penalty must be between 0.0 (exclusive) and 2.0 (inclusive), got {}",
+                rp
+            )));
+        }
+    }
+
+    // Min P: [0.0, 1.0]
+    if let Some(min_p) = request.min_p {
+        if !(0.0..=1.0).contains(&min_p) {
+            return Err(Error::ConfigError(format!(
+                "Min P must be between 0.0 and 1.0, got {}",
+                min_p
+            )));
+        }
+    }
+
+    // Top A: [0.0, 1.0]
+    if let Some(top_a) = request.top_a {
+        if !(0.0..=1.0).contains(&top_a) {
+            return Err(Error::ConfigError(format!(
+                "Top A must be between 0.0 and 1.0, got {}",
+                top_a
+            )));
+        }
+    }
+
+    // Top Logprobs: [0, 20]
+    if let Some(tlp) = request.top_logprobs {
+        if tlp > 20 {
+            return Err(Error::ConfigError(format!(
+                "Top logprobs must be <= 20, got {}",
+                tlp
+            )));
+        }
+    }
+
+    Ok(())
+}
+
 /// Validates a single message for errors.
 fn validate_message(message: &Message, index: usize) -> Result<()> {
     // Role validation
     match message.role.as_str() {
-        "user" | "assistant" | "system" => {}
+        "user" | "assistant" | "system" | "tool" => {}
         _ => {
             return Err(Error::ConfigError(format!(
-                "Invalid role at message[{}]: '{}'. Must be 'user', 'assistant', or 'system'",
-                index, message.role
-            )))
+            "Invalid role at message[{}]: '{}'. Must be 'user', 'assistant', 'system', or 'tool'",
+            index, message.role
+        )))
         }
     }
 
-    // Content validation
-    if message.content.trim().is_empty() && message.tool_calls.is_none() {
-        return Err(Error::ConfigError(format!(
-            "Message at index {} must have either non-empty content or tool_calls",
-            index
-        )));
-    }
+    // Content validation based on role
+    validate_message_content(message, index)?;
 
     // Tool calls validation for assistant messages
     if let Some(tool_calls) = &message.tool_calls {
@@ -83,6 +176,92 @@ fn validate_message(message: &Message, index: usize) -> Result<()> {
                 return Err(Error::ConfigError(format!(
                     "Function name in tool call {} at message {} cannot be empty",
                     tc_idx, index
+                )));
+            }
+        }
+    }
+
+    // Tool call ID validation for tool messages
+    if message.role == "tool"
+        && (message.tool_call_id.is_none()
+            || message.tool_call_id.as_ref().unwrap().trim().is_empty())
+    {
+        return Err(Error::ConfigError(format!(
+            "Tool message at index {} must have a non-empty tool_call_id",
+            index
+        )));
+    }
+
+    Ok(())
+}
+
+/// Validates message content based on role and content type.
+fn validate_message_content(message: &Message, index: usize) -> Result<()> {
+    match &message.content {
+        MessageContent::Text(text) => {
+            // For tool messages, content can be empty (some providers allow empty results)
+            if message.role != "tool" && text.trim().is_empty() && message.tool_calls.is_none() {
+                return Err(Error::ConfigError(format!(
+                    "Message at index {} must have either non-empty content or tool_calls",
+                    index
+                )));
+            }
+        }
+        MessageContent::Parts(parts) => {
+            // Multimodal content is only allowed for user messages
+            if message.role != "user" {
+                return Err(Error::ConfigError(format!(
+                    "Multimodal content (ContentParts) is only allowed for user messages, got role '{}' at index {}",
+                    message.role, index
+                )));
+            }
+
+            // Validate each content part
+            if parts.is_empty() {
+                return Err(Error::ConfigError(format!(
+                    "Content parts array cannot be empty for message at index {}",
+                    index
+                )));
+            }
+
+            for (part_idx, part) in parts.iter().enumerate() {
+                validate_content_part(part, index, part_idx)?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Validates a single content part.
+fn validate_content_part(part: &ContentPart, msg_index: usize, part_index: usize) -> Result<()> {
+    match part {
+        ContentPart::Text(text_content) => {
+            if text_content.text.trim().is_empty() {
+                return Err(Error::ConfigError(format!(
+                    "Text content part {} at message {} cannot be empty",
+                    part_index, msg_index
+                )));
+            }
+        }
+        ContentPart::Image(image_content) => {
+            // Validate image URL
+            if image_content.image_url.url.trim().is_empty() {
+                return Err(Error::ConfigError(format!(
+                    "Image URL cannot be empty for image part {} at message {}",
+                    part_index, msg_index
+                )));
+            }
+
+            // Basic URL validation - should start with http://, https://, or data:image/
+            let url = &image_content.image_url.url;
+            if !(url.starts_with("http://")
+                || url.starts_with("https://")
+                || url.starts_with("data:image/"))
+            {
+                return Err(Error::ConfigError(format!(
+                    "Image URL must be a valid HTTP(S) URL or base64 data URI for image part {} at message {}",
+                    part_index, msg_index
                 )));
             }
         }
@@ -133,11 +312,30 @@ fn validate_tools(tools: &[Tool]) -> Result<()> {
 
 /// Estimates token count for a message (rough approximation).
 pub fn estimate_message_tokens(message: &Message) -> u32 {
-    // Very rough approximation: 1 token per 4 characters
-    let content_tokens = message.content.len() as u32 / 4;
+    let content_tokens = match &message.content {
+        MessageContent::Text(text) => {
+            // Very rough approximation: 1 token per 4 characters
+            text.len() as u32 / 4
+        }
+        MessageContent::Parts(parts) => {
+            // Estimate tokens for each part
+            parts
+                .iter()
+                .map(|part| {
+                    match part {
+                        ContentPart::Text(text_content) => text_content.text.len() as u32 / 4,
+                        ContentPart::Image(_) => {
+                            // Images typically cost ~85-100 tokens each for vision models
+                            85
+                        }
+                    }
+                })
+                .sum()
+        }
+    };
 
     // Add tokens for role
-    let role_tokens = 3; // Typically "user", "assistant" or "system" is 1-3 tokens
+    let role_tokens = 3; // Typically "user", "assistant", "system" or "tool" is 1-3 tokens
 
     // Add tokens for tool calls if present
     let tool_call_tokens = if let Some(tool_calls) = &message.tool_calls {
@@ -154,7 +352,14 @@ pub fn estimate_message_tokens(message: &Message) -> u32 {
         0
     };
 
-    role_tokens + content_tokens + tool_call_tokens
+    // Add tokens for tool call ID if present
+    let tool_call_id_tokens = if let Some(tool_call_id) = &message.tool_call_id {
+        tool_call_id.len() as u32 / 4
+    } else {
+        0
+    };
+
+    role_tokens + content_tokens + tool_call_tokens + tool_call_id_tokens
 }
 
 /// Estimates total token count for a request (rough approximation).

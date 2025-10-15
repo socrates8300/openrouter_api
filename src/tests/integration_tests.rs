@@ -12,7 +12,9 @@ mod tests {
     use crate::models::structured::{JsonSchemaConfig, JsonSchemaDefinition};
     #[allow(unused_imports)]
     use crate::models::tool::{FunctionCall, FunctionDescription, Tool, ToolCall};
-    use crate::types::chat::{ChatCompletionRequest, ChatCompletionResponse, Message};
+    use crate::types::chat::{
+        ChatCompletionRequest, ChatCompletionResponse, Message, MessageContent,
+    };
     use serde_json::{json, Value};
     use std::env;
     use url::Url;
@@ -38,18 +40,33 @@ mod tests {
         // Create a basic chat completion request.
         let _request = ChatCompletionRequest {
             model: "openai/gpt-4o".to_string(),
-            messages: vec![Message {
-                role: "user".to_string(),
-                content: "What is a phantom type in Rust?".to_string(),
-                name: None,
-                tool_calls: None,
-            }],
+            messages: vec![Message::text("user", "What is a phantom type in Rust?")],
             stream: None,
             response_format: None,
             tools: None,
+            tool_choice: None,
             provider: None,
             models: None,
             transforms: None,
+            route: None,
+            user: None,
+            max_tokens: None,
+            temperature: None,
+            top_p: None,
+            top_k: None,
+            frequency_penalty: None,
+            presence_penalty: None,
+            repetition_penalty: None,
+            min_p: None,
+            top_a: None,
+            seed: None,
+            stop: None,
+            logit_bias: None,
+            logprobs: None,
+            top_logprobs: None,
+            prediction: None,
+            parallel_tool_calls: None,
+            verbosity: None,
         };
 
         // For this integration test we are simulating a response.
@@ -67,6 +84,7 @@ mod tests {
             }],
             "created": 1234567890,
             "model": "openai/gpt-4o",
+            "object": "chat.completion",
             "usage": {
                 "prompt_tokens": 10,
                 "completion_tokens": 15,
@@ -104,7 +122,8 @@ mod tests {
                 "native_finish_reason": "tool_calls"
             }],
             "created": 1234567890,
-            "model": "openai/gpt-4o"
+            "model": "openai/gpt-4o",
+            "object": "chat.completion"
         }
         "#;
         let response = deserialize_chat_response(simulated_response_json);
@@ -187,7 +206,8 @@ mod tests {
                 "native_finish_reason": "tool_calls"
             }],
             "created": 1234567890,
-            "model": "openai/gpt-4o"
+            "model": "openai/gpt-4o",
+            "object": "chat.completion"
         }
         "#;
         let response = deserialize_chat_response(simulated_response_json);
@@ -295,8 +315,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_chat_completion_with_provider_preferences() -> Result<(), Box<dyn std::error::Error>> {
-        use crate::models::provider_preferences::{DataCollection, ProviderPreferences, ProviderSort};
+    async fn test_chat_completion_with_provider_preferences(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        use crate::models::provider_preferences::{
+            DataCollection, ProviderPreferences, ProviderSort,
+        };
         use crate::types::chat::{ChatCompletionRequest, Message};
 
         // Create provider preferences
@@ -313,18 +336,33 @@ mod tests {
         // Create a chat completion request with provider preferences
         let request = ChatCompletionRequest {
             model: "openai/gpt-4o".to_string(),
-            messages: vec![Message {
-                role: "user".to_string(),
-                content: "Hello with provider preferences!".to_string(),
-                name: None,
-                tool_calls: None,
-            }],
+            messages: vec![Message::text("user", "Hello with provider preferences!")],
             stream: None,
             response_format: None,
             tools: None,
+            tool_choice: None,
             provider: Some(preferences),
             models: None,
             transforms: None,
+            route: None,
+            user: None,
+            max_tokens: None,
+            temperature: None,
+            top_p: None,
+            top_k: None,
+            frequency_penalty: None,
+            presence_penalty: None,
+            repetition_penalty: None,
+            min_p: None,
+            top_a: None,
+            seed: None,
+            stop: None,
+            logit_bias: None,
+            logprobs: None,
+            top_logprobs: None,
+            prediction: None,
+            parallel_tool_calls: None,
+            verbosity: None,
         };
 
         // Serialize to JSON to verify the structure
@@ -334,17 +372,27 @@ mod tests {
         // Verify that the provider field is serialized as an object, not a string
         let parsed: serde_json::Value = serde_json::from_str(&json)?;
         let provider_field = parsed.get("provider").expect("Provider field should exist");
-        
+
         // Ensure it's an object, not a string
-        assert!(provider_field.is_object(), "Provider field should be an object");
-        
+        assert!(
+            provider_field.is_object(),
+            "Provider field should be an object"
+        );
+
         // Verify specific fields
-        let order = provider_field.get("order").expect("Order field should exist");
+        let order = provider_field
+            .get("order")
+            .expect("Order field should exist");
         assert!(order.is_array(), "Order should be an array");
-        
-        let allow_fallbacks = provider_field.get("allowFallbacks").expect("allowFallbacks field should exist");
-        assert!(allow_fallbacks.is_boolean(), "allowFallbacks should be boolean");
-        
+
+        let allow_fallbacks = provider_field
+            .get("allowFallbacks")
+            .expect("allowFallbacks field should exist");
+        assert!(
+            allow_fallbacks.is_boolean(),
+            "allowFallbacks should be boolean"
+        );
+
         Ok(())
     }
 
@@ -370,7 +418,10 @@ mod tests {
         let chunk: ChatCompletionChunk = serde_json::from_str(streaming_chunk_json)?;
         assert_eq!(chunk.id, "chatcmpl-123");
         assert_eq!(chunk.choices.len(), 1);
-        assert_eq!(chunk.choices[0].delta.content, Some("Hello".to_string()));
+        assert_eq!(
+            chunk.choices[0].delta.content,
+            Some(MessageContent::Text("Hello".to_string()))
+        );
         assert!(chunk.usage.is_none());
 
         // Test final chunk with usage
@@ -392,7 +443,10 @@ mod tests {
         }"#;
 
         let final_chunk: ChatCompletionChunk = serde_json::from_str(final_chunk_json)?;
-        assert_eq!(final_chunk.choices[0].finish_reason, Some("stop".to_string()));
+        assert_eq!(
+            final_chunk.choices[0].finish_reason,
+            Some("stop".to_string())
+        );
         assert!(final_chunk.usage.is_some());
         let usage = final_chunk.usage.unwrap();
         assert_eq!(usage.prompt_tokens, 10);
