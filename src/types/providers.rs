@@ -42,21 +42,21 @@ impl Provider {
     pub fn has_privacy_policy(&self) -> bool {
         self.privacy_policy_url
             .as_ref()
-            .map_or(false, |url| !url.is_empty())
+            .is_some_and(|url| !url.is_empty())
     }
 
     /// Returns true if the provider has a terms of service URL
     pub fn has_terms_of_service(&self) -> bool {
         self.terms_of_service_url
             .as_ref()
-            .map_or(false, |url| !url.is_empty())
+            .is_some_and(|url| !url.is_empty())
     }
 
     /// Returns true if the provider has a status page URL
     pub fn has_status_page(&self) -> bool {
         self.status_page_url
             .as_ref()
-            .map_or(false, |url| !url.is_empty())
+            .is_some_and(|url| !url.is_empty())
     }
 
     /// Gets the domain from the privacy policy URL if available
@@ -153,7 +153,7 @@ impl ProvidersResponse {
                 .or_else(|| provider.status_page_domain())
                 .unwrap_or_else(|| "unknown".to_string());
 
-            let provider_list = groups.entry(domain).or_insert_with(Vec::new);
+            let provider_list = groups.entry(domain).or_default();
             provider_list.push(provider);
         }
 

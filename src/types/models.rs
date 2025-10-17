@@ -52,39 +52,39 @@ pub struct PricingInfo {
 impl PricingInfo {
     /// Validates that all pricing strings represent valid non-negative numbers
     pub fn validate(&self) -> Result<(), String> {
-        if let Err(_) = self.prompt.parse::<f64>() {
+        if self.prompt.parse::<f64>().is_err() {
             return Err("Invalid prompt price format".to_string());
         }
-        if let Err(_) = self.completion.parse::<f64>() {
+        if self.completion.parse::<f64>().is_err() {
             return Err("Invalid completion price format".to_string());
         }
         if let Some(ref request) = self.request {
-            if let Err(_) = request.parse::<f64>() {
+            if request.parse::<f64>().is_err() {
                 return Err("Invalid request price format".to_string());
             }
         }
         if let Some(ref image) = self.image {
-            if let Err(_) = image.parse::<f64>() {
+            if image.parse::<f64>().is_err() {
                 return Err("Invalid image price format".to_string());
             }
         }
         if let Some(ref web_search) = self.web_search {
-            if let Err(_) = web_search.parse::<f64>() {
+            if web_search.parse::<f64>().is_err() {
                 return Err("Invalid web search price format".to_string());
             }
         }
         if let Some(ref internal_reasoning) = self.internal_reasoning {
-            if let Err(_) = internal_reasoning.parse::<f64>() {
+            if internal_reasoning.parse::<f64>().is_err() {
                 return Err("Invalid internal reasoning price format".to_string());
             }
         }
         if let Some(ref input_cache_read) = self.input_cache_read {
-            if let Err(_) = input_cache_read.parse::<f64>() {
+            if input_cache_read.parse::<f64>().is_err() {
                 return Err("Invalid input cache read price format".to_string());
             }
         }
         if let Some(ref input_cache_write) = self.input_cache_write {
-            if let Err(_) = input_cache_write.parse::<f64>() {
+            if input_cache_write.parse::<f64>().is_err() {
                 return Err("Invalid input cache write price format".to_string());
             }
         }

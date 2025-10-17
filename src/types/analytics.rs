@@ -147,7 +147,7 @@ impl ActivityData {
 
     /// Returns true if the request was successful (not cancelled)
     pub fn is_successful(&self) -> bool {
-        self.cancelled.unwrap_or(false) == false
+        !self.cancelled.unwrap_or(false)
     }
 
     /// Returns true if the request was streamed
@@ -431,7 +431,7 @@ impl ActivityResponse {
         let provider_activities: Vec<&ActivityData> = self
             .data
             .iter()
-            .filter(|d| d.provider.as_ref().map_or(false, |p| p == provider))
+            .filter(|d| d.provider.as_ref().is_some_and(|p| p == provider))
             .collect();
 
         ProviderUsageStats {
@@ -543,7 +543,7 @@ fn is_valid_date_format(date: &str) -> bool {
         return false;
     }
     let month = if let Ok(m) = parts[1].parse::<u32>() {
-        if m < 1 || m > 12 {
+        if !(1..=12).contains(&m) {
             return false;
         }
         m
@@ -556,7 +556,7 @@ fn is_valid_date_format(date: &str) -> bool {
         return false;
     }
     let day = if let Ok(d) = parts[2].parse::<u32>() {
-        if d < 1 || d > 31 {
+        if !(1..=31).contains(&d) {
             return false;
         }
         d
@@ -594,7 +594,7 @@ fn is_valid_day_for_month(day: u32, month: u32, year: Option<u32>) -> bool {
 
 /// Checks if a year is a leap year
 fn is_leap_year(year: u32) -> bool {
-    (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)
+    year.is_multiple_of(4) && !year.is_multiple_of(100) || year.is_multiple_of(400)
 }
 
 #[cfg(test)]
