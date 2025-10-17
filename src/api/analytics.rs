@@ -95,17 +95,15 @@ impl AnalyticsApi {
         request.validate().map_err(Error::ConfigError)?;
 
         // Build the URL with query parameters
-        // Handle base_url that may or may not end with /
-        let url = if self.config.base_url.path().ends_with('/') {
-            self.config.base_url.join("api/v1/activity")
-        } else {
-            self.config.base_url.join("api/v1/activity")
-        }
-        .map_err(|e| Error::ApiError {
-            code: 400,
-            message: format!("Invalid URL for activity endpoint: {e}"),
-            metadata: None,
-        })?;
+        let url = self
+            .config
+            .base_url
+            .join("api/v1/activity")
+            .map_err(|e| Error::ApiError {
+                code: 400,
+                message: format!("Invalid URL for activity endpoint: {e}"),
+                metadata: None,
+            })?;
 
         // Build query parameters
         let mut query_params = Vec::new();
