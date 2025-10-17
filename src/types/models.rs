@@ -447,7 +447,7 @@ mod tests {
 
         let model_info: Result<ModelInfo, _> = serde_json::from_str(json_minimal);
         assert!(model_info.is_ok());
-        
+
         let model = model_info.unwrap();
         assert_eq!(model.id, "test/minimal");
         assert_eq!(model.name, "Minimal Model");
@@ -499,7 +499,7 @@ mod tests {
 
         let model_info: Result<ModelInfo, _> = serde_json::from_str(json_full);
         assert!(model_info.is_ok());
-        
+
         let model = model_info.unwrap();
         assert!(model.description.is_some());
         assert!(model.canonical_slug.is_some());

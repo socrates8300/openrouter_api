@@ -40,17 +40,23 @@ impl Provider {
 
     /// Returns true if the provider has a privacy policy URL
     pub fn has_privacy_policy(&self) -> bool {
-        self.privacy_policy_url.as_ref().map_or(false, |url| !url.is_empty())
+        self.privacy_policy_url
+            .as_ref()
+            .map_or(false, |url| !url.is_empty())
     }
 
     /// Returns true if the provider has a terms of service URL
     pub fn has_terms_of_service(&self) -> bool {
-        self.terms_of_service_url.as_ref().map_or(false, |url| !url.is_empty())
+        self.terms_of_service_url
+            .as_ref()
+            .map_or(false, |url| !url.is_empty())
     }
 
     /// Returns true if the provider has a status page URL
     pub fn has_status_page(&self) -> bool {
-        self.status_page_url.as_ref().map_or(false, |url| !url.is_empty())
+        self.status_page_url
+            .as_ref()
+            .map_or(false, |url| !url.is_empty())
     }
 
     /// Gets the domain from the privacy policy URL if available
@@ -308,7 +314,10 @@ mod tests {
         // Domain extraction should return None for invalid URLs
         assert_eq!(provider_malformed.privacy_policy_domain(), None);
         assert_eq!(provider_malformed.terms_of_service_domain(), None);
-        assert_eq!(provider_malformed.status_page_domain(), Some("valid.com".to_string()));
+        assert_eq!(
+            provider_malformed.status_page_domain(),
+            Some("valid.com".to_string())
+        );
 
         // Test provider with empty URLs
         let provider_empty = Provider::new(
@@ -338,13 +347,7 @@ mod tests {
 
         // Test case-insensitive name search
         let providers = vec![
-            Provider::new(
-                "OpenAI".to_string(),
-                "openai".to_string(),
-                None,
-                None,
-                None,
-            ),
+            Provider::new("OpenAI".to_string(), "openai".to_string(), None, None, None),
             Provider::new(
                 "ANTHROPIC".to_string(),
                 "anthropic".to_string(),
@@ -355,7 +358,7 @@ mod tests {
         ];
 
         let response = ProvidersResponse::new(providers);
-        
+
         // Should find regardless of case
         assert!(response.find_by_name("openai").is_some());
         assert!(response.find_by_name("OPENAI").is_some());
@@ -393,8 +396,11 @@ mod tests {
             );
 
             assert!(provider.privacy_policy_url.is_some());
-            
-            assert_eq!(provider.privacy_policy_domain(), expected_domain.map(|s| s.to_string()));
+
+            assert_eq!(
+                provider.privacy_policy_domain(),
+                expected_domain.map(|s| s.to_string())
+            );
         }
     }
 }

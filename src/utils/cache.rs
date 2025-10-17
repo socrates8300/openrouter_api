@@ -93,7 +93,10 @@ mod tests {
         assert_eq!(cache.get(&"nonexistent".to_string()), None);
 
         // Remove
-        assert_eq!(cache.remove(&"key1".to_string()), Some("value1".to_string()));
+        assert_eq!(
+            cache.remove(&"key1".to_string()),
+            Some("value1".to_string())
+        );
         assert_eq!(cache.get(&"key1".to_string()), None);
     }
 
@@ -113,7 +116,11 @@ mod tests {
     fn test_cache_custom_ttl() {
         let mut cache = Cache::new(Duration::from_secs(10));
 
-        cache.insert_with_ttl("key1".to_string(), "value1".to_string(), Duration::from_millis(50));
+        cache.insert_with_ttl(
+            "key1".to_string(),
+            "value1".to_string(),
+            Duration::from_millis(50),
+        );
         assert_eq!(cache.get(&"key1".to_string()), Some("value1".to_string()));
 
         thread::sleep(Duration::from_millis(100));

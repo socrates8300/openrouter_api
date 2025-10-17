@@ -6,19 +6,19 @@ use std::collections::HashMap;
 pub mod constants {
     /// Standard date format length (YYYY-MM-DD)
     pub const DATE_FORMAT_LENGTH: usize = 10;
-    
+
     /// Default limit for activity queries
     pub const DEFAULT_LIMIT: u32 = 100;
-    
+
     /// Maximum limit for activity queries
     pub const MAX_LIMIT: u32 = 1000;
-    
+
     /// Default recent activity days
     pub const DEFAULT_RECENT_DAYS: i64 = 30;
-    
+
     /// Milliseconds per second for time conversions
     pub const MS_PER_SECOND: f64 = 1000.0;
-    
+
     /// Tokens per million for cost calculations
     pub const TOKENS_PER_MILLION: f64 = 1_000_000.0;
 }
@@ -130,7 +130,8 @@ impl ActivityData {
 
     /// Returns the cost per million tokens if both cost and token count are available
     pub fn cost_per_million_tokens(&self) -> Option<f64> {
-        self.cost_per_token().map(|cost| cost * constants::TOKENS_PER_MILLION)
+        self.cost_per_token()
+            .map(|cost| cost * constants::TOKENS_PER_MILLION)
     }
 
     /// Returns the latency in seconds if available
@@ -140,7 +141,8 @@ impl ActivityData {
 
     /// Returns the generation time in seconds if available
     pub fn generation_time_seconds(&self) -> Option<f64> {
-        self.generation_time.map(|ms| ms as f64 / constants::MS_PER_SECOND)
+        self.generation_time
+            .map(|ms| ms as f64 / constants::MS_PER_SECOND)
     }
 
     /// Returns true if the request was successful (not cancelled)
@@ -586,7 +588,7 @@ fn is_valid_day_for_month(day: u32, month: u32, year: Option<u32>) -> bool {
         }
         _ => return false,
     };
-    
+
     day <= max_day
 }
 
@@ -753,23 +755,21 @@ mod tests {
         assert_eq!(feature_usage.streaming, 0.0);
 
         // Test response with missing optional fields
-        let partial_activities = vec![
-            ActivityData {
-                id: "partial-1".to_string(),
-                created_at: Utc::now(),
-                model: "model-partial".to_string(),
-                total_cost: None, // Missing cost
-                total_tokens: None, // Missing tokens
-                cancelled: None, // Missing cancelled status
-                streamed: None, // Missing streamed status
-                web_search: None, // Missing web search status
-                media: None, // Missing media status
-                reasoning: None, // Missing reasoning status
-                provider: None, // Missing provider
-                latency: None, // Missing latency
-                ..Default::default()
-            },
-        ];
+        let partial_activities = vec![ActivityData {
+            id: "partial-1".to_string(),
+            created_at: Utc::now(),
+            model: "model-partial".to_string(),
+            total_cost: None,   // Missing cost
+            total_tokens: None, // Missing tokens
+            cancelled: None,    // Missing cancelled status
+            streamed: None,     // Missing streamed status
+            web_search: None,   // Missing web search status
+            media: None,        // Missing media status
+            reasoning: None,    // Missing reasoning status
+            provider: None,     // Missing provider
+            latency: None,      // Missing latency
+            ..Default::default()
+        }];
 
         let partial_response = ActivityResponse {
             data: partial_activities,
