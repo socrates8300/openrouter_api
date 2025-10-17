@@ -1,4 +1,4 @@
-//! Validation utilities for request and response objects.
+//! Validation utilities for chat completion requests
 
 use crate::error::{Error, Result};
 use crate::models::tool::Tool;
@@ -413,5 +413,72 @@ pub fn check_token_limits(request: &ChatCompletionRequest) -> Result<()> {
 }
 
 #[cfg(test)]
-#[path = "validation_tests.rs"]
-mod validation_tests;
+mod tests {
+    use super::*;
+
+    fn create_valid_chat_request() -> ChatCompletionRequest {
+        ChatCompletionRequest {
+            model: "openai/gpt-4o".to_string(),
+            messages: vec![Message::text("user", "Hello, world!")],
+            stream: None,
+            response_format: None,
+            tools: None,
+            tool_choice: None,
+            provider: None,
+            models: None,
+            transforms: None,
+            route: None,
+            user: None,
+            max_tokens: None,
+            temperature: None,
+            top_p: None,
+            top_k: None,
+            frequency_penalty: None,
+            presence_penalty: None,
+            repetition_penalty: None,
+            min_p: None,
+            top_a: None,
+            seed: None,
+            stop: None,
+            logit_bias: None,
+            logprobs: None,
+            top_logprobs: None,
+            prediction: None,
+            parallel_tool_calls: None,
+            verbosity: None,
+        }
+    }
+
+    #[test]
+    fn test_validate_chat_request_valid() {
+        let request = create_valid_chat_request();
+        let result = validate_chat_request(&request);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_chat_request_empty_model() {
+        let mut request = create_valid_chat_request();
+        request.model = "".to_string();
+        let result = validate_chat_request(&request);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_chat_request_empty_messages() {
+        let mut request = create_valid_chat_request();
+        request.messages = vec![];
+        let result = validate_chat_request(&request);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_check_token_limits_moderate_content() {
+        let mut request = create_valid_chat_request();
+        // Create content that should be well within limits
+        let moderate_content = "This is a moderate length message. ".repeat(100);
+        request.messages[0].content = MessageContent::Text(moderate_content);
+        let result = check_token_limits(&request);
+        assert!(result.is_ok());
+    }
+}

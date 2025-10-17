@@ -4,7 +4,7 @@ use crate::error::{Error, Result};
 use crate::types::completion::{CompletionRequest, CompletionResponse};
 use crate::utils::{
     retry::execute_with_retry_builder, retry::handle_response_json,
-    retry::operations::TEXT_COMPLETION,
+    retry::operations::TEXT_COMPLETION, validation::validate_completion_request,
 };
 use reqwest::Client;
 
@@ -26,7 +26,7 @@ impl CompletionApi {
     /// Calls the completions endpoint. The request payload includes at minimum the `model` and `prompt` fields,
     /// along with any additional generation parameters (temperature, top_p, and so on).
     pub async fn text_completion(&self, request: CompletionRequest) -> Result<CompletionResponse> {
-        // Validate the request
+        // Validate the request using the new validation module
         validate_completion_request(&request)?;
 
         // Build the URL.
@@ -58,60 +58,5 @@ impl CompletionApi {
     }
 }
 
-/// Validates a completion request for common errors.
-fn validate_completion_request(request: &CompletionRequest) -> Result<()> {
-    // Validate model is not empty
-    if request.model.trim().is_empty() {
-        return Err(Error::ConfigError("Model ID cannot be empty".into()));
-    }
-
-    // Validate prompt is not empty
-    if request.prompt.trim().is_empty() {
-        return Err(Error::ConfigError("Prompt cannot be empty".into()));
-    }
-
-    // Validate extra parameters if present
-    if let serde_json::Value::Object(params) = &request.extra_params {
-        // Temperature: [0.0, 2.0]
-        if let Some(temp) = params.get("temperature").and_then(|v| v.as_f64()) {
-            if !(0.0..=2.0).contains(&temp) {
-                return Err(Error::ConfigError(format!(
-                    "Temperature must be between 0.0 and 2.0, got {}",
-                    temp
-                )));
-            }
-        }
-
-        // Top P: (0.0, 1.0]
-        if let Some(top_p) = params.get("top_p").and_then(|v| v.as_f64()) {
-            if top_p <= 0.0 || top_p > 1.0 {
-                return Err(Error::ConfigError(format!(
-                    "Top P must be between 0.0 (exclusive) and 1.0 (inclusive), got {}",
-                    top_p
-                )));
-            }
-        }
-
-        // Frequency Penalty: [-2.0, 2.0]
-        if let Some(fp) = params.get("frequency_penalty").and_then(|v| v.as_f64()) {
-            if !(-2.0..=2.0).contains(&fp) {
-                return Err(Error::ConfigError(format!(
-                    "Frequency penalty must be between -2.0 and 2.0, got {}",
-                    fp
-                )));
-            }
-        }
-
-        // Presence Penalty: [-2.0, 2.0]
-        if let Some(pp) = params.get("presence_penalty").and_then(|v| v.as_f64()) {
-            if !(-2.0..=2.0).contains(&pp) {
-                return Err(Error::ConfigError(format!(
-                    "Presence penalty must be between -2.0 and 2.0, got {}",
-                    pp
-                )));
-            }
-        }
-    }
-
-    Ok(())
-}
+// Validation is now handled by the validation module
+// The validate_completion_request function is imported from utils::validation

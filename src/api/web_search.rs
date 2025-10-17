@@ -4,7 +4,10 @@ use crate::{
     error::{Error, Result},
     types::web_search::{WebSearchRequest, WebSearchResponse},
     utils::retry::operations::WEB_SEARCH,
-    utils::{retry::execute_with_retry_builder, retry::handle_response_json},
+    utils::{
+        retry::execute_with_retry_builder, retry::handle_response_json,
+        validation::validate_web_search_request,
+    },
 };
 use reqwest::Client;
 
@@ -24,6 +27,9 @@ impl WebSearchApi {
 
     /// Performs a web search with the given request and returns a structured response.
     pub async fn search(&self, request: WebSearchRequest) -> Result<WebSearchResponse> {
+        // Validate the request using the validation module
+        validate_web_search_request(&request)?;
+
         // Join the base URL with the relative path "web/search".
         let url = self
             .config
