@@ -1,7 +1,9 @@
 use crate::client::ClientConfig;
 use crate::error::{Error, Result};
-use crate::types::analytics::{ActivityRequest, ActivityResponse};
-use crate::utils::security::create_safe_error_message;
+#[allow(dead_code, unused_imports)]
+use crate::types::analytics::{ActivityRequest, ActivityResponse, SortField, SortOrder};
+use crate::utils::retry::operations::GET_ACTIVITY;
+use crate::utils::{retry::execute_with_retry_builder, retry::handle_response_json};
 use reqwest::Client;
 use urlencoding::encode;
 
@@ -48,28 +50,28 @@ impl AnalyticsApi {
     ///
     /// ```rust,no_run
     /// use openrouter_api::OpenRouterClient;
-    /// use openrouter_api::types::analytics::ActivityRequest;
+    /// use openrouter_api::types::analytics::{ActivityRequest, SortField, SortOrder};
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = OpenRouterClient::from_env()?;
-    ///     
+    ///
     ///     // Get activity for the last 7 days
     ///     let request = ActivityRequest::new()
     ///         .with_start_date("2024-01-01")
     ///         .with_end_date("2024-01-07")
-    ///         .with_sort("created_at")
-    ///         .with_order("desc")
+    ///         .with_sort(SortField::CreatedAt)
+    ///         .with_order(SortOrder::Descending)
     ///         .with_limit(100);
-    ///     
+    ///
     ///     let response = client.analytics()?.get_activity(request).await?;
-    ///     
+    ///
     ///     println!("Total requests: {}", response.data.len());
     ///     println!("Total cost: ${:.6}", response.total_cost());
     ///     println!("Total tokens: {}", response.total_tokens());
     ///     println!("Success rate: {:.1}%", response.success_rate());
     ///     println!("Streaming rate: {:.1}%", response.streaming_rate());
-    ///     
+    ///
     ///     // Group by model
     ///     let model_groups = response.group_by_model();
     ///     for (model, activities) in model_groups {
@@ -77,20 +79,20 @@ impl AnalyticsApi {
     ///         println!("Model {}: {} requests, ${:.6} total cost",
     ///                  model, stats.request_count, stats.total_cost);
     ///     }
-    ///     
+    ///
     ///     // Feature usage percentages
     ///     let features = response.feature_usage_percentages();
     ///     println!("Web search usage: {:.1}%", features.web_search);
     ///     println!("Media usage: {:.1}%", features.media);
     ///     println!("Reasoning usage: {:.1}%", features.reasoning);
     ///     println!("Streaming usage: {:.1}%", features.streaming);
-    ///     
+    ///
     ///     Ok(())
     /// }
     /// ```
     pub async fn get_activity(&self, request: ActivityRequest) -> Result<ActivityResponse> {
         // Validate the request parameters
-        request.validate().map_err(|e| Error::ConfigError(e))?;
+        request.validate().map_err(Error::ConfigError)?;
 
         // Build the URL with query parameters
         let url = self
@@ -123,11 +125,11 @@ impl AnalyticsApi {
         }
 
         if let Some(sort) = &request.sort {
-            query_params.push(("sort", encode(sort).to_string()));
+            query_params.push(("sort", encode(sort.as_str()).to_string()));
         }
 
         if let Some(order) = &request.order {
-            query_params.push(("order", encode(order).to_string()));
+            query_params.push(("order", encode(order.as_str()).to_string()));
         }
 
         if let Some(limit) = request.limit {
@@ -138,48 +140,24 @@ impl AnalyticsApi {
             query_params.push(("offset", offset.to_string()));
         }
 
-        // Build the request with query parameters
-        let mut req_builder = self.client.get(url).headers(self.config.build_headers()?);
+        // Build headers once to avoid closure issues
+        let headers = self.config.build_headers()?;
 
-        // Add query parameters if any
-        if !query_params.is_empty() {
-            req_builder = req_builder.query(&query_params);
-        }
+        // Execute request with retry logic
+        let response = execute_with_retry_builder(&self.config.retry_config, GET_ACTIVITY, || {
+            let mut req_builder = self.client.get(url.clone()).headers(headers.clone());
 
-        let response = req_builder.send().await?;
+            // Add query parameters if any
+            if !query_params.is_empty() {
+                req_builder = req_builder.query(&query_params);
+            }
 
-        // Capture the status code before consuming the response body
-        let status = response.status();
-
-        // Get the response body
-        let body = response.text().await?;
-
-        // Check if the HTTP response was successful
-        if !status.is_success() {
-            return Err(Error::ApiError {
-                code: status.as_u16(),
-                message: create_safe_error_message(&body, "Analytics API request failed"),
-                metadata: None,
-            });
-        }
-
-        if body.trim().is_empty() {
-            return Err(Error::ApiError {
-                code: status.as_u16(),
-                message: "Empty response body".into(),
-                metadata: None,
-            });
-        }
-
-        // Deserialize the body
-        serde_json::from_str::<ActivityResponse>(&body).map_err(|e| Error::ApiError {
-            code: status.as_u16(),
-            message: create_safe_error_message(
-                &format!("Failed to decode JSON: {e}. Body was: {body}"),
-                "Analytics JSON parsing error",
-            ),
-            metadata: None,
+            req_builder
         })
+        .await?;
+
+        // Handle response with consistent error parsing
+        handle_response_json::<ActivityResponse>(response, GET_ACTIVITY).await
     }
 
     /// Retrieves activity data for a specific date range with default parameters.
@@ -204,15 +182,15 @@ impl AnalyticsApi {
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = OpenRouterClient::from_env()?;
-    ///     
+    ///
     ///     // Get activity for the last 7 days
     ///     let response = client.analytics()?
     ///         .get_activity_by_date_range("2024-01-01", "2024-01-07")
     ///         .await?;
-    ///     
+    ///
     ///     println!("Found {} requests", response.data.len());
     ///     println!("Total cost: ${:.6}", response.total_cost());
-    ///     
+    ///
     ///     Ok(())
     /// }
     /// ```
@@ -224,8 +202,8 @@ impl AnalyticsApi {
         let request = ActivityRequest::new()
             .with_start_date(start_date)
             .with_end_date(end_date)
-            .with_sort("created_at")
-            .with_order("desc");
+            .with_sort(crate::types::analytics::SortField::CreatedAt)
+            .with_order(crate::types::analytics::SortOrder::Descending);
 
         self.get_activity(request).await
     }
@@ -247,29 +225,30 @@ impl AnalyticsApi {
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = OpenRouterClient::from_env()?;
-    ///     
+    ///
     ///     // Get recent activity
     ///     let response = client.analytics()?.get_recent_activity().await?;
-    ///     
+    ///
     ///     println!("Found {} recent requests", response.data.len());
     ///     println!("Success rate: {:.1}%", response.success_rate());
-    ///     
+    ///
     ///     Ok(())
     /// }
     /// ```
     pub async fn get_recent_activity(&self) -> Result<ActivityResponse> {
-        // Calculate date 30 days ago
+        // Calculate date for recent activity
         let end_date = chrono::Utc::now().format("%Y-%m-%d").to_string();
-        let start_date = (chrono::Utc::now() - chrono::Duration::days(30))
-            .format("%Y-%m-%d")
-            .to_string();
+        let start_date = (chrono::Utc::now()
+            - chrono::Duration::days(crate::types::analytics::constants::DEFAULT_RECENT_DAYS))
+        .format("%Y-%m-%d")
+        .to_string();
 
         let request = ActivityRequest::new()
             .with_start_date(start_date)
             .with_end_date(end_date)
-            .with_sort("created_at")
-            .with_order("desc")
-            .with_limit(1000);
+            .with_sort(crate::types::analytics::SortField::CreatedAt)
+            .with_order(crate::types::analytics::SortOrder::Descending)
+            .with_limit(crate::types::analytics::constants::MAX_LIMIT);
 
         self.get_activity(request).await
     }
@@ -296,17 +275,17 @@ impl AnalyticsApi {
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = OpenRouterClient::from_env()?;
-    ///     
+    ///
     ///     // Get activity for a specific model
     ///     let response = client.analytics()?
     ///         .get_activity_by_model("anthropic/claude-3-opus", None, None)
     ///         .await?;
-    ///     
+    ///
     ///     let stats = response.model_stats("anthropic/claude-3-opus");
     ///     println!("Model {}: {} requests", stats.model, stats.request_count);
     ///     println!("Total cost: ${:.6}", stats.total_cost);
     ///     println!("Success rate: {:.1}%", stats.success_rate);
-    ///     
+    ///
     ///     Ok(())
     /// }
     /// ```
@@ -318,8 +297,8 @@ impl AnalyticsApi {
     ) -> Result<ActivityResponse> {
         let mut request = ActivityRequest::new()
             .with_model(model)
-            .with_sort("created_at")
-            .with_order("desc");
+            .with_sort(crate::types::analytics::SortField::CreatedAt)
+            .with_order(crate::types::analytics::SortOrder::Descending);
 
         if let Some(start) = start_date {
             request = request.with_start_date(start);
@@ -354,17 +333,17 @@ impl AnalyticsApi {
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = OpenRouterClient::from_env()?;
-    ///     
+    ///
     ///     // Get activity for a specific provider
     ///     let response = client.analytics()?
     ///         .get_activity_by_provider("Anthropic", None, None)
     ///         .await?;
-    ///     
+    ///
     ///     let stats = response.provider_stats("Anthropic");
     ///     println!("Provider {}: {} requests", stats.provider, stats.request_count);
     ///     println!("Total cost: ${:.6}", stats.total_cost);
     ///     println!("Success rate: {:.1}%", stats.success_rate);
-    ///     
+    ///
     ///     Ok(())
     /// }
     /// ```
@@ -376,8 +355,8 @@ impl AnalyticsApi {
     ) -> Result<ActivityResponse> {
         let mut request = ActivityRequest::new()
             .with_provider(provider)
-            .with_sort("created_at")
-            .with_order("desc");
+            .with_sort(crate::types::analytics::SortField::CreatedAt)
+            .with_order(crate::types::analytics::SortOrder::Descending);
 
         if let Some(start) = start_date {
             request = request.with_start_date(start);
@@ -423,8 +402,8 @@ mod tests {
             .with_end_date("2024-01-31")
             .with_model("test-model")
             .with_provider("test-provider")
-            .with_sort("created_at")
-            .with_order("desc")
+            .with_sort(SortField::CreatedAt)
+            .with_order(SortOrder::Descending)
             .with_limit(100)
             .with_offset(0);
 
@@ -432,8 +411,8 @@ mod tests {
         assert_eq!(request.end_date, Some("2024-01-31".to_string()));
         assert_eq!(request.model, Some("test-model".to_string()));
         assert_eq!(request.provider, Some("test-provider".to_string()));
-        assert_eq!(request.sort, Some("created_at".to_string()));
-        assert_eq!(request.order, Some("desc".to_string()));
+        assert_eq!(request.sort, Some(SortField::CreatedAt));
+        assert_eq!(request.order, Some(SortOrder::Descending));
         assert_eq!(request.limit, Some(100));
         assert_eq!(request.offset, Some(0));
     }

@@ -3,7 +3,7 @@ use serde_json::Value;
 
 /// A model capability, such as "completion" or "chat".
 /// This is used for filtering in `ModelsRequest`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum ModelCapability {
     Chat,
@@ -47,6 +47,59 @@ pub struct PricingInfo {
     pub input_cache_read: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub input_cache_write: Option<String>,
+}
+
+impl PricingInfo {
+    /// Validates that all pricing strings represent valid non-negative numbers
+    pub fn validate(&self) -> Result<(), String> {
+        if self.prompt.parse::<f64>().is_err() {
+            return Err("Invalid prompt price format".to_string());
+        }
+        if self.completion.parse::<f64>().is_err() {
+            return Err("Invalid completion price format".to_string());
+        }
+        if let Some(ref request) = self.request {
+            if request.parse::<f64>().is_err() {
+                return Err("Invalid request price format".to_string());
+            }
+        }
+        if let Some(ref image) = self.image {
+            if image.parse::<f64>().is_err() {
+                return Err("Invalid image price format".to_string());
+            }
+        }
+        if let Some(ref web_search) = self.web_search {
+            if web_search.parse::<f64>().is_err() {
+                return Err("Invalid web search price format".to_string());
+            }
+        }
+        if let Some(ref internal_reasoning) = self.internal_reasoning {
+            if internal_reasoning.parse::<f64>().is_err() {
+                return Err("Invalid internal reasoning price format".to_string());
+            }
+        }
+        if let Some(ref input_cache_read) = self.input_cache_read {
+            if input_cache_read.parse::<f64>().is_err() {
+                return Err("Invalid input cache read price format".to_string());
+            }
+        }
+        if let Some(ref input_cache_write) = self.input_cache_write {
+            if input_cache_write.parse::<f64>().is_err() {
+                return Err("Invalid input cache write price format".to_string());
+            }
+        }
+        Ok(())
+    }
+
+    /// Gets the prompt price as f64, returns None if invalid
+    pub fn prompt_price(&self) -> Option<f64> {
+        self.prompt.parse().ok()
+    }
+
+    /// Gets the completion price as f64, returns None if invalid
+    pub fn completion_price(&self) -> Option<f64> {
+        self.completion.parse().ok()
+    }
 }
 
 /// Nested structure for top provider details within ModelInfo.
@@ -273,5 +326,186 @@ mod tests {
         } else {
             panic!("No models found in deserialized data");
         }
+    }
+
+    #[test]
+    fn test_pricing_info_validation() {
+        // Test valid pricing
+        let valid_pricing = PricingInfo {
+            prompt: "0.001".to_string(),
+            completion: "0.002".to_string(),
+            request: Some("0.0001".to_string()),
+            image: Some("0.01".to_string()),
+            web_search: Some("0".to_string()),
+            internal_reasoning: Some("0.005".to_string()),
+            input_cache_read: Some("0.0005".to_string()),
+            input_cache_write: Some("0.001".to_string()),
+        };
+
+        assert!(valid_pricing.validate().is_ok());
+        assert_eq!(valid_pricing.prompt_price(), Some(0.001));
+        assert_eq!(valid_pricing.completion_price(), Some(0.002));
+
+        // Test invalid pricing
+        let invalid_pricing = PricingInfo {
+            prompt: "invalid".to_string(),
+            completion: "0.002".to_string(),
+            request: None,
+            image: None,
+            web_search: None,
+            internal_reasoning: None,
+            input_cache_read: None,
+            input_cache_write: None,
+        };
+
+        assert!(invalid_pricing.validate().is_err());
+        assert_eq!(invalid_pricing.prompt_price(), None);
+        assert_eq!(invalid_pricing.completion_price(), Some(0.002));
+
+        // Test negative pricing (should parse but might be invalid business logic)
+        let negative_pricing = PricingInfo {
+            prompt: "-0.001".to_string(),
+            completion: "0.002".to_string(),
+            request: None,
+            image: None,
+            web_search: None,
+            internal_reasoning: None,
+            input_cache_read: None,
+            input_cache_write: None,
+        };
+
+        assert!(negative_pricing.validate().is_ok()); // Negative numbers are valid f64
+        assert_eq!(negative_pricing.prompt_price(), Some(-0.001));
+
+        // Test zero pricing
+        let zero_pricing = PricingInfo {
+            prompt: "0".to_string(),
+            completion: "0".to_string(),
+            request: Some("0".to_string()),
+            image: Some("0".to_string()),
+            web_search: Some("0".to_string()),
+            internal_reasoning: Some("0".to_string()),
+            input_cache_read: Some("0".to_string()),
+            input_cache_write: Some("0".to_string()),
+        };
+
+        assert!(zero_pricing.validate().is_ok());
+        assert_eq!(zero_pricing.prompt_price(), Some(0.0));
+        assert_eq!(zero_pricing.completion_price(), Some(0.0));
+    }
+
+    #[test]
+    fn test_model_capability_deserialization() {
+        // Test all known capabilities
+        let capabilities = vec![
+            ("chat", ModelCapability::Chat),
+            ("completion", ModelCapability::Completion),
+            ("embedding", ModelCapability::Embedding),
+            ("tool", ModelCapability::Tool),
+            ("instruction", ModelCapability::Instruction),
+            ("multimodal", ModelCapability::Multimodal),
+            ("vision", ModelCapability::Vision),
+        ];
+
+        for (json_str, expected) in capabilities {
+            let json = format!("\"{}\"", json_str);
+            let capability: ModelCapability = serde_json::from_str(&json).unwrap();
+            assert_eq!(capability, expected);
+        }
+
+        // Test unknown capability (should deserialize as Other)
+        let unknown: ModelCapability = serde_json::from_str("\"unknown_capability\"").unwrap();
+        assert!(matches!(unknown, ModelCapability::Other));
+    }
+
+    #[test]
+    fn test_model_info_edge_cases() {
+        // Test model with minimal required fields
+        let json_minimal = r#"
+        {
+            "id": "test/minimal",
+            "name": "Minimal Model",
+            "context_length": 1000,
+            "created": 1234567890,
+            "architecture": {
+                "modality": "text->text",
+                "input_modalities": ["text"],
+                "output_modalities": ["text"],
+                "tokenizer": "Test"
+            },
+            "pricing": {
+                "prompt": "0.001",
+                "completion": "0.002"
+            },
+            "top_provider": {
+                "context_length": 1000,
+                "max_completion_tokens": null,
+                "is_moderated": false
+            }
+        }
+        "#;
+
+        let model_info: Result<ModelInfo, _> = serde_json::from_str(json_minimal);
+        assert!(model_info.is_ok());
+
+        let model = model_info.unwrap();
+        assert_eq!(model.id, "test/minimal");
+        assert_eq!(model.name, "Minimal Model");
+        assert!(model.description.is_none());
+        assert!(model.canonical_slug.is_none());
+        assert!(model.hugging_face_id.is_none());
+        assert!(model.per_request_limits.is_none());
+        assert!(model.supported_parameters.is_none());
+
+        // Test model with all optional fields
+        let json_full = r#"
+        {
+            "id": "test/full",
+            "name": "Full Model",
+            "description": "A complete model description",
+            "context_length": 100000,
+            "created": 1234567890,
+            "canonical_slug": "test/full",
+            "hugging_face_id": "test-org/full-model",
+            "architecture": {
+                "modality": "text+image->text",
+                "input_modalities": ["text", "image"],
+                "output_modalities": ["text"],
+                "tokenizer": "TestTokenizer",
+                "instruct_type": "test"
+            },
+            "pricing": {
+                "prompt": "0.001",
+                "completion": "0.002",
+                "request": "0.0001",
+                "image": "0.01",
+                "web_search": "0",
+                "internal_reasoning": "0.005",
+                "input_cache_read": "0.0005",
+                "input_cache_write": "0.001"
+            },
+            "top_provider": {
+                "context_length": 100000,
+                "max_completion_tokens": 4096,
+                "is_moderated": true
+            },
+            "per_request_limits": {
+                "max_tokens": 1000,
+                "max_images": 10
+            },
+            "supported_parameters": ["temperature", "top_p", "max_tokens", "tools"]
+        }
+        "#;
+
+        let model_info: Result<ModelInfo, _> = serde_json::from_str(json_full);
+        assert!(model_info.is_ok());
+
+        let model = model_info.unwrap();
+        assert!(model.description.is_some());
+        assert!(model.canonical_slug.is_some());
+        assert!(model.hugging_face_id.is_some());
+        assert!(model.per_request_limits.is_some());
+        assert!(model.supported_parameters.is_some());
+        assert!(model.pricing.validate().is_ok());
     }
 }

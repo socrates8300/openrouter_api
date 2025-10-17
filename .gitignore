@@ -31,6 +31,9 @@ output.txt
 **/AGENTS.md
 **/agents.md
 
+# docs
+**/tasks/
+
 # Rust and toolchain
 /.rustup
 tarpaulin-report.html

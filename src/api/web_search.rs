@@ -3,10 +3,10 @@ use crate::{
     client::ClientConfig,
     error::{Error, Result},
     types::web_search::{WebSearchRequest, WebSearchResponse},
-    utils::security::create_safe_error_message,
+    utils::retry::operations::WEB_SEARCH,
+    utils::{retry::execute_with_retry_builder, retry::handle_response_json},
 };
 use reqwest::Client;
-use serde::de::DeserializeOwned;
 
 pub struct WebSearchApi {
     pub client: Client,
@@ -35,56 +35,24 @@ impl WebSearchApi {
                 metadata: None,
             })?;
 
-        let response = self
-            .client
-            .post(url)
-            .headers(self.config.build_headers()?)
-            .json(&request)
-            .send()
-            .await?;
+        // Build headers once to avoid closure issues
+        let headers = self.config.build_headers()?;
 
-        if !response.status().is_success() {
-            let status_code = response.status().as_u16();
-            let body = response.text().await?;
-            return Err(Error::ApiError {
-                code: status_code,
-                message: create_safe_error_message(&body, "Web search API request failed"),
-                metadata: None,
-            });
-        }
+        // Execute request with retry logic
+        let response = execute_with_retry_builder(&self.config.retry_config, WEB_SEARCH, || {
+            self.client
+                .post(url.clone())
+                .headers(headers.clone())
+                .json(&request)
+        })
+        .await?;
 
-        let search_response: WebSearchResponse = self.handle_response(response).await?;
+        // Handle response with consistent error parsing
+        let search_response: WebSearchResponse =
+            handle_response_json::<WebSearchResponse>(response, WEB_SEARCH).await?;
         Ok(search_response)
     }
 
-    /// Internal helper to deserialize a response while handling errors.
-    async fn handle_response<T>(&self, response: reqwest::Response) -> Result<T>
-    where
-        T: DeserializeOwned,
-    {
-        let status = response.status();
-        let body = response.text().await?;
-        if !status.is_success() {
-            return Err(Error::ApiError {
-                code: status.as_u16(),
-                message: create_safe_error_message(&body, "Web search response error"),
-                metadata: None,
-            });
-        }
-        if body.trim().is_empty() {
-            return Err(Error::ApiError {
-                code: status.as_u16(),
-                message: "Empty response body".into(),
-                metadata: None,
-            });
-        }
-        serde_json::from_str::<T>(&body).map_err(|e| Error::ApiError {
-            code: status.as_u16(),
-            message: create_safe_error_message(
-                &format!("Failed to decode JSON: {e}. Body was: {body}"),
-                "Web search JSON parsing error",
-            ),
-            metadata: None,
-        })
-    }
+    // Note: The handle_response method has been replaced by the centralized
+    // handle_response_json utility in utils::retry for consistency across all endpoints.
 }

@@ -1,7 +1,8 @@
 use crate::client::ClientConfig;
 use crate::error::{Error, Result};
 use crate::types::models::{ModelsRequest, ModelsResponse};
-use crate::utils::security::create_safe_error_message;
+use crate::utils::retry::operations::LIST_MODELS;
+use crate::utils::{retry::execute_with_retry_builder, retry::handle_response_json};
 use reqwest::Client;
 
 /// API endpoint for model management.
@@ -32,47 +33,22 @@ impl ModelsApi {
                 metadata: None,
             })?;
 
-        // Build the request with optional query parameters.
-        let mut req_builder = self.client.get(url).headers(self.config.build_headers()?);
+        // Build headers once to avoid closure issues
+        let headers = self.config.build_headers()?;
 
-        if let Some(req) = request {
-            req_builder = req_builder.query(&req);
-        }
+        // Execute request with retry logic
+        let response = execute_with_retry_builder(&self.config.retry_config, LIST_MODELS, || {
+            let mut req_builder = self.client.get(url.clone()).headers(headers.clone());
 
-        // Send the request.
-        let response = req_builder.send().await?;
+            if let Some(ref req) = request {
+                req_builder = req_builder.query(req);
+            }
 
-        // Capture the status code before consuming the response body.
-        let status = response.status();
-
-        // Get the response body.
-        let body = response.text().await?;
-
-        // Check if the HTTP response was successful.
-        if !status.is_success() {
-            return Err(Error::ApiError {
-                code: status.as_u16(),
-                message: create_safe_error_message(&body, "Models API request failed"),
-                metadata: None,
-            });
-        }
-
-        if body.trim().is_empty() {
-            return Err(Error::ApiError {
-                code: status.as_u16(),
-                message: "Empty response body".into(),
-                metadata: None,
-            });
-        }
-
-        // Deserialize the body.
-        serde_json::from_str::<ModelsResponse>(&body).map_err(|e| Error::ApiError {
-            code: status.as_u16(),
-            message: create_safe_error_message(
-                &format!("Failed to decode JSON: {e}. Body was: {body}"),
-                "Models JSON parsing error",
-            ),
-            metadata: None,
+            req_builder
         })
+        .await?;
+
+        // Handle response with consistent error parsing
+        handle_response_json::<ModelsResponse>(response, LIST_MODELS).await
     }
 }

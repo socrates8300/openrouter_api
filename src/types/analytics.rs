@@ -2,6 +2,63 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+/// Constants for analytics validation and defaults
+pub mod constants {
+    /// Standard date format length (YYYY-MM-DD)
+    pub const DATE_FORMAT_LENGTH: usize = 10;
+
+    /// Default limit for activity queries
+    pub const DEFAULT_LIMIT: u32 = 100;
+
+    /// Maximum limit for activity queries
+    pub const MAX_LIMIT: u32 = 1000;
+
+    /// Default recent activity days
+    pub const DEFAULT_RECENT_DAYS: i64 = 30;
+
+    /// Milliseconds per second for time conversions
+    pub const MS_PER_SECOND: f64 = 1000.0;
+
+    /// Tokens per million for cost calculations
+    pub const TOKENS_PER_MILLION: f64 = 1_000_000.0;
+}
+
+/// Sort order for activity queries
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum SortOrder {
+    Ascending,
+    Descending,
+}
+
+impl SortOrder {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            SortOrder::Ascending => "asc",
+            SortOrder::Descending => "desc",
+        }
+    }
+}
+
+/// Sort field for activity queries
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum SortField {
+    CreatedAt,
+    Cost,
+    Latency,
+    Tokens,
+}
+
+impl SortField {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            SortField::CreatedAt => "created_at",
+            SortField::Cost => "total_cost",
+            SortField::Latency => "latency",
+            SortField::Tokens => "total_tokens",
+        }
+    }
+}
+
 /// Activity data for a specific request
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ActivityData {
@@ -59,29 +116,38 @@ impl ActivityData {
     /// Returns the cost per token if both cost and token count are available
     pub fn cost_per_token(&self) -> Option<f64> {
         match (self.total_cost, self.total_tokens) {
-            (Some(cost), Some(tokens)) if tokens > 0 => Some(cost / tokens as f64),
+            (Some(cost), Some(tokens)) if tokens > 0 => {
+                // Check for valid cost value
+                if cost.is_finite() && cost >= 0.0 {
+                    Some(cost / tokens as f64)
+                } else {
+                    None
+                }
+            }
             _ => None,
         }
     }
 
     /// Returns the cost per million tokens if both cost and token count are available
     pub fn cost_per_million_tokens(&self) -> Option<f64> {
-        self.cost_per_token().map(|cost| cost * 1_000_000.0)
+        self.cost_per_token()
+            .map(|cost| cost * constants::TOKENS_PER_MILLION)
     }
 
     /// Returns the latency in seconds if available
     pub fn latency_seconds(&self) -> Option<f64> {
-        self.latency.map(|ms| ms as f64 / 1000.0)
+        self.latency.map(|ms| ms as f64 / constants::MS_PER_SECOND)
     }
 
     /// Returns the generation time in seconds if available
     pub fn generation_time_seconds(&self) -> Option<f64> {
-        self.generation_time.map(|ms| ms as f64 / 1000.0)
+        self.generation_time
+            .map(|ms| ms as f64 / constants::MS_PER_SECOND)
     }
 
     /// Returns true if the request was successful (not cancelled)
     pub fn is_successful(&self) -> bool {
-        self.cancelled.unwrap_or(false) == false
+        !self.cancelled.unwrap_or(false)
     }
 
     /// Returns true if the request was streamed
@@ -122,9 +188,9 @@ pub struct ActivityRequest {
     /// Provider name for filtering
     pub provider: Option<String>,
     /// Field to sort by
-    pub sort: Option<String>,
-    /// Sort order (asc or desc)
-    pub order: Option<String>,
+    pub sort: Option<SortField>,
+    /// Sort order
+    pub order: Option<SortOrder>,
     /// Maximum number of results to return
     pub limit: Option<u32>,
     /// Offset for pagination
@@ -162,14 +228,14 @@ impl ActivityRequest {
     }
 
     /// Sets the sort field
-    pub fn with_sort(mut self, sort: impl Into<String>) -> Self {
-        self.sort = Some(sort.into());
+    pub fn with_sort(mut self, sort: SortField) -> Self {
+        self.sort = Some(sort);
         self
     }
 
     /// Sets the sort order
-    pub fn with_order(mut self, order: impl Into<String>) -> Self {
-        self.order = Some(order.into());
+    pub fn with_order(mut self, order: SortOrder) -> Self {
+        self.order = Some(order);
         self
     }
 
@@ -207,12 +273,7 @@ impl ActivityRequest {
             }
         }
 
-        // Validate sort order
-        if let Some(order) = &self.order {
-            if order != "asc" && order != "desc" {
-                return Err("order must be 'asc' or 'desc'".to_string());
-            }
-        }
+        // Sort order is now type-safe, no validation needed
 
         Ok(())
     }
@@ -265,7 +326,12 @@ impl ActivityResponse {
         if total_tokens == 0 {
             None
         } else {
-            Some(self.total_cost() * 1_000_000.0 / total_tokens as f64)
+            let total_cost = self.total_cost();
+            if total_cost.is_finite() && total_cost >= 0.0 {
+                Some(total_cost * constants::TOKENS_PER_MILLION / total_tokens as f64)
+            } else {
+                None
+            }
         }
     }
 
@@ -365,7 +431,7 @@ impl ActivityResponse {
         let provider_activities: Vec<&ActivityData> = self
             .data
             .iter()
-            .filter(|d| d.provider.as_ref().map_or(false, |p| p == provider))
+            .filter(|d| d.provider.as_ref().is_some_and(|p| p == provider))
             .collect();
 
         ProviderUsageStats {
@@ -456,9 +522,9 @@ pub struct FeatureUsagePercentages {
     pub streaming: f64,
 }
 
-/// Validates date format (YYYY-MM-DD)
+/// Validates date format (YYYY-MM-DD) with proper calendar validation
 fn is_valid_date_format(date: &str) -> bool {
-    if date.len() != 10 {
+    if date.len() != constants::DATE_FORMAT_LENGTH {
         return false;
     }
 
@@ -476,27 +542,92 @@ fn is_valid_date_format(date: &str) -> bool {
     if parts[1].len() != 2 || !parts[1].chars().all(|c| c.is_ascii_digit()) {
         return false;
     }
-    if let Ok(month) = parts[1].parse::<u32>() {
-        if month < 1 || month > 12 {
+    let month = if let Ok(m) = parts[1].parse::<u32>() {
+        if !(1..=12).contains(&m) {
             return false;
         }
+        m
     } else {
         return false;
-    }
+    };
 
     // Check day (2 digits, 01-31)
     if parts[2].len() != 2 || !parts[2].chars().all(|c| c.is_ascii_digit()) {
         return false;
     }
-    if let Ok(day) = parts[2].parse::<u32>() {
-        if day < 1 || day > 31 {
+    let day = if let Ok(d) = parts[2].parse::<u32>() {
+        if !(1..=31).contains(&d) {
             return false;
         }
+        d
     } else {
         return false;
-    }
+    };
 
-    true
+    // Validate day against month (including leap years)
+    let year = parts[0].parse::<u32>().ok();
+    is_valid_day_for_month(day, month, year)
+}
+
+/// Validates that a day is valid for a given month and year
+fn is_valid_day_for_month(day: u32, month: u32, year: Option<u32>) -> bool {
+    let max_day = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 => {
+            // February: check for leap year
+            if let Some(y) = year {
+                if is_leap_year(y) {
+                    29
+                } else {
+                    28
+                }
+            } else {
+                28 // Default to non-leap year if year not provided
+            }
+        }
+        _ => return false,
+    };
+
+    day <= max_day
+}
+
+/// Checks if a year is a leap year
+fn is_leap_year(year: u32) -> bool {
+    year.is_multiple_of(4) && !year.is_multiple_of(100) || year.is_multiple_of(400)
+}
+
+impl Default for ActivityData {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            created_at: DateTime::parse_from_rfc3339("2024-01-01T00:00:00Z")
+                .unwrap()
+                .with_timezone(&Utc),
+            model: String::new(),
+            total_cost: None,
+            tokens_prompt: None,
+            tokens_completion: None,
+            total_tokens: None,
+            provider: None,
+            streamed: None,
+            cancelled: None,
+            web_search: None,
+            media: None,
+            reasoning: None,
+            finish_reason: None,
+            native_finish_reason: None,
+            origin: None,
+            latency: None,
+            generation_time: None,
+            moderation_latency: None,
+            cache_discount: None,
+            effective_cost: None,
+            upstream_id: None,
+            user_id: None,
+            http_referer: None,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -509,7 +640,7 @@ mod tests {
         let request = ActivityRequest::new()
             .with_start_date("2024-01-01")
             .with_end_date("2024-01-31")
-            .with_order("asc");
+            .with_order(SortOrder::Ascending);
         assert!(request.validate().is_ok());
 
         // Invalid date format
@@ -520,10 +651,6 @@ mod tests {
         let request = ActivityRequest::new()
             .with_start_date("2024-02-01")
             .with_end_date("2024-01-31");
-        assert!(request.validate().is_err());
-
-        // Invalid order
-        let request = ActivityRequest::new().with_order("invalid");
         assert!(request.validate().is_err());
     }
 
@@ -637,35 +764,123 @@ mod tests {
         assert_eq!(feature_usage.reasoning, 50.0);
         assert_eq!(feature_usage.streaming, 50.0);
     }
-}
 
-impl Default for ActivityData {
-    fn default() -> Self {
-        Self {
-            id: String::new(),
+    #[test]
+    fn test_activity_response_edge_cases() {
+        // Test empty response
+        let empty_response = ActivityResponse {
+            data: vec![],
+            total_count: Some(0),
+            has_more: Some(false),
+        };
+
+        assert_eq!(empty_response.total_cost(), 0.0);
+        assert_eq!(empty_response.total_tokens(), 0);
+        assert_eq!(empty_response.average_cost_per_request(), None);
+        assert_eq!(empty_response.success_rate(), 0.0);
+        assert_eq!(empty_response.streaming_rate(), 0.0);
+        assert_eq!(empty_response.average_latency_seconds(), None);
+
+        let feature_usage = empty_response.feature_usage_percentages();
+        assert_eq!(feature_usage.web_search, 0.0);
+        assert_eq!(feature_usage.media, 0.0);
+        assert_eq!(feature_usage.reasoning, 0.0);
+        assert_eq!(feature_usage.streaming, 0.0);
+
+        // Test response with missing optional fields
+        let partial_activities = vec![ActivityData {
+            id: "partial-1".to_string(),
             created_at: Utc::now(),
-            model: String::new(),
-            total_cost: None,
-            tokens_prompt: None,
-            tokens_completion: None,
-            total_tokens: None,
-            provider: None,
-            streamed: None,
-            cancelled: None,
-            web_search: None,
-            media: None,
-            reasoning: None,
-            finish_reason: None,
-            native_finish_reason: None,
-            origin: None,
-            latency: None,
-            generation_time: None,
-            moderation_latency: None,
-            cache_discount: None,
-            effective_cost: None,
-            upstream_id: None,
-            user_id: None,
-            http_referer: None,
-        }
+            model: "model-partial".to_string(),
+            total_cost: None,   // Missing cost
+            total_tokens: None, // Missing tokens
+            cancelled: None,    // Missing cancelled status
+            streamed: None,     // Missing streamed status
+            web_search: None,   // Missing web search status
+            media: None,        // Missing media status
+            reasoning: None,    // Missing reasoning status
+            provider: None,     // Missing provider
+            latency: None,      // Missing latency
+            ..Default::default()
+        }];
+
+        let partial_response = ActivityResponse {
+            data: partial_activities,
+            total_count: Some(1),
+            has_more: Some(false),
+        };
+
+        // Should handle missing fields gracefully
+        assert_eq!(partial_response.total_cost(), 0.0);
+        assert_eq!(partial_response.total_tokens(), 0);
+        assert_eq!(partial_response.success_rate(), 100.0); // Default to successful
+        assert_eq!(partial_response.streaming_rate(), 0.0); // Default to not streamed
+    }
+
+    #[test]
+    fn test_activity_data_edge_cases() {
+        // Test with zero values
+        let zero_activity = ActivityData {
+            id: "zero-test".to_string(),
+            created_at: Utc::now(),
+            model: "test-model".to_string(),
+            total_cost: Some(0.0),
+            total_tokens: Some(0),
+            latency: Some(0),
+            generation_time: Some(0),
+            ..Default::default()
+        };
+
+        assert_eq!(zero_activity.cost_per_token(), None);
+        assert_eq!(zero_activity.cost_per_million_tokens(), None);
+        assert_eq!(zero_activity.latency_seconds(), Some(0.0));
+        assert_eq!(zero_activity.generation_time_seconds(), Some(0.0));
+        assert!(zero_activity.is_successful());
+
+        // Test with negative values (should be handled gracefully)
+        let negative_activity = ActivityData {
+            id: "negative-test".to_string(),
+            created_at: Utc::now(),
+            model: "test-model".to_string(),
+            total_cost: Some(-0.001), // Negative cost
+            total_tokens: Some(100),
+            ..Default::default()
+        };
+
+        // Should return None for negative costs (invalid data)
+        assert_eq!(negative_activity.cost_per_token(), None);
+    }
+
+    #[test]
+    fn test_leap_year_validation() {
+        // Test leap year dates
+        assert!(is_valid_date_format("2024-02-29")); // Valid leap year
+        assert!(!is_valid_date_format("2023-02-29")); // Invalid non-leap year
+        assert!(is_valid_date_format("2000-02-29")); // Valid leap year (divisible by 400)
+        assert!(!is_valid_date_format("1900-02-29")); // Invalid leap year (divisible by 100 but not 400)
+    }
+
+    #[test]
+    fn test_model_and_provider_stats_edge_cases() {
+        let response = ActivityResponse {
+            data: vec![],
+            total_count: Some(0),
+            has_more: Some(false),
+        };
+
+        // Test stats for non-existent model/provider
+        let model_stats = response.model_stats("non-existent-model");
+        assert_eq!(model_stats.request_count, 0);
+        assert_eq!(model_stats.total_cost, 0.0);
+        assert_eq!(model_stats.total_tokens, 0);
+        assert_eq!(model_stats.average_cost_per_request, None);
+        assert_eq!(model_stats.success_rate, 0.0);
+
+        let provider_stats = response.provider_stats("non-existent-provider");
+        assert_eq!(provider_stats.request_count, 0);
+        assert_eq!(provider_stats.total_cost, 0.0);
+        assert_eq!(provider_stats.total_tokens, 0);
+        assert_eq!(provider_stats.average_cost_per_request, None);
+        assert_eq!(provider_stats.success_rate, 0.0);
     }
 }
