@@ -93,10 +93,14 @@ mod tests {
         assert_eq!(cache.get(&"nonexistent".to_string()), None);
 
         // Remove
+<<<<<<< HEAD
         assert_eq!(
             cache.remove(&"key1".to_string()),
             Some("value1".to_string())
         );
+=======
+        assert_eq!(cache.remove(&"key1".to_string()), Some("value1".to_string()));
+>>>>>>> 0eddcaa (feat: enterprise-grade error handling standardization (v0.3.0))
         assert_eq!(cache.get(&"key1".to_string()), None);
     }
 
@@ -116,11 +120,15 @@ mod tests {
     fn test_cache_custom_ttl() {
         let mut cache = Cache::new(Duration::from_secs(10));
 
+<<<<<<< HEAD
         cache.insert_with_ttl(
             "key1".to_string(),
             "value1".to_string(),
             Duration::from_millis(50),
         );
+=======
+        cache.insert_with_ttl("key1".to_string(), "value1".to_string(), Duration::from_millis(50));
+>>>>>>> 0eddcaa (feat: enterprise-grade error handling standardization (v0.3.0))
         assert_eq!(cache.get(&"key1".to_string()), Some("value1".to_string()));
 
         thread::sleep(Duration::from_millis(100));
@@ -140,3 +148,6 @@ mod tests {
         assert_eq!(cache.len(), 0);
     }
 }
+=======
+}
+>>>>>>> 0eddcaa (feat: enterprise-grade error handling standardization (v0.3.0))
