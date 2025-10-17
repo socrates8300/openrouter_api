@@ -28,19 +28,7 @@ pub mod operations {
 /// # Arguments
 /// * `config` - Retry configuration
 /// * `operation_name` - Name of the operation for logging purposes
-/// * `request_builder` - Closure that creates a new RequestBuilder for each attempt
-///
-/// # Returns
 
-=======
-/// ```rust
-/// use crate::utils::retry::execute_with_retry_builder;
-/// let response = execute_with_retry_builder(
-///     &retry_config,
-///     "completion",
-///     || client.post(url).headers(headers).json(&request_body)
-/// ).await?;
->>>>>>> 0eddcaa (feat: enterprise-grade error handling standardization (v0.3.0))
 /// ```
 pub async fn execute_with_retry_builder<F>(
     config: &RetryConfig,
