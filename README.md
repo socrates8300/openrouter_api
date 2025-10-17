@@ -16,10 +16,13 @@ A production-ready Rust client for the OpenRouter API with comprehensive securit
 - **Environment Integration:** Automatic API key loading from `OPENROUTER_API_KEY` or `OR_API_KEY` environment variables
 
 ### 🔒 **Security & Reliability**
+- **Standardized Error Handling:** Enterprise-grade retry logic with exponential backoff and jitter across all endpoints
 - **Memory Safety:** Secure API key handling with automatic memory zeroing
 - **Response Redaction:** Automatic sanitization of error messages to prevent sensitive data exposure
 - **Streaming Safety:** Buffer limits and backpressure handling for streaming responses
 - **Input Validation:** Comprehensive validation of requests and parameters
+- **Automatic Retries:** Configurable retry behavior for network failures and rate limiting
+- **Production Reliability:** Enterprise-grade error handling with exponential backoff and jitter
 
 ### 🌐 **OpenRouter API Support**
 - **Chat Completions:** Full support for OpenRouter's chat completion API with streaming
@@ -39,9 +42,9 @@ A production-ready Rust client for the OpenRouter API with comprehensive securit
 - **Context Integration:** Seamless context sharing between applications and LLMs
 
 ### 🧪 **Quality & Testing**
-- **100% Test Coverage:** Comprehensive unit and integration test suite
+- **100% Test Coverage:** 162 comprehensive unit and integration tests
 - **CI/CD Pipeline:** Automated quality gates with formatting, linting, security audits, and documentation checks
-- **Production Ready:** Extensive error handling, retry logic, and timeout management
+- **Production Ready:** Extensive error handling, standardized retry logic, and timeout management
 
 ## Getting Started
 
@@ -599,25 +602,31 @@ This is a production-ready library with comprehensive functionality:
 - **Analytics API:** Comprehensive activity data retrieval with filtering and pagination
 - **Providers API:** Provider information management with search and filtering
 - **Enhanced Models API:** Advanced model discovery with filtering, sorting, and search
+- **Credits API:** Account credit and usage tracking
+- **Generation API:** Generation metadata and cost tracking
 - **Model Context Protocol:** Complete MCP client implementation
 
 ### ✅ **Quality Infrastructure (Completed)**
-- **100% Test Coverage:** 147 comprehensive unit and integration tests
+- **100% Test Coverage:** 162 comprehensive unit and integration tests
 - **Security Auditing:** Automated security vulnerability scanning
 - **CI/CD Pipeline:** GitHub Actions with quality gates
 - **Documentation:** Complete API documentation with examples
 - **Developer Experience:** Contributing guidelines, issue templates, PR templates
+- **Error Handling Standardization:** Enterprise-grade retry logic across all endpoints
 
 ### ✅ **Ergonomic Improvements (Completed)**
 - **Convenience Constructors:** `from_env()`, `from_api_key()`, `production()`, `quick()`
 - **Flexible Configuration:** Timeout, retry, and header management
-- **Error Handling:** Comprehensive error types with context
+- **Error Handling:** Comprehensive error types with context and automatic retries
 - **Memory Safety:** Automatic sensitive data cleanup
 - **Advanced Filtering:** Sophisticated query builders for analytics, providers, and models
 - **Convenience Methods:** Helper methods for common operations like domain extraction
+- **Production Reliability:** Exponential backoff with jitter, rate limit handling, and consistent retry behavior
 
 ### 🔄 **Future Enhancements**
-- **Credits API:** Account credit and usage tracking
+- **Retry-After Header Support:** Respect server-provided retry guidance
+- **Circuit Breaker Pattern:** Prevent cascading failures
+- **Retry Budget Management:** Prevent excessive retries in high-throughput scenarios
 - **Performance Optimizations:** Connection pooling and caching
 - **Extended MCP Features:** Additional MCP protocol capabilities
 - **Generation API Enhancements:** Additional generation endpoints and features
@@ -801,6 +810,34 @@ let resource = mcp_client.get_resource(GetResourceParams {
 
 ## Error Handling
 
+The library provides enterprise-grade error handling with automatic retries and consistent behavior across all endpoints.
+
+### Standardized Retry Logic
+
+All API endpoints automatically retry failed requests with:
+- **Exponential Backoff:** Starting at 500ms, doubling up to 10 seconds maximum
+- **Jitter:** ±25% random variation to prevent thundering herd effects
+- **Smart Status Codes:** Retries on rate limiting (429) and server errors (500, 502, 503, 504)
+- **Configurable Limits:** Customizable maximum retries and backoff settings
+
+```rust
+use openrouter_api::{OpenRouterClient, Result};
+
+// Custom retry configuration
+let client = OpenRouterClient::from_env()?
+    .with_retry_config(RetryConfig {
+        max_retries: 5,
+        initial_backoff_ms: 1000,
+        max_backoff_ms: 30000,
+        retry_on_status_codes: vec![429, 500, 502, 503, 504],
+    })?;
+
+// Automatic retries happen transparently
+let response = client.chat()?.chat_completion(request).await?;
+```
+
+### Error Types
+
 ```rust
 match client.chat()?.chat_completion(request).await {
     Ok(response) => {
@@ -810,15 +847,38 @@ match client.chat()?.chat_completion(request).await {
         Error::ApiError { code, message, .. } => {
             eprintln!("API Error ({}): {}", code, message);
         },
+        Error::RateLimitExceeded(msg) => {
+            eprintln!("Rate limit exceeded: {}", msg);
+            // Automatic retry with exponential backoff
+        },
         Error::HttpError(ref err) if err.is_timeout() => {
             eprintln!("Request timed out!");
+            // Automatic retry with exponential backoff
         },
         Error::ConfigError(msg) => {
             eprintln!("Configuration error: {}", msg);
         },
+        Error::ContextLengthExceeded { model, message } => {
+            eprintln!("Context limit exceeded for {}: {}", model, message);
+        },
         _ => eprintln!("Other error: {:?}", e),
     }
 }
+```
+
+### Retry Behavior
+
+The library automatically handles:
+- **Network Timeouts:** Retries with increasing delays
+- **Rate Limiting:** Respects HTTP 429 with exponential backoff
+- **Server Errors:** Retries 5xx errors to handle temporary failures
+- **Connection Issues:** Retries connection failures and DNS errors
+
+All retry attempts are logged with operation context for debugging:
+
+```
+Retrying chat_completion request (1/3) after 625 ms (base: 500 ms, jitter: 25.00%) due to status code 429
+Retrying chat_completion request (2/3) after 1250 ms (base: 1000 ms, jitter: 25.00%) due to status code 429
 ```
 
 ## Best Practices
@@ -826,16 +886,27 @@ match client.chat()?.chat_completion(request).await {
 1. **Use the Type‑State Pattern:**
    Let the compiler ensure your client is properly configured.
 
-2. **Set Appropriate Timeouts & Headers:**
+2. **Configure Retry Behavior:**
+   Adjust retry settings based on your application's needs:
+   ```rust
+   let client = OpenRouterClient::from_env()?
+       .with_retries(5)?  // More retries for resilience
+       .without_retries()?; // Disable for testing
+   ```
+
+3. **Set Appropriate Timeouts & Headers:**
    Configure reasonable timeouts and identify your application.
 
-3. **Handle Errors Appropriately:**
-   Implement proper error handling for each error type.
+4. **Handle Errors Appropriately:**
+   Implement proper error handling for each error type. The automatic retry logic handles most transient failures.
 
-4. **Use Provider Preferences:**
+5. **Use Provider Preferences:**
    Configure provider routing for optimal model selection.
 
-5. **Secure Your API Keys:**
+6. **Monitor Retry Behavior:**
+   Watch retry logs in production to identify patterns and adjust configuration.
+
+7. **Secure Your API Keys:**
    Store keys in environment variables or secure storage.
 
 ## Additional Resources

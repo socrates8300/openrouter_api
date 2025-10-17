@@ -1,7 +1,10 @@
 use crate::client::ClientConfig;
 use crate::error::{Error, Result};
 use crate::types::generation::GenerationResponse;
-use crate::utils::security::create_safe_error_message;
+use crate::utils::{
+    retry::execute_with_retry_builder, retry::handle_response_json,
+    retry::operations::GET_GENERATION,
+};
 use reqwest::Client;
 
 /// API endpoint for generation management.
@@ -57,29 +60,29 @@ impl GenerationApi {
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = OpenRouterClient::from_env()?;
     ///     let generation = client.generation()?.get_generation("gen-123456789").await?;
-    ///     
+    ///
     ///     println!("Generation ID: {}", generation.id());
     ///     println!("Model: {}", generation.model());
     ///     println!("Total cost: ${:.6}", generation.total_cost());
     ///     println!("Effective cost: ${:.6}", generation.effective_cost());
-    ///     
+    ///
     ///     if let Some(tokens) = generation.total_tokens() {
     ///         println!("Total tokens: {}", tokens);
     ///         if let Some(cost_per_token) = generation.cost_per_token() {
     ///             println!("Cost per token: ${:.8}", cost_per_token);
     ///         }
     ///     }
-    ///     
+    ///
     ///     if let Some(latency) = generation.latency_seconds() {
     ///         println!("Latency: {:.2}s", latency);
     ///     }
-    ///     
+    ///
     ///     println!("Successful: {}", generation.is_successful());
     ///     println!("Streamed: {}", generation.was_streamed());
     ///     println!("Used web search: {}", generation.used_web_search());
     ///     println!("Included media: {}", generation.included_media());
     ///     println!("Used reasoning: {}", generation.used_reasoning());
-    ///     
+    ///
     ///     Ok(())
     /// }
     /// ```
@@ -102,47 +105,21 @@ impl GenerationApi {
                 metadata: None,
             })?;
 
-        // Build the request with query parameter.
-        let response = self
-            .client
-            .get(url)
-            .query(&[("id", id)])
-            .headers(self.config.build_headers()?)
-            .send()
+        // Build headers once to avoid closure issues
+        let headers = self.config.build_headers()?;
+
+        // Execute request with retry logic
+        let response =
+            execute_with_retry_builder(&self.config.retry_config, GET_GENERATION, || {
+                self.client
+                    .get(url.clone())
+                    .query(&[("id", id)])
+                    .headers(headers.clone())
+            })
             .await?;
 
-        // Capture the status code before consuming the response body.
-        let status = response.status();
-
-        // Get the response body.
-        let body = response.text().await?;
-
-        // Check if the HTTP response was successful.
-        if !status.is_success() {
-            return Err(Error::ApiError {
-                code: status.as_u16(),
-                message: create_safe_error_message(&body, "Generation API request failed"),
-                metadata: None,
-            });
-        }
-
-        if body.trim().is_empty() {
-            return Err(Error::ApiError {
-                code: status.as_u16(),
-                message: "Empty response body".into(),
-                metadata: None,
-            });
-        }
-
-        // Deserialize the body.
-        serde_json::from_str::<GenerationResponse>(&body).map_err(|e| Error::ApiError {
-            code: status.as_u16(),
-            message: create_safe_error_message(
-                &format!("Failed to decode JSON: {e}. Body was: {body}"),
-                "Generation JSON parsing error",
-            ),
-            metadata: None,
-        })
+        // Handle response with consistent error parsing
+        handle_response_json::<GenerationResponse>(response, GET_GENERATION).await
     }
 }
 

@@ -40,17 +40,17 @@ impl Provider {
 
     /// Returns true if the provider has a privacy policy URL
     pub fn has_privacy_policy(&self) -> bool {
-        self.privacy_policy_url.is_some()
+        self.privacy_policy_url.as_ref().map_or(false, |url| !url.is_empty())
     }
 
     /// Returns true if the provider has a terms of service URL
     pub fn has_terms_of_service(&self) -> bool {
-        self.terms_of_service_url.is_some()
+        self.terms_of_service_url.as_ref().map_or(false, |url| !url.is_empty())
     }
 
     /// Returns true if the provider has a status page URL
     pub fn has_status_page(&self) -> bool {
-        self.status_page_url.is_some()
+        self.status_page_url.as_ref().map_or(false, |url| !url.is_empty())
     }
 
     /// Gets the domain from the privacy policy URL if available
@@ -58,7 +58,7 @@ impl Provider {
         self.privacy_policy_url.as_ref().and_then(|url| {
             url::Url::parse(url)
                 .ok()
-                .map(|parsed| parsed.host_str().unwrap_or("").to_string())
+                .and_then(|parsed| parsed.host_str().map(|host| host.to_string()))
         })
     }
 
@@ -67,7 +67,7 @@ impl Provider {
         self.terms_of_service_url.as_ref().and_then(|url| {
             url::Url::parse(url)
                 .ok()
-                .map(|parsed| parsed.host_str().unwrap_or("").to_string())
+                .and_then(|parsed| parsed.host_str().map(|host| host.to_string()))
         })
     }
 
@@ -76,7 +76,7 @@ impl Provider {
         self.status_page_url.as_ref().and_then(|url| {
             url::Url::parse(url)
                 .ok()
-                .map(|parsed| parsed.host_str().unwrap_or("").to_string())
+                .and_then(|parsed| parsed.host_str().map(|host| host.to_string()))
         })
     }
 }
@@ -288,5 +288,113 @@ mod tests {
 
         assert_eq!(groups.get("openai.com").unwrap().len(), 1);
         assert_eq!(groups.get("anthropic.com").unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_provider_edge_cases() {
+        // Test provider with malformed URLs
+        let provider_malformed = Provider::new(
+            "Malformed Provider".to_string(),
+            "malformed".to_string(),
+            Some("not-a-valid-url".to_string()),
+            Some("also-not-valid".to_string()),
+            Some("https://valid.com/status".to_string()), // One valid URL
+        );
+
+        assert!(provider_malformed.has_privacy_policy());
+        assert!(provider_malformed.has_terms_of_service());
+        assert!(provider_malformed.has_status_page());
+
+        // Domain extraction should return None for invalid URLs
+        assert_eq!(provider_malformed.privacy_policy_domain(), None);
+        assert_eq!(provider_malformed.terms_of_service_domain(), None);
+        assert_eq!(provider_malformed.status_page_domain(), Some("valid.com".to_string()));
+
+        // Test provider with empty URLs
+        let provider_empty = Provider::new(
+            "Empty Provider".to_string(),
+            "empty".to_string(),
+            Some("".to_string()),
+            None,
+            None,
+        );
+
+        assert!(!provider_empty.has_privacy_policy());
+        assert_eq!(provider_empty.privacy_policy_domain(), None);
+    }
+
+    #[test]
+    fn test_providers_response_edge_cases() {
+        // Test empty response
+        let empty_response = ProvidersResponse::new(vec![]);
+        assert_eq!(empty_response.count(), 0);
+        assert_eq!(empty_response.find_by_slug("anything"), None);
+        assert_eq!(empty_response.find_by_name("anything"), None);
+        assert_eq!(empty_response.with_privacy_policy().len(), 0);
+        assert_eq!(empty_response.with_terms_of_service().len(), 0);
+        assert_eq!(empty_response.with_status_page().len(), 0);
+        assert_eq!(empty_response.sorted_slugs().len(), 0);
+        assert_eq!(empty_response.sorted_names().len(), 0);
+
+        // Test case-insensitive name search
+        let providers = vec![
+            Provider::new(
+                "OpenAI".to_string(),
+                "openai".to_string(),
+                None,
+                None,
+                None,
+            ),
+            Provider::new(
+                "ANTHROPIC".to_string(),
+                "anthropic".to_string(),
+                None,
+                None,
+                None,
+            ),
+        ];
+
+        let response = ProvidersResponse::new(providers);
+        
+        // Should find regardless of case
+        assert!(response.find_by_name("openai").is_some());
+        assert!(response.find_by_name("OPENAI").is_some());
+        assert!(response.find_by_name("OpenAI").is_some());
+        assert!(response.find_by_name("anthropic").is_some());
+        assert!(response.find_by_name("ANTHROPIC").is_some());
+        assert!(response.find_by_name("Anthropic").is_some());
+
+        // Test partial name matching (should not match)
+        assert!(response.find_by_name("Open").is_none());
+        assert!(response.find_by_name("AI").is_none());
+    }
+
+    #[test]
+    fn test_provider_url_validation() {
+        // Test various URL formats
+        let test_cases = vec![
+            ("https://example.com", Some("example.com")),
+            ("http://example.com", Some("example.com")),
+            ("https://example.com/path", Some("example.com")),
+            ("https://sub.example.com", Some("sub.example.com")),
+            ("ftp://example.com", Some("example.com")), // URL::parse accepts this
+            ("not-a-url", None),
+            ("", None),
+            ("javascript:alert('xss')", None), // Parses but has no host
+        ];
+
+        for (url_str, expected_domain) in test_cases {
+            let provider = Provider::new(
+                "Test".to_string(),
+                "test".to_string(),
+                Some(url_str.to_string()),
+                None,
+                None,
+            );
+
+            assert!(provider.privacy_policy_url.is_some());
+            
+            assert_eq!(provider.privacy_policy_domain(), expected_domain.map(|s| s.to_string()));
+        }
     }
 }

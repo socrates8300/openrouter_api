@@ -1,7 +1,8 @@
 use crate::client::ClientConfig;
 use crate::error::{Error, Result};
 use crate::types::credits::CreditsResponse;
-use crate::utils::security::create_safe_error_message;
+use crate::utils::retry::operations::GET_BALANCE;
+use crate::utils::{retry::execute_with_retry_builder, retry::handle_response_json};
 use reqwest::Client;
 
 /// API endpoint for credits management.
@@ -71,46 +72,17 @@ impl CreditsApi {
                 metadata: None,
             })?;
 
-        // Build the request.
-        let response = self
-            .client
-            .get(url)
-            .headers(self.config.build_headers()?)
-            .send()
-            .await?;
+        // Build headers once to avoid closure issues
+        let headers = self.config.build_headers()?;
 
-        // Capture the status code before consuming the response body.
-        let status = response.status();
-
-        // Get the response body.
-        let body = response.text().await?;
-
-        // Check if the HTTP response was successful.
-        if !status.is_success() {
-            return Err(Error::ApiError {
-                code: status.as_u16(),
-                message: create_safe_error_message(&body, "Credits API request failed"),
-                metadata: None,
-            });
-        }
-
-        if body.trim().is_empty() {
-            return Err(Error::ApiError {
-                code: status.as_u16(),
-                message: "Empty response body".into(),
-                metadata: None,
-            });
-        }
-
-        // Deserialize the body.
-        serde_json::from_str::<CreditsResponse>(&body).map_err(|e| Error::ApiError {
-            code: status.as_u16(),
-            message: create_safe_error_message(
-                &format!("Failed to decode JSON: {e}. Body was: {body}"),
-                "Credits JSON parsing error",
-            ),
-            metadata: None,
+        // Execute request with retry logic
+        let response = execute_with_retry_builder(&self.config.retry_config, GET_BALANCE, || {
+            self.client.get(url.clone()).headers(headers.clone())
         })
+        .await?;
+
+        // Handle response with consistent error parsing
+        handle_response_json::<CreditsResponse>(response, GET_BALANCE).await
     }
 }
 

@@ -73,24 +73,28 @@ impl Error {
     pub async fn from_response(response: Response) -> Result<Self> {
         let status = response.status().as_u16();
         let text = response.text().await.unwrap_or_default();
+        Self::from_response_text(status, &text)
+    }
 
+    /// Creates an API error from status code and response text.
+    pub fn from_response_text(status: u16, text: &str) -> Result<Self> {
         // Try to parse structured API error response
-        if let Ok(api_error) = serde_json::from_str::<ApiErrorDetails>(&text) {
+        if let Ok(api_error) = serde_json::from_str::<ApiErrorDetails>(text) {
             return Ok(Error::ApiError {
                 code: status,
-                message: text,
+                message: text.to_string(),
                 metadata: Some(serde_json::to_value(api_error).unwrap_or_default()),
             });
         }
 
         // Handle rate limiting specifically
         if status == 429 {
-            return Ok(Error::RateLimitExceeded(text));
+            return Ok(Error::RateLimitExceeded(text.to_string()));
         }
 
         Ok(Error::ApiError {
             code: status,
-            message: text,
+            message: text.to_string(),
             metadata: None,
         })
     }

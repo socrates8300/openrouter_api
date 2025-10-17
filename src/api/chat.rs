@@ -3,7 +3,10 @@ use crate::error::{Error, Result};
 use crate::types::chat::{
     ChatCompletionChunk, ChatCompletionRequest, ChatCompletionResponse, Message, MessageContent,
 };
-use crate::utils::{security::create_safe_error_message, validation};
+use crate::utils::{
+    retry::execute_with_retry_builder, retry::handle_response_json,
+    retry::operations::CHAT_COMPLETION, security::create_safe_error_message, validation,
+};
 use async_stream::try_stream;
 use futures::stream::Stream;
 use futures::StreamExt;
@@ -11,8 +14,6 @@ use futures::TryStreamExt;
 use reqwest::Client;
 use serde_json;
 use std::pin::Pin;
-use std::time::Duration;
-use tokio::time::sleep;
 use tokio_util::codec::{FramedRead, LinesCodec};
 use tokio_util::io::StreamReader;
 
@@ -53,87 +54,22 @@ impl ChatApi {
                 metadata: None,
             })?;
 
-        // Initialize retry counter and backoff duration
-        let mut retry_count = 0;
-        let mut backoff_ms = self.config.retry_config.initial_backoff_ms;
+        // Build headers once to avoid closure issues
+        let headers = self.config.build_headers()?;
 
-        let response = loop {
-            // Issue the POST request with appropriate headers and JSON body.
-            let response = self
-                .client
-                .post(url.clone())
-                .headers(self.config.build_headers()?)
-                .json(&request)
-                .send()
-                .await?;
+        // Execute request with retry logic
+        let response =
+            execute_with_retry_builder(&self.config.retry_config, CHAT_COMPLETION, || {
+                self.client
+                    .post(url.clone())
+                    .headers(headers.clone())
+                    .json(&request)
+            })
+            .await?;
 
-            let status = response.status();
-
-            // Check if we should retry based on status code
-            if self
-                .config
-                .retry_config
-                .retry_on_status_codes
-                .contains(&status.as_u16())
-                && retry_count < self.config.retry_config.max_retries
-            {
-                // Increment retry counter and exponential backoff
-                retry_count += 1;
-
-                // Log retry attempt
-                eprintln!(
-                    "Retrying request ({}/{}) after {} ms due to status code {}",
-                    retry_count,
-                    self.config.retry_config.max_retries,
-                    backoff_ms,
-                    status.as_u16()
-                );
-
-                // Wait before retrying
-                sleep(Duration::from_millis(backoff_ms)).await;
-
-                // Calculate next backoff with exponential increase
-                backoff_ms = std::cmp::min(backoff_ms * 2, self.config.retry_config.max_backoff_ms);
-
-                continue;
-            }
-
-            break response;
-        };
-
-        // Capture the HTTP status.
-        let status = response.status();
-
-        // Retrieve the response body.
-        let body = response.text().await?;
-
-        // Check if the HTTP response is successful.
-        if !status.is_success() {
-            return Err(Error::ApiError {
-                code: status.as_u16(),
-                message: body.clone(),
-                metadata: None,
-            });
-        }
-
-        if body.trim().is_empty() {
-            return Err(Error::ApiError {
-                code: status.as_u16(),
-                message: "Empty response body".into(),
-                metadata: None,
-            });
-        }
-
-        // Deserialize the JSON response into ChatCompletionResponse.
-        let chat_response =
-            serde_json::from_str::<ChatCompletionResponse>(&body).map_err(|e| Error::ApiError {
-                code: status.as_u16(),
-                message: create_safe_error_message(
-                    &format!("Failed to decode JSON: {e}. Body was: {body}"),
-                    "Chat completion JSON parsing error",
-                ),
-                metadata: None,
-            })?;
+        // Handle response with consistent error parsing
+        let chat_response: ChatCompletionResponse =
+            handle_response_json::<ChatCompletionResponse>(response, CHAT_COMPLETION).await?;
 
         // Validate any tool calls in the response
         for choice in &chat_response.choices {

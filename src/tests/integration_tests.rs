@@ -1,3 +1,4 @@
+#[allow(dead_code, unused_imports, unused_variables)]
 /// Integration tests for the OpenRouter client.
 #[cfg(test)]
 mod tests {
@@ -903,7 +904,7 @@ mod tests {
         let request = ActivityRequest::new()
             .with_start_date("2024-01-01")
             .with_end_date("2024-01-31")
-            .with_order("asc");
+            .with_order(crate::types::analytics::SortOrder::Ascending);
         assert!(request.validate().is_ok());
 
         // Invalid date format
@@ -914,10 +915,6 @@ mod tests {
         let request = ActivityRequest::new()
             .with_start_date("2024-02-01")
             .with_end_date("2024-01-31");
-        assert!(request.validate().is_err());
-
-        // Invalid order
-        let request = ActivityRequest::new().with_order("invalid");
         assert!(request.validate().is_err());
 
         Ok(())
@@ -1050,8 +1047,8 @@ mod tests {
             .with_end_date("2024-01-07")
             .with_model("test-model")
             .with_provider("test-provider")
-            .with_sort("created_at")
-            .with_order("desc")
+            .with_sort(crate::types::analytics::SortField::CreatedAt)
+            .with_order(crate::types::analytics::SortOrder::Descending)
             .with_limit(100)
             .with_offset(0);
 
@@ -1059,8 +1056,14 @@ mod tests {
         assert_eq!(request.end_date, Some("2024-01-07".to_string()));
         assert_eq!(request.model, Some("test-model".to_string()));
         assert_eq!(request.provider, Some("test-provider".to_string()));
-        assert_eq!(request.sort, Some("created_at".to_string()));
-        assert_eq!(request.order, Some("desc".to_string()));
+        assert_eq!(
+            request.sort,
+            Some(crate::types::analytics::SortField::CreatedAt)
+        );
+        assert_eq!(
+            request.order,
+            Some(crate::types::analytics::SortOrder::Descending)
+        );
         assert_eq!(request.limit, Some(100));
         assert_eq!(request.offset, Some(0));
 

@@ -1,12 +1,20 @@
 use crate::client::ClientConfig;
 use crate::error::Error;
 use crate::types::{Provider, ProvidersResponse};
+use crate::utils::cache::Cache;
+use crate::utils::{
+    retry::execute_with_retry_builder, retry::handle_response_json,
+    retry::operations::GET_PROVIDERS,
+};
 use reqwest::Client;
+use std::sync::Mutex;
+use std::time::Duration;
 
 /// API client for provider-related operations
 pub struct ProvidersApi {
     client: Client,
     config: ClientConfig,
+    cache: Mutex<Cache<String, ProvidersResponse>>,
 }
 
 impl ProvidersApi {
@@ -15,6 +23,7 @@ impl ProvidersApi {
         Self {
             client,
             config: config.clone(),
+            cache: Mutex::new(Cache::new(Duration::from_secs(300))), // 5 minutes cache
         }
     }
 
@@ -36,45 +45,62 @@ impl ProvidersApi {
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = OpenRouterClient::from_env()?;
-    ///     
+    ///
     ///     // Get all available providers
     ///     let providers_response = client.providers()?.get_providers().await?;
-    ///     
+    ///
     ///     println!("Found {} providers", providers_response.count());
-    ///     
+    ///
     ///     // Find a specific provider
     ///     if let Some(openai) = providers_response.find_by_slug("openai") {
     ///         println!("OpenAI provider found: {}", openai.name);
-     ///         if openai.has_privacy_policy() {
-     ///             println!("Privacy policy: {}", openai.privacy_policy_url.as_ref().unwrap());
-     ///         }
+    ///         if openai.has_privacy_policy() {
+    ///             println!("Privacy policy: {}", openai.privacy_policy_url.as_ref().unwrap());
+    ///         }
     ///     }
-    ///     
+    ///
     ///     // Group providers by domain
     ///     let domain_groups = providers_response.group_by_domain();
     ///     for (domain, providers) in domain_groups {
     ///         println!("Domain {}: {} providers", domain, providers.len());
     ///     }
-    ///     
+    ///
     ///     Ok(())
     /// }
     /// ```
     pub async fn get_providers(&self) -> Result<ProvidersResponse, Error> {
-        let url = format!("{}/providers", self.config.base_url);
-
-        let response = self
-            .client
-            .get(&url)
-            .headers(self.config.build_headers()?)
-            .send()
-            .await?;
-
-        if !response.status().is_success() {
-            return Err(Error::from_response(response).await?);
+        // Check cache first
+        let cache_key = "providers".to_string();
+        if let Ok(mut cache) = self.cache.lock() {
+            if let Some(cached_response) = cache.get(&cache_key) {
+                return Ok(cached_response);
+            }
         }
 
-        let providers_response: ProvidersResponse =
-            response.json().await.map_err(|e| Error::HttpError(e))?;
+        // Build the URL handling base_url that may or may not end with /
+        let url = if self.config.base_url.path().ends_with('/') {
+            format!("{}providers", self.config.base_url)
+        } else {
+            format!("{}/providers", self.config.base_url)
+        };
+
+        // Build headers once to avoid closure issues
+        let headers = self.config.build_headers()?;
+
+        // Execute request with retry logic
+        let response = execute_with_retry_builder(&self.config.retry_config, GET_PROVIDERS, || {
+            self.client.get(&url).headers(headers.clone())
+        })
+        .await?;
+
+        // Handle response with consistent error parsing
+        let providers_response =
+            handle_response_json::<ProvidersResponse>(response, GET_PROVIDERS).await?;
+
+        // Cache the response
+        if let Ok(mut cache) = self.cache.lock() {
+            cache.insert(cache_key, providers_response.clone());
+        }
 
         Ok(providers_response)
     }
@@ -101,17 +127,24 @@ impl ProvidersApi {
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = OpenRouterClient::from_env()?;
-    ///     
+    ///
     ///     // Get a specific provider by slug
     ///     let openai = client.providers()?.get_provider_by_slug("openai").await?;
-    ///     
+    ///
     ///     println!("Provider: {}", openai.name);
     ///     println!("Slug: {}", openai.slug);
-    ///     
+    ///
     ///     Ok(())
     /// }
     /// ```
     pub async fn get_provider_by_slug(&self, slug: &str) -> Result<Provider, Error> {
+        // Validate input
+        if slug.trim().is_empty() {
+            return Err(Error::ConfigError(
+                "Provider slug cannot be empty".to_string(),
+            ));
+        }
+
         let providers_response = self.get_providers().await?;
 
         providers_response
@@ -144,17 +177,24 @@ impl ProvidersApi {
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = OpenRouterClient::from_env()?;
-    ///     
+    ///
     ///     // Get a specific provider by name (case-insensitive)
     ///     let anthropic = client.providers()?.get_provider_by_name("anthropic").await?;
-    ///     
+    ///
     ///     println!("Provider: {}", anthropic.name);
     ///     println!("Slug: {}", anthropic.slug);
-    ///     
+    ///
     ///     Ok(())
     /// }
     /// ```
     pub async fn get_provider_by_name(&self, name: &str) -> Result<Provider, Error> {
+        // Validate input
+        if name.trim().is_empty() {
+            return Err(Error::ConfigError(
+                "Provider name cannot be empty".to_string(),
+            ));
+        }
+
         let providers_response = self.get_providers().await?;
 
         providers_response
@@ -183,17 +223,17 @@ impl ProvidersApi {
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = OpenRouterClient::from_env()?;
-    ///     
+    ///
     ///     // Get providers with privacy policies
     ///     let providers_with_privacy = client.providers()?
     ///         .get_providers_with_privacy_policy().await?;
-    ///     
+    ///
     ///     println!("{} providers have privacy policies", providers_with_privacy.len());
-    ///     
+    ///
     ///     for provider in providers_with_privacy {
     ///         println!("{}: {}", provider.name, provider.privacy_policy_url.unwrap());
     ///     }
-    ///     
+    ///
     ///     Ok(())
     /// }
     /// ```
@@ -224,17 +264,17 @@ impl ProvidersApi {
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = OpenRouterClient::from_env()?;
-    ///     
+    ///
     ///     // Get providers with terms of service
     ///     let providers_with_tos = client.providers()?
     ///         .get_providers_with_terms_of_service().await?;
-    ///     
+    ///
     ///     println!("{} providers have terms of service", providers_with_tos.len());
-    ///     
+    ///
     ///     for provider in providers_with_tos {
     ///         println!("{}: {}", provider.name, provider.terms_of_service_url.unwrap());
     ///     }
-    ///     
+    ///
     ///     Ok(())
     /// }
     /// ```
@@ -265,17 +305,17 @@ impl ProvidersApi {
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = OpenRouterClient::from_env()?;
-    ///     
+    ///
     ///     // Get providers with status pages
     ///     let providers_with_status = client.providers()?
     ///         .get_providers_with_status_page().await?;
-    ///     
+    ///
     ///     println!("{} providers have status pages", providers_with_status.len());
-    ///     
+    ///
     ///     for provider in providers_with_status {
     ///         println!("{}: {}", provider.name, provider.status_page_url.unwrap());
     ///     }
-    ///     
+    ///
     ///     Ok(())
     /// }
     /// ```
@@ -306,15 +346,15 @@ impl ProvidersApi {
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = OpenRouterClient::from_env()?;
-    ///     
+    ///
     ///     // Get all provider slugs sorted alphabetically
     ///     let slugs = client.providers()?.get_provider_slugs().await?;
-    ///     
+    ///
     ///     println!("Available provider slugs:");
     ///     for slug in slugs {
     ///         println!("  {}", slug);
     ///     }
-    ///     
+    ///
     ///     Ok(())
     /// }
     /// ```
@@ -341,15 +381,15 @@ impl ProvidersApi {
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = OpenRouterClient::from_env()?;
-    ///     
+    ///
     ///     // Get all provider names sorted alphabetically
     ///     let names = client.providers()?.get_provider_names().await?;
-    ///     
+    ///
     ///     println!("Available provider names:");
     ///     for name in names {
     ///         println!("  {}", name);
     ///     }
-    ///     
+    ///
     ///     Ok(())
     /// }
     /// ```
@@ -378,7 +418,7 @@ mod tests {
         };
         let http_client = Client::new();
 
-        let providers_api = ProvidersApi::new(http_client, &config);
+        let _providers_api = ProvidersApi::new(http_client, &config);
 
         // Test that the API was created successfully
         // We can't test actual API calls without a real server

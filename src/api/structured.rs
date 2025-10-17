@@ -4,7 +4,10 @@ use crate::client::ClientConfig;
 use crate::error::{Error, Result};
 use crate::models::structured::{JsonSchemaConfig, JsonSchemaDefinition};
 use crate::types::chat::{ChatCompletionRequest, ChatCompletionResponse, Message, MessageContent};
-use crate::utils::security::create_safe_error_message;
+use crate::utils::{
+    retry::execute_with_retry_builder, retry::handle_response_json,
+    retry::operations::STRUCTURED_GENERATE,
+};
 use reqwest::Client;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
@@ -101,43 +104,27 @@ impl StructuredApi {
             },
         });
 
-        // Send the request
-        let response = self
-            .client
-            .post(url)
-            .headers(self.config.build_headers()?)
-            .json(&body)
-            .send()
+        // Build headers once to avoid closure issues
+        let headers = self.config.build_headers()?;
+
+        // Execute request with retry logic
+        let response =
+            execute_with_retry_builder(&self.config.retry_config, STRUCTURED_GENERATE, || {
+                self.client
+                    .post(url.clone())
+                    .headers(headers.clone())
+                    .json(&body)
+            })
             .await?;
 
-        // Get the response status and body
-        let status = response.status();
-        let body = response.text().await?;
-
-        // Check if the HTTP response is successful.
-        if !status.is_success() {
-            return Err(Error::ApiError {
-                code: status.as_u16(),
-                message: create_safe_error_message(&body, "Structured API request failed"),
-                metadata: None,
-            });
-        }
-
-        // Deserialize the JSON response
+        // Handle response with consistent error parsing
         let chat_response: ChatCompletionResponse =
-            serde_json::from_str(&body).map_err(|e| Error::ApiError {
-                code: status.as_u16(),
-                message: create_safe_error_message(
-                    &format!("Failed to decode JSON: {e}. Body was: {body}"),
-                    "Structured JSON parsing error",
-                ),
-                metadata: None,
-            })?;
+            handle_response_json::<ChatCompletionResponse>(response, STRUCTURED_GENERATE).await?;
 
         // Extract the content from the response
         if chat_response.choices.is_empty() {
             return Err(Error::ApiError {
-                code: status.as_u16(),
+                code: 200,
                 message: "No choices returned in response".into(),
                 metadata: None,
             });
@@ -147,7 +134,7 @@ impl StructuredApi {
             MessageContent::Text(content) => content,
             MessageContent::Parts(_) => {
                 return Err(Error::ApiError {
-                    code: status.as_u16(),
+                    code: 200,
                     message: "Unexpected multimodal content in structured response".into(),
                     metadata: None,
                 });
