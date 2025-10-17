@@ -597,6 +597,39 @@ fn is_leap_year(year: u32) -> bool {
     year.is_multiple_of(4) && !year.is_multiple_of(100) || year.is_multiple_of(400)
 }
 
+impl Default for ActivityData {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            created_at: DateTime::parse_from_rfc3339("2024-01-01T00:00:00Z")
+                .unwrap()
+                .with_timezone(&Utc),
+            model: String::new(),
+            total_cost: None,
+            tokens_prompt: None,
+            tokens_completion: None,
+            total_tokens: None,
+            provider: None,
+            streamed: None,
+            cancelled: None,
+            web_search: None,
+            media: None,
+            reasoning: None,
+            finish_reason: None,
+            native_finish_reason: None,
+            origin: None,
+            latency: None,
+            generation_time: None,
+            moderation_latency: None,
+            cache_discount: None,
+            effective_cost: None,
+            upstream_id: None,
+            user_id: None,
+            http_referer: None,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -849,38 +882,5 @@ mod tests {
         assert_eq!(provider_stats.total_tokens, 0);
         assert_eq!(provider_stats.average_cost_per_request, None);
         assert_eq!(provider_stats.success_rate, 0.0);
-    }
-}
-
-impl Default for ActivityData {
-    fn default() -> Self {
-        Self {
-            id: String::new(),
-            created_at: DateTime::parse_from_rfc3339("2024-01-01T00:00:00Z")
-                .unwrap()
-                .with_timezone(&Utc),
-            model: String::new(),
-            total_cost: None,
-            tokens_prompt: None,
-            tokens_completion: None,
-            total_tokens: None,
-            provider: None,
-            streamed: None,
-            cancelled: None,
-            web_search: None,
-            media: None,
-            reasoning: None,
-            finish_reason: None,
-            native_finish_reason: None,
-            origin: None,
-            latency: None,
-            generation_time: None,
-            moderation_latency: None,
-            cache_discount: None,
-            effective_cost: None,
-            upstream_id: None,
-            user_id: None,
-            http_referer: None,
-        }
     }
 }

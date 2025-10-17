@@ -422,7 +422,7 @@ mod tests {
 
         // Test that the API was created successfully
         // We can't test actual API calls without a real server
-        assert!(true);
+        // API creation successful if we reach this point
     }
 
     #[tokio::test]
