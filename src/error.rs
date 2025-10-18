@@ -124,19 +124,22 @@ impl Error {
         let mut error = Self::from_response_text(status, &text)?;
 
         // Add operation context to metadata
-        if let Error::ApiError { metadata, .. } = &mut error {
-            if let Some(metadata) = metadata {
-                let metadata_obj = metadata.as_object_mut().unwrap();
+        if let Error::ApiError {
+            metadata: Some(metadata),
+            ..
+        } = &mut error
+        {
+            // Add operation context to metadata
+            let metadata_obj = metadata.as_object_mut().unwrap();
+            metadata_obj.insert(
+                "operation".to_string(),
+                serde_json::Value::String(operation_name.to_string()),
+            );
+            if let Some(rid) = request_id {
                 metadata_obj.insert(
-                    "operation".to_string(),
-                    serde_json::Value::String(operation_name.to_string()),
+                    "request_id".to_string(),
+                    serde_json::Value::String(rid.to_string()),
                 );
-                if let Some(rid) = request_id {
-                    metadata_obj.insert(
-                        "request_id".to_string(),
-                        serde_json::Value::String(rid.to_string()),
-                    );
-                }
             }
         }
 
