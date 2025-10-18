@@ -36,6 +36,30 @@ pub struct JsonRpcError {
     pub data: Option<serde_json::Value>,
 }
 
+/// Configuration for MCP client security and performance limits
+#[derive(Debug, Clone)]
+pub struct McpConfig {
+    /// Timeout for individual requests
+    pub request_timeout: Duration,
+    /// Maximum response size in bytes
+    pub max_response_size: usize,
+    /// Maximum request size in bytes
+    pub max_request_size: usize,
+    /// Maximum concurrent requests
+    pub max_concurrent_requests: usize,
+}
+
+impl Default for McpConfig {
+    fn default() -> Self {
+        Self {
+            request_timeout: Duration::from_secs(30),
+            max_response_size: 10 * 1024 * 1024, // 10MB
+            max_request_size: 1024 * 1024,       // 1MB
+            max_concurrent_requests: 10,
+        }
+    }
+}
+
 /// Initialize parameters sent by the client
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InitializeParams {

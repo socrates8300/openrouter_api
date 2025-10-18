@@ -1,6 +1,5 @@
 //! Structured output API module for handling JSON schema-based responses
 
-use crate::client::ClientConfig;
 use crate::error::{Error, Result};
 use crate::models::structured::{JsonSchemaConfig, JsonSchemaDefinition};
 use crate::types::chat::{ChatCompletionRequest, ChatCompletionResponse, Message, MessageContent};
@@ -15,16 +14,16 @@ use serde_json::Value;
 /// API endpoint for structured output generation.
 pub struct StructuredApi {
     client: Client,
-    config: ClientConfig,
+    config: crate::client::ApiConfig,
 }
 
 impl StructuredApi {
     /// Creates a new StructuredApi with the given reqwest client and configuration.
-    pub fn new(client: Client, config: &ClientConfig) -> Self {
-        Self {
+    pub fn new(client: Client, config: &crate::client::ClientConfig) -> Result<Self> {
+        Ok(Self {
             client,
-            config: config.clone(),
-        }
+            config: config.to_api_config()?,
+        })
     }
 
     /// Generates a structured output that conforms to the provided JSON schema.
@@ -104,8 +103,8 @@ impl StructuredApi {
             },
         });
 
-        // Build headers once to avoid closure issues
-        let headers = self.config.build_headers()?;
+        // Use pre-built headers from config
+        let headers = self.config.headers.clone();
 
         // Execute request with retry logic
         let response =

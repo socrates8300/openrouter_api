@@ -1,5 +1,3 @@
-use crate::client::ClientConfig;
-/// API endpoint for chat completions.
 use crate::error::{Error, Result};
 use crate::types::chat::{
     ChatCompletionChunk, ChatCompletionRequest, ChatCompletionResponse, Message, MessageContent,
@@ -22,23 +20,33 @@ use tokio::sync::Semaphore;
 use tokio_util::codec::{FramedRead, LinesCodec};
 use tokio_util::io::StreamReader;
 
+/// API endpoint for chat completions.
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::sync::Semaphore;
+use tokio_util::codec::{FramedRead, LinesCodec};
+use tokio_util::io::StreamReader;
+
 // Streaming safety limits to prevent memory exhaustion
 const MAX_LINE_LENGTH: usize = 64 * 1024; // 64KB per line
 const MAX_TOTAL_CHUNKS: usize = 10_000; // Maximum chunks per stream
 const MAX_CONCURRENT_CHUNKS: usize = 10; // Maximum chunks processing concurrently
 const CHUNK_PROCESSING_DELAY_MS: u64 = 10; // Delay between chunks for backpressure
 
+/// API endpoint for chat completions.
 pub struct ChatApi {
     pub client: Client,
-    pub config: ClientConfig,
+    pub config: crate::client::ApiConfig,
 }
 
 impl ChatApi {
-    pub fn new(client: Client, config: &ClientConfig) -> Self {
-        Self {
+    /// Creates a new ChatApi with the given reqwest client and configuration.
+    pub fn new(client: Client, config: &crate::client::ClientConfig) -> Result<Self> {
+        Ok(Self {
             client,
-            config: config.clone(),
-        }
+            config: config.to_api_config()?,
+        })
     }
 
     /// Sends a chat completion request and returns a complete ChatCompletionResponse.
@@ -61,8 +69,8 @@ impl ChatApi {
                 metadata: None,
             })?;
 
-        // Build headers once to avoid closure issues
-        let headers = self.config.build_headers()?;
+        // Use pre-built headers from config
+        let headers = self.config.headers.clone();
 
         // Execute request with retry logic
         let response =
@@ -100,9 +108,10 @@ impl ChatApi {
     pub fn chat_completion_stream(
         &self,
         request: ChatCompletionRequest,
-    ) -> Pin<Box<dyn Stream<Item = Result<ChatCompletionChunk>> + Send>> {
+    ) -> Pin<Box<dyn Stream<Item = Result<ChatCompletionChunk>> + Send + '_>> {
         let client = self.client.clone();
-        let config = self.config.clone();
+        let headers = self.config.headers.clone();
+        let _retry_config = self.config.retry_config.clone();
 
         // Validate the request before streaming
         if let Err(e) = validation::validate_chat_request(&request) {

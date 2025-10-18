@@ -13,7 +13,12 @@ use url::Url;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 /// Secure wrapper for API keys that automatically zeros memory on drop
-#[derive(Clone, ZeroizeOnDrop)]
+///
+/// # Security Notes
+/// - This type implements `Drop` to securely zero memory
+/// - Does NOT implement `Clone` to prevent secret duplication
+/// - Use references (`&SecureApiKey`) for passing around keys
+#[derive(ZeroizeOnDrop)]
 pub struct SecureApiKey {
     #[zeroize(skip)]
     inner: String,
@@ -67,7 +72,12 @@ impl std::fmt::Debug for SecureApiKey {
 }
 
 /// Client configuration containing API key, base URL, and additional settings.
-#[derive(Debug, Clone)]
+///
+/// # Security Notes
+/// - This type implements `Drop` to securely zero memory for API keys
+/// - Does NOT implement `Clone` to prevent secret duplication
+/// - Use references (`&ClientConfig`) for passing around configuration
+#[derive(Debug)]
 pub struct ClientConfig {
     pub api_key: Option<SecureApiKey>,
     pub base_url: Url,
@@ -78,28 +88,16 @@ pub struct ClientConfig {
     pub retry_config: RetryConfig,
 }
 
-/// Configuration for automatic retry behavior
+/// Configuration for API instances that doesn't include sensitive data
 #[derive(Debug, Clone)]
-pub struct RetryConfig {
-    pub max_retries: u32,
-    pub initial_backoff_ms: u64,
-    pub max_backoff_ms: u64,
-    pub retry_on_status_codes: Vec<u16>,
-    pub total_timeout: Duration,
-    pub max_retry_interval: Duration,
-}
-
-impl Default for RetryConfig {
-    fn default() -> Self {
-        Self {
-            max_retries: 3,
-            initial_backoff_ms: 500,
-            max_backoff_ms: 10000,
-            retry_on_status_codes: vec![429, 500, 502, 503, 504],
-            total_timeout: Duration::from_secs(60),
-            max_retry_interval: Duration::from_secs(30),
-        }
-    }
+pub struct ApiConfig {
+    pub base_url: Url,
+    pub http_referer: Option<String>,
+    pub site_title: Option<String>,
+    pub user_id: Option<String>,
+    pub timeout: Duration,
+    pub retry_config: RetryConfig,
+    pub headers: HeaderMap,
 }
 
 impl ClientConfig {
@@ -119,17 +117,70 @@ impl ClientConfig {
                 .map_err(|e| Error::ConfigError(format!("Invalid Referer header: {e}")))?;
             headers.insert("Referer", ref_value);
         }
-        if let Some(ref title) = self.site_title {
-            let title_value = HeaderValue::from_str(title)
-                .map_err(|e| Error::ConfigError(format!("Invalid Title header: {e}")))?;
+        if let Some(ref site_title) = self.site_title {
+            let title_value = HeaderValue::from_str(site_title)
+                .map_err(|e| Error::ConfigError(format!("Invalid X-Title header: {e}")))?;
             headers.insert("X-Title", title_value);
         }
         if let Some(ref user_id) = self.user_id {
-            let user_id_value = HeaderValue::from_str(user_id)
-                .map_err(|e| Error::ConfigError(format!("Invalid User-ID header: {e}")))?;
-            headers.insert("X-User-ID", user_id_value);
+            let user_value = HeaderValue::from_str(user_id)
+                .map_err(|e| Error::ConfigError(format!("Invalid X-User-ID header: {e}")))?;
+            headers.insert("X-User-ID", user_value);
         }
         Ok(headers)
+    }
+
+    /// Create an ApiConfig for API instances (excludes sensitive API key)
+    pub fn to_api_config(&self) -> Result<ApiConfig> {
+        Ok(ApiConfig {
+            base_url: self.base_url.clone(),
+            http_referer: self.http_referer.clone(),
+            site_title: self.site_title.clone(),
+            user_id: self.user_id.clone(),
+            timeout: self.timeout,
+            retry_config: self.retry_config.clone(),
+            headers: self.build_headers()?,
+        })
+    }
+}
+
+/// Configuration for automatic retry behavior
+#[derive(Debug, Clone)]
+pub struct RetryConfig {
+    pub max_retries: u32,
+    pub initial_backoff_ms: u64,
+    pub max_backoff_ms: u64,
+    pub retry_on_status_codes: Vec<u16>,
+    /// Total time cap for all retry attempts combined
+    pub total_timeout: Duration,
+    /// Maximum interval between retries (enforces upper bound on backoff)
+    pub max_retry_interval: Duration,
+}
+
+impl Default for RetryConfig {
+    fn default() -> Self {
+        Self {
+            max_retries: 3,
+            initial_backoff_ms: 500,
+            max_backoff_ms: 10000,
+            retry_on_status_codes: vec![429, 500, 502, 503, 504],
+            total_timeout: Duration::from_secs(120), // 2 minutes total
+            max_retry_interval: Duration::from_secs(30), // 30 seconds max between retries
+        }
+    }
+}
+
+impl RetryConfig {
+    /// Set total timeout for all retry attempts
+    pub fn with_total_timeout(mut self, timeout: Duration) -> Self {
+        self.total_timeout = timeout;
+        self
+    }
+
+    /// Set maximum retry interval
+    pub fn with_max_retry_interval(mut self, interval: Duration) -> Self {
+        self.max_retry_interval = interval;
+        self
     }
 }
 
@@ -435,7 +486,7 @@ impl OpenRouterClient<Ready> {
             .http_client
             .clone()
             .ok_or_else(|| Error::ConfigError("HTTP client is missing".into()))?;
-        Ok(crate::api::chat::ChatApi::new(client, &self.config))
+        crate::api::chat::ChatApi::new(client, &self.config)
     }
 
     /// Provides access to the completions endpoint.
@@ -444,10 +495,7 @@ impl OpenRouterClient<Ready> {
             .http_client
             .clone()
             .ok_or_else(|| Error::ConfigError("HTTP client is missing".into()))?;
-        Ok(crate::api::completion::CompletionApi::new(
-            client,
-            &self.config,
-        ))
+        crate::api::completion::CompletionApi::new(client, &self.config)
     }
 
     /// Provides access to the models endpoint.
@@ -456,7 +504,7 @@ impl OpenRouterClient<Ready> {
             .http_client
             .clone()
             .ok_or_else(|| Error::ConfigError("HTTP client is missing".into()))?;
-        Ok(crate::api::models::ModelsApi::new(client, &self.config))
+        crate::api::models::ModelsApi::new(client, &self.config)
     }
 
     /// Provides access to the structured output endpoint.
@@ -465,10 +513,7 @@ impl OpenRouterClient<Ready> {
             .http_client
             .clone()
             .ok_or_else(|| Error::ConfigError("HTTP client is missing".into()))?;
-        Ok(crate::api::structured::StructuredApi::new(
-            client,
-            &self.config,
-        ))
+        crate::api::structured::StructuredApi::new(client, &self.config)
     }
 
     /// Provides access to the web search endpoint.
@@ -477,10 +522,7 @@ impl OpenRouterClient<Ready> {
             .http_client
             .clone()
             .ok_or_else(|| Error::ConfigError("HTTP client is missing".into()))?;
-        Ok(crate::api::web_search::WebSearchApi::new(
-            client,
-            &self.config,
-        ))
+        crate::api::web_search::WebSearchApi::new(client, &self.config)
     }
 
     /// Provides access to the credits endpoint.
@@ -489,19 +531,17 @@ impl OpenRouterClient<Ready> {
             .http_client
             .clone()
             .ok_or_else(|| Error::ConfigError("HTTP client is missing".into()))?;
-        Ok(crate::api::credits::CreditsApi::new(client, &self.config))
+        crate::api::credits::CreditsApi::new(client, &self.config)
     }
 
     /// Provides access to the analytics endpoint.
+    /// Get analytics API instance
     pub fn analytics(&self) -> Result<crate::api::analytics::AnalyticsApi> {
         let client = self
             .http_client
             .clone()
             .ok_or_else(|| Error::ConfigError("HTTP client is missing".into()))?;
-        Ok(crate::api::analytics::AnalyticsApi::new(
-            client,
-            &self.config,
-        ))
+        crate::api::analytics::AnalyticsApi::new(client, &self.config)
     }
 
     /// Provides access to the providers endpoint.
@@ -510,10 +550,7 @@ impl OpenRouterClient<Ready> {
             .http_client
             .clone()
             .ok_or_else(|| Error::ConfigError("HTTP client is missing".into()))?;
-        Ok(crate::api::providers::ProvidersApi::new(
-            client,
-            &self.config,
-        ))
+        crate::api::providers::ProvidersApi::new(client, &self.config)
     }
 
     /// Provides access to the generation endpoint.
@@ -522,10 +559,7 @@ impl OpenRouterClient<Ready> {
             .http_client
             .clone()
             .ok_or_else(|| Error::ConfigError("HTTP client is missing".into()))?;
-        Ok(crate::api::generation::GenerationApi::new(
-            client,
-            &self.config,
-        ))
+        crate::api::generation::GenerationApi::new(client, &self.config)
     }
 
     /// Returns a new request builder for chat completions that supports MCP.
