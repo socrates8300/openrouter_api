@@ -1,5 +1,4 @@
 // api/completion.rs
-use crate::client::ClientConfig;
 use crate::error::{Error, Result};
 use crate::types::completion::{CompletionRequest, CompletionResponse};
 use crate::utils::{
@@ -11,16 +10,16 @@ use reqwest::Client;
 /// API endpoint for text completions.
 pub struct CompletionApi {
     pub client: Client,
-    pub config: ClientConfig,
+    pub config: crate::client::ApiConfig,
 }
 
 impl CompletionApi {
     /// Creates a new CompletionApi with the given reqwest client and configuration.
-    pub fn new(client: Client, config: &ClientConfig) -> Self {
-        Self {
+    pub fn new(client: Client, config: &crate::client::ClientConfig) -> Result<Self> {
+        Ok(Self {
             client,
-            config: config.clone(),
-        }
+            config: config.to_api_config()?,
+        })
     }
 
     /// Calls the completions endpoint. The request payload includes at minimum the `model` and `prompt` fields,
@@ -40,8 +39,8 @@ impl CompletionApi {
                 metadata: None,
             })?;
 
-        // Build headers once to avoid closure issues
-        let headers = self.config.build_headers()?;
+        // Use pre-built headers from config
+        let headers = self.config.headers.clone();
 
         // Execute request with retry logic
         let response =

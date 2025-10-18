@@ -1,4 +1,3 @@
-use crate::client::ClientConfig;
 use crate::error::{Error, Result};
 use crate::types::credits::CreditsResponse;
 use crate::utils::retry::operations::GET_BALANCE;
@@ -8,16 +7,16 @@ use reqwest::Client;
 /// API endpoint for credits management.
 pub struct CreditsApi {
     pub client: Client,
-    pub config: ClientConfig,
+    pub config: crate::client::ApiConfig,
 }
 
 impl CreditsApi {
     /// Creates a new CreditsApi with the given reqwest client and configuration.
-    pub fn new(client: Client, config: &ClientConfig) -> Self {
-        Self {
+    pub fn new(client: Client, config: &crate::client::ClientConfig) -> Result<Self> {
+        Ok(Self {
             client,
-            config: config.clone(),
-        }
+            config: config.to_api_config()?,
+        })
     }
 
     /// Retrieves the current credit balance and usage information.
@@ -72,8 +71,8 @@ impl CreditsApi {
                 metadata: None,
             })?;
 
-        // Build headers once to avoid closure issues
-        let headers = self.config.build_headers()?;
+        // Use pre-built headers from config
+        let headers = self.config.headers.clone();
 
         // Execute request with retry logic
         let response = execute_with_retry_builder(&self.config.retry_config, GET_BALANCE, || {
@@ -94,10 +93,11 @@ mod tests {
     fn test_credits_api_new() {
         use crate::client::{ClientConfig, RetryConfig, SecureApiKey};
         use reqwest::Client;
+        use url::Url;
 
         let config = ClientConfig {
             api_key: Some(SecureApiKey::new("sk-test123456789012345678901234567890").unwrap()),
-            base_url: url::Url::parse("https://openrouter.ai/api/v1/").unwrap(),
+            base_url: Url::parse("https://openrouter.ai/api/v1").unwrap(),
             timeout: std::time::Duration::from_secs(30),
             http_referer: None,
             site_title: None,
@@ -106,8 +106,11 @@ mod tests {
         };
 
         let client = Client::new();
-        let credits_api = CreditsApi::new(client, &config);
+        let credits_api = CreditsApi::new(client, &config).unwrap();
 
-        assert!(credits_api.config.api_key.is_some());
+        // Verify that the API config was created successfully
+        // The API key should NOT be stored in the API config for security reasons
+        assert!(!credits_api.config.headers.is_empty());
+        assert!(credits_api.config.headers.contains_key("authorization"));
     }
 }

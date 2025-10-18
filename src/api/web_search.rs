@@ -1,6 +1,5 @@
-/// Web search API implementation
+/// Web Search API implementation
 use crate::{
-    client::ClientConfig,
     error::{Error, Result},
     types::web_search::{WebSearchRequest, WebSearchResponse},
     utils::retry::operations::WEB_SEARCH,
@@ -11,18 +10,19 @@ use crate::{
 };
 use reqwest::Client;
 
+/// API endpoint for web search integration.
 pub struct WebSearchApi {
     pub client: Client,
-    pub config: ClientConfig,
+    pub config: crate::client::ApiConfig,
 }
 
 impl WebSearchApi {
-    /// Creates a new WebSearchApi instance given a reqwest client and a client configuration.
-    pub fn new(client: Client, config: &ClientConfig) -> Self {
-        Self {
+    /// Creates a new WebSearchApi with the given reqwest client and configuration.
+    pub fn new(client: Client, config: &crate::client::ClientConfig) -> Result<Self> {
+        Ok(Self {
             client,
-            config: config.clone(),
-        }
+            config: config.to_api_config()?,
+        })
     }
 
     /// Performs a web search with the given request and returns a structured response.
@@ -41,8 +41,8 @@ impl WebSearchApi {
                 metadata: None,
             })?;
 
-        // Build headers once to avoid closure issues
-        let headers = self.config.build_headers()?;
+        // Use pre-built headers from config
+        let headers = self.config.headers.clone();
 
         // Execute request with retry logic
         let response = execute_with_retry_builder(&self.config.retry_config, WEB_SEARCH, || {
