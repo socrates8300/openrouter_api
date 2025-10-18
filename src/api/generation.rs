@@ -1,4 +1,3 @@
-use crate::client::ClientConfig;
 use crate::error::{Error, Result};
 use crate::types::generation::GenerationResponse;
 use crate::utils::{
@@ -8,18 +7,19 @@ use crate::utils::{
 use reqwest::Client;
 
 /// API endpoint for generation management.
+/// API endpoint for generation information.
 pub struct GenerationApi {
     pub client: Client,
-    pub config: ClientConfig,
+    pub config: crate::client::ApiConfig,
 }
 
 impl GenerationApi {
     /// Creates a new GenerationApi with the given reqwest client and configuration.
-    pub fn new(client: Client, config: &ClientConfig) -> Self {
-        Self {
+    pub fn new(client: Client, config: &crate::client::ClientConfig) -> Result<Self> {
+        Ok(Self {
             client,
-            config: config.clone(),
-        }
+            config: config.to_api_config()?,
+        })
     }
 
     /// Retrieves metadata about a specific generation request.
@@ -105,8 +105,8 @@ impl GenerationApi {
                 metadata: None,
             })?;
 
-        // Build headers once to avoid closure issues
-        let headers = self.config.build_headers()?;
+        // Use pre-built headers from config
+        let headers = self.config.headers.clone();
 
         // Execute request with retry logic
         let response =
@@ -131,10 +131,11 @@ mod tests {
     fn test_generation_api_new() {
         use crate::client::{ClientConfig, RetryConfig, SecureApiKey};
         use reqwest::Client;
+        use url::Url;
 
         let config = ClientConfig {
             api_key: Some(SecureApiKey::new("sk-test123456789012345678901234567890").unwrap()),
-            base_url: url::Url::parse("https://openrouter.ai/api/v1/").unwrap(),
+            base_url: Url::parse("https://openrouter.ai/api/v1").unwrap(),
             timeout: std::time::Duration::from_secs(30),
             http_referer: None,
             site_title: None,
@@ -143,9 +144,12 @@ mod tests {
         };
 
         let client = Client::new();
-        let generation_api = GenerationApi::new(client, &config);
+        let generation_api = GenerationApi::new(client, &config).unwrap();
 
-        assert!(generation_api.config.api_key.is_some());
+        // Verify that the API config was created successfully
+        // The API key should NOT be stored in the API config for security reasons
+        assert!(!generation_api.config.headers.is_empty());
+        assert!(generation_api.config.headers.contains_key("authorization"));
     }
 
     #[test]
@@ -164,7 +168,7 @@ mod tests {
         };
 
         let client = Client::new();
-        let generation_api = GenerationApi::new(client, &config);
+        let generation_api = GenerationApi::new(client, &config).unwrap();
 
         // Test empty ID
         let rt = tokio::runtime::Runtime::new().unwrap();

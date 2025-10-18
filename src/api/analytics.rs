@@ -1,4 +1,3 @@
-use crate::client::ClientConfig;
 use crate::error::{Error, Result};
 #[allow(dead_code, unused_imports)]
 use crate::types::analytics::{ActivityRequest, ActivityResponse, SortField, SortOrder};
@@ -10,16 +9,16 @@ use urlencoding::encode;
 /// API endpoint for analytics and activity data.
 pub struct AnalyticsApi {
     pub client: Client,
-    pub config: ClientConfig,
+    pub config: crate::client::ApiConfig,
 }
 
 impl AnalyticsApi {
     /// Creates a new AnalyticsApi with the given reqwest client and configuration.
-    pub fn new(client: Client, config: &ClientConfig) -> Self {
-        Self {
+    pub fn new(client: Client, config: &crate::client::ClientConfig) -> Result<Self> {
+        Ok(Self {
             client,
-            config: config.clone(),
-        }
+            config: config.to_api_config()?,
+        })
     }
 
     /// Retrieves activity data for the authenticated user.
@@ -140,8 +139,8 @@ impl AnalyticsApi {
             query_params.push(("offset", offset.to_string()));
         }
 
-        // Build headers once to avoid closure issues
-        let headers = self.config.build_headers()?;
+        // Use pre-built headers from config
+        let headers = self.config.headers.clone();
 
         // Execute request with retry logic
         let response = execute_with_retry_builder(&self.config.retry_config, GET_ACTIVITY, || {
@@ -378,10 +377,11 @@ mod tests {
     fn test_analytics_api_new() {
         use crate::client::{ClientConfig, RetryConfig, SecureApiKey};
         use reqwest::Client;
+        use url::Url;
 
         let config = ClientConfig {
             api_key: Some(SecureApiKey::new("sk-test123456789012345678901234567890").unwrap()),
-            base_url: url::Url::parse("https://openrouter.ai/api/v1/").unwrap(),
+            base_url: Url::parse("https://openrouter.ai/api/v1").unwrap(),
             timeout: std::time::Duration::from_secs(30),
             http_referer: None,
             site_title: None,
@@ -390,9 +390,12 @@ mod tests {
         };
 
         let client = Client::new();
-        let analytics_api = AnalyticsApi::new(client, &config);
+        let analytics_api = AnalyticsApi::new(client, &config).unwrap();
 
-        assert!(analytics_api.config.api_key.is_some());
+        // Verify that the API config was created successfully
+        // The API key should NOT be stored in the API config for security reasons
+        assert!(!analytics_api.config.headers.is_empty());
+        assert!(analytics_api.config.headers.contains_key("authorization"));
     }
 
     #[test]

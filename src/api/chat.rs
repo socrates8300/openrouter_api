@@ -1,4 +1,3 @@
-use crate::client::ClientConfig;
 use crate::error::{Error, Result};
 use crate::types::chat::{
     ChatCompletionChunk, ChatCompletionRequest, ChatCompletionResponse, Message, MessageContent,
@@ -21,17 +20,19 @@ use tokio_util::io::StreamReader;
 const MAX_LINE_LENGTH: usize = 64 * 1024; // 64KB per line
 const MAX_TOTAL_CHUNKS: usize = 10_000; // Maximum chunks per stream
 
+/// API endpoint for chat completions.
 pub struct ChatApi {
     pub client: Client,
-    pub config: ClientConfig,
+    pub config: crate::client::ApiConfig,
 }
 
 impl ChatApi {
-    pub fn new(client: Client, config: &ClientConfig) -> Self {
-        Self {
+    /// Creates a new ChatApi with the given reqwest client and configuration.
+    pub fn new(client: Client, config: &crate::client::ClientConfig) -> Result<Self> {
+        Ok(Self {
             client,
-            config: config.clone(),
-        }
+            config: config.to_api_config()?,
+        })
     }
 
     /// Sends a chat completion request and returns a complete ChatCompletionResponse.
@@ -54,8 +55,8 @@ impl ChatApi {
                 metadata: None,
             })?;
 
-        // Build headers once to avoid closure issues
-        let headers = self.config.build_headers()?;
+        // Use pre-built headers from config
+        let headers = self.config.headers.clone();
 
         // Execute request with retry logic
         let response =
@@ -93,9 +94,10 @@ impl ChatApi {
     pub fn chat_completion_stream(
         &self,
         request: ChatCompletionRequest,
-    ) -> Pin<Box<dyn Stream<Item = Result<ChatCompletionChunk>> + Send>> {
+    ) -> Pin<Box<dyn Stream<Item = Result<ChatCompletionChunk>> + Send + '_>> {
         let client = self.client.clone();
-        let config = self.config.clone();
+        let headers = self.config.headers.clone();
+        let _retry_config = self.config.retry_config.clone();
 
         // Validate the request before streaming
         if let Err(e) = validation::validate_chat_request(&request) {
@@ -108,7 +110,7 @@ impl ChatApi {
 
         let stream = try_stream! {
             // Build the URL for the chat completions endpoint.
-            let url = config.base_url.join("chat/completions").map_err(|e| Error::ApiError {
+            let url = self.config.base_url.join("chat/completions").map_err(|e| Error::ApiError {
                 code: 400,
                 message: format!("Invalid URL: {e}"),
                 metadata: None,
@@ -125,7 +127,7 @@ impl ChatApi {
             // Issue the POST request with error-for-status checking.
             let response = client
                 .post(url)
-                .headers(config.build_headers()?)
+                .headers(headers.clone())
                 .json(&req_body)
                 .send()
                 .await?

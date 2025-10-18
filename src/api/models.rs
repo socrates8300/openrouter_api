@@ -1,4 +1,3 @@
-use crate::client::ClientConfig;
 use crate::error::{Error, Result};
 use crate::types::models::{ModelsRequest, ModelsResponse};
 use crate::utils::retry::operations::LIST_MODELS;
@@ -6,18 +5,19 @@ use crate::utils::{retry::execute_with_retry_builder, retry::handle_response_jso
 use reqwest::Client;
 
 /// API endpoint for model management.
+/// API endpoint for model information.
 pub struct ModelsApi {
     pub client: Client,
-    pub config: ClientConfig,
+    pub config: crate::client::ApiConfig,
 }
 
 impl ModelsApi {
     /// Creates a new ModelsApi with the given reqwest client and configuration.
-    pub fn new(client: Client, config: &ClientConfig) -> Self {
-        Self {
+    pub fn new(client: Client, config: &crate::client::ClientConfig) -> Result<Self> {
+        Ok(Self {
             client,
-            config: config.clone(),
-        }
+            config: config.to_api_config()?,
+        })
     }
 
     /// Lists available models, optionally filtered by capability or provider.
@@ -33,8 +33,8 @@ impl ModelsApi {
                 metadata: None,
             })?;
 
-        // Build headers once to avoid closure issues
-        let headers = self.config.build_headers()?;
+        // Use pre-built headers from config
+        let headers = self.config.headers.clone();
 
         // Execute request with retry logic
         let response = execute_with_retry_builder(&self.config.retry_config, LIST_MODELS, || {

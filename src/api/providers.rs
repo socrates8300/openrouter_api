@@ -1,5 +1,4 @@
-use crate::client::ClientConfig;
-use crate::error::Error;
+use crate::error::{Error, Result};
 use crate::types::{Provider, ProvidersResponse};
 use crate::utils::cache::Cache;
 use crate::utils::{
@@ -13,18 +12,18 @@ use std::time::Duration;
 /// API client for provider-related operations
 pub struct ProvidersApi {
     client: Client,
-    config: ClientConfig,
+    config: crate::client::ApiConfig,
     cache: Mutex<Cache<String, ProvidersResponse>>,
 }
 
 impl ProvidersApi {
     /// Creates a new ProvidersApi with the given reqwest client and configuration.
-    pub fn new(client: Client, config: &ClientConfig) -> Self {
-        Self {
+    pub fn new(client: Client, config: &crate::client::ClientConfig) -> Result<Self> {
+        Ok(Self {
             client,
-            config: config.clone(),
+            config: config.to_api_config()?,
             cache: Mutex::new(Cache::new(Duration::from_secs(300))), // 5 minutes cache
-        }
+        })
     }
 
     /// Retrieves a list of all available providers
@@ -68,7 +67,7 @@ impl ProvidersApi {
     ///     Ok(())
     /// }
     /// ```
-    pub async fn get_providers(&self) -> Result<ProvidersResponse, Error> {
+    pub async fn get_providers(&self) -> Result<ProvidersResponse> {
         // Check cache first
         let cache_key = "providers".to_string();
         if let Ok(mut cache) = self.cache.lock() {
@@ -84,8 +83,8 @@ impl ProvidersApi {
             format!("{}/providers", self.config.base_url)
         };
 
-        // Build headers once to avoid closure issues
-        let headers = self.config.build_headers()?;
+        // Use pre-built headers from config
+        let headers = self.config.headers.clone();
 
         // Execute request with retry logic
         let response = execute_with_retry_builder(&self.config.retry_config, GET_PROVIDERS, || {
@@ -137,7 +136,7 @@ impl ProvidersApi {
     ///     Ok(())
     /// }
     /// ```
-    pub async fn get_provider_by_slug(&self, slug: &str) -> Result<Provider, Error> {
+    pub async fn get_provider_by_slug(&self, slug: &str) -> Result<Provider> {
         // Validate input
         if slug.trim().is_empty() {
             return Err(Error::ConfigError(
@@ -187,7 +186,7 @@ impl ProvidersApi {
     ///     Ok(())
     /// }
     /// ```
-    pub async fn get_provider_by_name(&self, name: &str) -> Result<Provider, Error> {
+    pub async fn get_provider_by_name(&self, name: &str) -> Result<Provider> {
         // Validate input
         if name.trim().is_empty() {
             return Err(Error::ConfigError(
@@ -237,7 +236,7 @@ impl ProvidersApi {
     ///     Ok(())
     /// }
     /// ```
-    pub async fn get_providers_with_privacy_policy(&self) -> Result<Vec<Provider>, Error> {
+    pub async fn get_providers_with_privacy_policy(&self) -> Result<Vec<Provider>> {
         let providers_response = self.get_providers().await?;
         Ok(providers_response
             .with_privacy_policy()
@@ -278,7 +277,7 @@ impl ProvidersApi {
     ///     Ok(())
     /// }
     /// ```
-    pub async fn get_providers_with_terms_of_service(&self) -> Result<Vec<Provider>, Error> {
+    pub async fn get_providers_with_terms_of_service(&self) -> Result<Vec<Provider>> {
         let providers_response = self.get_providers().await?;
         Ok(providers_response
             .with_terms_of_service()
@@ -319,7 +318,7 @@ impl ProvidersApi {
     ///     Ok(())
     /// }
     /// ```
-    pub async fn get_providers_with_status_page(&self) -> Result<Vec<Provider>, Error> {
+    pub async fn get_providers_with_status_page(&self) -> Result<Vec<Provider>> {
         let providers_response = self.get_providers().await?;
         Ok(providers_response
             .with_status_page()
@@ -358,7 +357,7 @@ impl ProvidersApi {
     ///     Ok(())
     /// }
     /// ```
-    pub async fn get_provider_slugs(&self) -> Result<Vec<String>, Error> {
+    pub async fn get_provider_slugs(&self) -> Result<Vec<String>> {
         let providers_response = self.get_providers().await?;
         Ok(providers_response.sorted_slugs())
     }
@@ -393,7 +392,7 @@ impl ProvidersApi {
     ///     Ok(())
     /// }
     /// ```
-    pub async fn get_provider_names(&self) -> Result<Vec<String>, Error> {
+    pub async fn get_provider_names(&self) -> Result<Vec<String>> {
         let providers_response = self.get_providers().await?;
         Ok(providers_response.sorted_names())
     }
@@ -438,7 +437,7 @@ mod tests {
             retry_config: RetryConfig::default(),
         };
         let http_client = Client::new();
-        let providers_api = ProvidersApi::new(http_client, &config);
+        let providers_api = ProvidersApi::new(http_client, &config).unwrap();
 
         // Test that network errors are properly handled
         let result = providers_api.get_providers().await;
@@ -473,7 +472,7 @@ mod tests {
             retry_config: RetryConfig::default(),
         };
         let http_client = Client::new();
-        let providers_api = ProvidersApi::new(http_client, &config);
+        let providers_api = ProvidersApi::new(http_client, &config).unwrap();
 
         // All convenience methods should handle network errors gracefully
         assert!(providers_api.get_provider_by_slug("openai").await.is_err());
