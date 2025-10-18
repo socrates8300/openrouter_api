@@ -28,33 +28,7 @@ pub mod operations {
 /// # Arguments
 /// * `config` - Retry configuration
 /// * `operation_name` - Name of the operation for logging purposes
-/// * `request_builder` - Closure that creates a new RequestBuilder for each attempt
 ///
-/// # Returns
-/// * `Result<Response>` - The successful response or error after all retries
-///
-/// # Example
-/// ```rust,no_run
-/// use openrouter_api::{OpenRouterClient, Result};
-/// use openrouter_api::client::RetryConfig;
-/// use openrouter_api::types::completion::{CompletionRequest, CompletionResponse};
-///
-/// #[tokio::main]
-/// async fn main() -> Result<()> {
-///     let client = OpenRouterClient::from_env()?;
-///
-///     // The retry logic is handled internally by the API methods
-///     let request = CompletionRequest {
-///         model: "openai/gpt-4o".to_string(),
-///         prompt: "Hello, world!".to_string(),
-///         extra_params: serde_json::json!({}),
-///     };
-///
-///     let response = client.completions()?.text_completion(request).await?;
-///     println!("Response: {}", response.choices[0].text);
-///
-///     Ok(())
-/// }
 /// ```
 pub async fn execute_with_retry_builder<F>(
     config: &RetryConfig,
