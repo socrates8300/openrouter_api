@@ -464,8 +464,7 @@ mod tests {
     async fn test_provider_convenience_methods_with_empty_response() {
         let config = ClientConfig {
             api_key: Some(SecureApiKey::new("sk-test123456789012345678901234567890").unwrap()),
-            base_url: url::Url::parse("https://invalid-url-that-does-not-exist.com/api/v1/")
-                .unwrap(),
+            base_url: url::Url::parse("http://localhost:0/api/v1/").unwrap(),
             timeout: std::time::Duration::from_secs(1),
             http_referer: None,
             site_title: None,
