@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.1] - 2025-10-18
+### Added
+- Comprehensive input validation framework across endpoints (completion, web search), with shared utilities and tests.
+- Centralized retry and error handling usage across APIs.
+
+### Fixed
+- Resolved doctest failures in validation docs and standardized MSRV-safe leap year logic.
+- Removed merge conflict artifacts and addressed clippy warnings.
+- Cleaned up unused imports and variables; conformed to formatting and lint rules.
+
+### Changed
+- Validation integrated into CompletionApi and WebSearchApi before sending requests.
+- Documentation improvements and consistent error messages.
+
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
