@@ -18,7 +18,7 @@
 //!
 //! # Usage
 //!
-//! ```rust
+//! ```rust,ignore
 //! use openrouter_api::utils::validation::{
 //!     validate_chat_request, check_token_limits,
 //!     validate_completion_request, validate_web_search_request

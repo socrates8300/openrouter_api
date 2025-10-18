@@ -28,7 +28,7 @@ pub mod operations {
 /// # Arguments
 /// * `config` - Retry configuration
 /// * `operation_name` - Name of the operation for logging purposes
-
+///
 /// ```
 pub async fn execute_with_retry_builder<F>(
     config: &RetryConfig,
