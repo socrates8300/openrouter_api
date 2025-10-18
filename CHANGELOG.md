@@ -1,5 +1,56 @@
 # Changelog
 
+## [0.3.2] - 2025-10-18
+### 🛡️ Security Release
+This release addresses three critical security vulnerabilities that could lead to secret exposure, resource exhaustion, and denial of service attacks.
+
+#### SEC-001: SecureApiKey Clone Implementation (CRITICAL)
+- **Fixed**: Removed `Clone` trait from `SecureApiKey` to prevent secret duplication in memory
+- **Fixed**: Implemented `ApiConfig` pattern to isolate API keys from API instances
+- **Impact**: Prevents API keys from persisting in memory beyond intended lifetime
+- **Breaking**: Code that explicitly clones `SecureApiKey` will fail to compile
+
+#### SEC-002: MCP Client Missing Timeouts and Size Limits (HIGH)
+- **Added**: Comprehensive timeout and size limits for MCP client operations
+- **Added**: `McpConfig` with configurable security controls
+- **Added**: Request/response size validation and concurrent request limiting
+- **Impact**: Prevents DoS attacks, memory exhaustion, and resource abuse
+
+#### SEC-003: Retry Logic Missing Total Time Caps (HIGH)
+- **Added**: `total_timeout` field to `RetryConfig` (default: 2 minutes)
+- **Added**: `max_retry_interval` field to `RetryConfig` (default: 30 seconds)
+- **Enhanced**: Retry logic with total time tracking and timeout enforcement
+- **Impact**: Prevents indefinite retry sequences and cascading failures
+
+### Added
+- Comprehensive security test suite with 262 tests passing
+- `McpConfig` type for secure MCP client configuration
+- `ApiConfig` type for secure API instance configuration
+- Enhanced retry logic with time caps and interval limits
+- Builder methods for `RetryConfig` and `McpConfig`
+- Security documentation and migration guides
+
+### Fixed
+- **Critical**: SecureApiKey clone vulnerability eliminated
+- **High**: MCP client DoS vulnerabilities prevented
+- **High**: Retry logic infinite loop vulnerability fixed
+- Memory safety issues in API key handling
+- Resource exhaustion vulnerabilities in retry logic
+- Clippy warnings and code quality issues
+
+### Changed
+- **Breaking**: `SecureApiKey` no longer implements `Clone`
+- **Breaking**: API constructors now return `Result<Self>` for config validation
+- **Enhanced**: Retry logic with comprehensive time and size controls
+- **Improved**: MCP client security and performance characteristics
+- **Updated**: Error handling and security documentation
+
+### Security
+- All three security issues (SEC-001, SEC-002, SEC-003) have been completely resolved
+- Comprehensive security testing ensures protection against identified attack vectors
+- Backward compatibility maintained where possible, with clear migration paths
+- Zero-trust architecture principles applied throughout the codebase
+
 ## [0.3.1] - 2025-10-18
 ### Added
 - Comprehensive input validation framework across endpoints (completion, web search), with shared utilities and tests.

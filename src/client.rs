@@ -151,6 +151,10 @@ pub struct RetryConfig {
     pub initial_backoff_ms: u64,
     pub max_backoff_ms: u64,
     pub retry_on_status_codes: Vec<u16>,
+    /// Total time cap for all retry attempts combined
+    pub total_timeout: Duration,
+    /// Maximum interval between retries (enforces upper bound on backoff)
+    pub max_retry_interval: Duration,
 }
 
 impl Default for RetryConfig {
@@ -160,7 +164,23 @@ impl Default for RetryConfig {
             initial_backoff_ms: 500,
             max_backoff_ms: 10000,
             retry_on_status_codes: vec![429, 500, 502, 503, 504],
+            total_timeout: Duration::from_secs(120), // 2 minutes total
+            max_retry_interval: Duration::from_secs(30), // 30 seconds max between retries
         }
+    }
+}
+
+impl RetryConfig {
+    /// Set total timeout for all retry attempts
+    pub fn with_total_timeout(mut self, timeout: Duration) -> Self {
+        self.total_timeout = timeout;
+        self
+    }
+
+    /// Set maximum retry interval
+    pub fn with_max_retry_interval(mut self, interval: Duration) -> Self {
+        self.max_retry_interval = interval;
+        self
     }
 }
 
