@@ -20,6 +20,7 @@ pub use mcp::types as mcp_types; // Re-export MCP types
 
 #[cfg(test)]
 mod security_tests {
+    #![allow(unused)]
     use crate::client::{ClientConfig, RetryConfig, SecureApiKey};
 
     #[test]
