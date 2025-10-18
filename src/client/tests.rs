@@ -146,6 +146,8 @@ mod tests {
             initial_backoff_ms: 1000,
             max_backoff_ms: 30000,
             retry_on_status_codes: vec![429, 500],
+            total_timeout: Duration::from_secs(120),
+            max_retry_interval: Duration::from_secs(60),
         };
 
         let client = OpenRouterClient::<Unconfigured>::new()

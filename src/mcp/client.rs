@@ -14,18 +14,31 @@ pub struct MCPClient {
     server_url: Url,
     /// Server capabilities once initialized
     capabilities: Mutex<Option<ServerCapabilities>>,
+    /// Client configuration for security and performance
+    config: McpConfig,
 }
 
 impl MCPClient {
-    /// Create a new MCP client for the given server URL.
+    /// Create a new MCP client for the given server URL with default configuration.
     pub fn new(server_url: impl AsRef<str>) -> Result<Self> {
+        Self::new_with_config(server_url, McpConfig::default())
+    }
+
+    /// Create a new MCP client for the given server URL with custom configuration.
+    pub fn new_with_config(server_url: impl AsRef<str>, config: McpConfig) -> Result<Self> {
         let server_url = Url::parse(server_url.as_ref())
             .map_err(|e| Error::ConfigError(format!("Invalid server URL: {e}")))?;
 
+        let client = reqwest::Client::builder()
+            .timeout(config.request_timeout)
+            .build()
+            .map_err(|e| Error::ConfigError(format!("Failed to create HTTP client: {e}")))?;
+
         Ok(Self {
-            client: reqwest::Client::new(),
+            client,
             server_url,
             capabilities: Mutex::new(None),
+            config,
         })
     }
 
@@ -140,13 +153,21 @@ impl MCPClient {
 
     /// Send a JSON-RPC request to the server.
     async fn send_request(&self, request: JsonRpcRequest) -> Result<JsonRpcResponse> {
-        let response = self
-            .client
-            .post(self.server_url.clone())
-            .json(&request)
-            .send()
-            .await
-            .map_err(Error::HttpError)?;
+        let response = tokio::time::timeout(
+            self.config.request_timeout,
+            self.client
+                .post(self.server_url.clone())
+                .json(&request)
+                .send(),
+        )
+        .await
+        .map_err(|_| {
+            Error::TimeoutError(format!(
+                "MCP request timeout after {:?}",
+                self.config.request_timeout
+            ))
+        })?
+        .map_err(Error::HttpError)?;
 
         if !response.status().is_success() {
             return Err(Error::ApiError {

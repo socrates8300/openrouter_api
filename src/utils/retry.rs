@@ -3,7 +3,7 @@
 use crate::client::RetryConfig;
 use crate::error::{Error, Result};
 use fastrand::Rng;
-use reqwest::{RequestBuilder, Response};
+use reqwest::{header::RETRY_AFTER, RequestBuilder, Response};
 use std::time::Duration;
 use tokio::time::sleep;
 
@@ -41,10 +41,31 @@ where
     let mut retry_count = 0;
     let mut backoff_ms = config.initial_backoff_ms;
     let mut rng = Rng::new();
+    let start_time = std::time::Instant::now();
 
     loop {
-        // Build a fresh request for each attempt
-        let response = request_builder().send().await?;
+        // Check if we've exceeded the total timeout
+        if start_time.elapsed() > config.total_timeout {
+            return Err(Error::ConfigError(format!(
+                "Retry timeout exceeded for {}: {}ms limit",
+                operation_name,
+                config.total_timeout.as_millis()
+            )));
+        }
+
+        // Build a fresh request for each attempt with timeout
+        let response = tokio::time::timeout(
+            config.total_timeout.saturating_sub(start_time.elapsed()),
+            request_builder().send(),
+        )
+        .await
+        .map_err(|_| {
+            Error::TimeoutError(format!(
+                "Request timeout for {} after {:?}",
+                operation_name,
+                config.total_timeout.saturating_sub(start_time.elapsed())
+            ))
+        })??;
 
         let status = response.status();
         let status_code = status.as_u16();
@@ -53,22 +74,49 @@ where
         if config.retry_on_status_codes.contains(&status_code) && retry_count < config.max_retries {
             retry_count += 1;
 
+            // Check for Retry-After header for 429/503 responses
+            let mut retry_after_ms = None;
+            if status_code == 429 || status_code == 503 {
+                if let Some(retry_after_value) = response.headers().get(RETRY_AFTER) {
+                    if let Ok(retry_after_str) = retry_after_value.to_str() {
+                        // Try to parse as delta-seconds first
+                        if let Ok(seconds) = retry_after_str.parse::<u64>() {
+                            retry_after_ms = Some(seconds * 1000);
+                        } else {
+                            // Try to parse as HTTP date (RFC 1123)
+                            if let Ok(http_date) = httpdate::parse_http_date(retry_after_str) {
+                                let now = std::time::SystemTime::now();
+                                if let Ok(duration) = http_date.duration_since(now) {
+                                    retry_after_ms = Some(duration.as_millis() as u64);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Use Retry-After if available, otherwise use exponential backoff
+            let base_backoff_ms = retry_after_ms.unwrap_or(backoff_ms);
+            let capped_backoff_ms = std::cmp::min(base_backoff_ms, config.max_backoff_ms);
+
             // Add jitter to prevent thundering herd (±25% random variation)
             let jitter_factor = rng.f64() * 0.5 + 0.75; // Range: 0.75 to 1.25
-            let jittered_backoff_ms = (backoff_ms as f64 * jitter_factor) as u64;
+            let jittered_backoff_ms = (capped_backoff_ms as f64 * jitter_factor) as u64;
 
             // Log retry attempt
             eprintln!(
-                "Retrying {} request ({}/{}) after {} ms (base: {} ms, jitter: {:.2}%) due to status code {}",
-                operation_name, retry_count, config.max_retries, jittered_backoff_ms, backoff_ms,
-                (jitter_factor - 1.0) * 100.0, status_code
+                "Retrying {} request ({}/{}) after {} ms (base: {} ms, capped: {} ms, jitter: {:.2}%) due to status code {}",
+                operation_name, retry_count, config.max_retries, jittered_backoff_ms, base_backoff_ms,
+                capped_backoff_ms, (jitter_factor - 1.0) * 100.0, status_code
             );
 
             // Wait before retrying
             sleep(Duration::from_millis(jittered_backoff_ms)).await;
 
-            // Calculate next backoff with exponential increase
-            backoff_ms = std::cmp::min(backoff_ms * 2, config.max_backoff_ms);
+            // Calculate next backoff with exponential increase (only if not using Retry-After)
+            if retry_after_ms.is_none() {
+                backoff_ms = std::cmp::min(backoff_ms * 2, config.max_backoff_ms);
+            }
             continue;
         }
 

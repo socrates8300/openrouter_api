@@ -85,6 +85,8 @@ pub struct RetryConfig {
     pub initial_backoff_ms: u64,
     pub max_backoff_ms: u64,
     pub retry_on_status_codes: Vec<u16>,
+    pub total_timeout: Duration,
+    pub max_retry_interval: Duration,
 }
 
 impl Default for RetryConfig {
@@ -94,6 +96,8 @@ impl Default for RetryConfig {
             initial_backoff_ms: 500,
             max_backoff_ms: 10000,
             retry_on_status_codes: vec![429, 500, 502, 503, 504],
+            total_timeout: Duration::from_secs(60),
+            max_retry_interval: Duration::from_secs(30),
         }
     }
 }
@@ -591,23 +595,39 @@ impl OpenRouterClient<Ready> {
             return Err(Error::ApiError {
                 code: status.as_u16(),
                 message: create_safe_error_message(&body, "API error"),
-                metadata: None,
+                metadata: Some(serde_json::json!({
+                    "response_text_length": body.len(),
+                    "timestamp": chrono::Utc::now().to_rfc3339(),
+                    "status_code": status.as_u16(),
+                    "has_structured_error": false
+                })),
             });
         }
         if body.trim().is_empty() {
             return Err(Error::ApiError {
                 code: status.as_u16(),
                 message: "Empty response body".into(),
-                metadata: None,
+                metadata: Some(serde_json::json!({
+                    "response_text_length": 0,
+                    "timestamp": chrono::Utc::now().to_rfc3339(),
+                    "status_code": status.as_u16(),
+                    "error_type": "empty_response"
+                })),
             });
         }
         serde_json::from_str::<T>(&body).map_err(|e| Error::ApiError {
             code: status.as_u16(),
             message: create_safe_error_message(
-                &format!("Failed to decode JSON: {e}. Body was: {body}"),
+                &format!("Failed to decode JSON: {e}"),
                 "JSON parsing error",
             ),
-            metadata: None,
+            metadata: Some(serde_json::json!({
+                "response_text_length": body.len(),
+                "timestamp": chrono::Utc::now().to_rfc3339(),
+                "status_code": status.as_u16(),
+                "error_type": "json_parsing",
+                "parsing_error": e.to_string()
+            })),
         })
     }
 

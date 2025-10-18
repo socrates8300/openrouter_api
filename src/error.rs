@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use thiserror::Error;
 
+use crate::utils::security::create_safe_error_message;
+
 /// OpenRouter API error details
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiErrorDetails {
@@ -82,21 +84,63 @@ impl Error {
         if let Ok(api_error) = serde_json::from_str::<ApiErrorDetails>(text) {
             return Ok(Error::ApiError {
                 code: status,
-                message: text.to_string(),
-                metadata: Some(serde_json::to_value(api_error).unwrap_or_default()),
+                message: create_safe_error_message(text, "API error occurred"),
+                metadata: Some(serde_json::json!({
+                    "original_response": api_error,
+                    "response_text_length": text.len(),
+                    "timestamp": chrono::Utc::now().to_rfc3339()
+                })),
             });
         }
 
         // Handle rate limiting specifically
         if status == 429 {
-            return Ok(Error::RateLimitExceeded(text.to_string()));
+            return Ok(Error::RateLimitExceeded(create_safe_error_message(
+                text,
+                "Rate limit exceeded",
+            )));
         }
 
         Ok(Error::ApiError {
             code: status,
-            message: text.to_string(),
-            metadata: None,
+            message: create_safe_error_message(text, "API error occurred"),
+            metadata: Some(serde_json::json!({
+                "response_text_length": text.len(),
+                "timestamp": chrono::Utc::now().to_rfc3339(),
+                "has_structured_error": false
+            })),
         })
+    }
+
+    /// Creates an API error from a given HTTP response with additional context.
+    pub async fn from_response_with_context(
+        response: Response,
+        operation_name: &str,
+        request_id: Option<&str>,
+    ) -> Result<Self> {
+        let status = response.status().as_u16();
+        let text = response.text().await.unwrap_or_default();
+
+        let mut error = Self::from_response_text(status, &text)?;
+
+        // Add operation context to metadata
+        if let Error::ApiError { metadata, .. } = &mut error {
+            if let Some(metadata) = metadata {
+                let metadata_obj = metadata.as_object_mut().unwrap();
+                metadata_obj.insert(
+                    "operation".to_string(),
+                    serde_json::Value::String(operation_name.to_string()),
+                );
+                if let Some(rid) = request_id {
+                    metadata_obj.insert(
+                        "request_id".to_string(),
+                        serde_json::Value::String(rid.to_string()),
+                    );
+                }
+            }
+        }
+
+        Ok(error)
     }
 }
 

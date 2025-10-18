@@ -12,7 +12,7 @@ keywords = ["openrouter", "ai", "api-client"]
 categories = ["api-bindings", "asynchronous"]
 
 [dependencies]
-reqwest = { version = "0.11", default_features = false, features = [
+reqwest = { version = "0.11", default-features = false, features = [
   "json",
   "rustls-tls",
   "stream",
@@ -31,6 +31,7 @@ zeroize = { version = "1.8", features = ["derive"] }
 regex = "1.11"
 chrono = { version = "0.4", features = ["serde"] }
 urlencoding = "2.1"
+httpdate = "1.0"
 tracing = { version = "0.1", optional = true }
 
 [dev-dependencies]

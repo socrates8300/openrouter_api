@@ -1,6 +1,7 @@
 //! Type definitions for the Model Context Protocol.
 #![allow(unused)]
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 /// The base protocol version
 pub const MCP_PROTOCOL_VERSION: &str = "2025-03-26";
@@ -199,6 +200,24 @@ pub struct ToolCallParams {
 pub struct ToolCallResponse {
     /// The result of the tool call
     pub result: serde_json::Value,
+}
+
+/// Configuration for MCP client behavior
+#[derive(Debug, Clone)]
+pub struct McpConfig {
+    /// Request timeout for individual MCP requests
+    pub request_timeout: Duration,
+    /// Maximum number of concurrent requests
+    pub max_concurrent_requests: usize,
+}
+
+impl Default for McpConfig {
+    fn default() -> Self {
+        Self {
+            request_timeout: Duration::from_secs(30),
+            max_concurrent_requests: 10,
+        }
+    }
 }
 
 /// Prompt execution parameters

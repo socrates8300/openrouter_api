@@ -17,3 +17,7 @@ pub use types::*;
 pub use client::{NoAuth, OpenRouterClient, Ready, Unconfigured};
 pub use mcp::client::MCPClient; // Re-export MCPClient
 pub use mcp::types as mcp_types; // Re-export MCP types
+
+// Ensure TLS features are mutually exclusive
+#[cfg(all(feature = "rustls", feature = "native-tls"))]
+compile_error!("rustls and native-tls features are mutually exclusive. Please choose one.");
