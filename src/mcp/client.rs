@@ -73,6 +73,7 @@ impl MCPClient {
                 })
                 .map_err(Error::SerializationError)?,
             ),
+            protocol_version: Some(MCP_PROTOCOL_VERSION.to_string()),
         };
 
         let response = self.send_request(request).await?;
@@ -95,6 +96,7 @@ impl MCPClient {
             id: Self::generate_id(),
             method: "getResource".to_string(),
             params: Some(serde_json::to_value(params).map_err(Error::SerializationError)?),
+            protocol_version: Some(MCP_PROTOCOL_VERSION.to_string()),
         };
 
         let response = self.send_request(request).await?;
@@ -111,6 +113,7 @@ impl MCPClient {
             id: Self::generate_id(),
             method: "toolCall".to_string(),
             params: Some(serde_json::to_value(params).map_err(Error::SerializationError)?),
+            protocol_version: Some(MCP_PROTOCOL_VERSION.to_string()),
         };
 
         let response = self.send_request(request).await?;
@@ -130,6 +133,7 @@ impl MCPClient {
             id: Self::generate_id(),
             method: "executePrompt".to_string(),
             params: Some(serde_json::to_value(params).map_err(Error::SerializationError)?),
+            protocol_version: Some(MCP_PROTOCOL_VERSION.to_string()),
         };
 
         let response = self.send_request(request).await?;
@@ -158,6 +162,16 @@ impl MCPClient {
 
     /// Send a JSON-RPC request to the server.
     async fn send_request(&self, request: JsonRpcRequest) -> Result<JsonRpcResponse> {
+        // Check request size limit before sending
+        let request_json = serde_json::to_string(&request).map_err(Error::SerializationError)?;
+        if request_json.len() > self.config.max_request_size {
+            return Err(Error::ConfigError(format!(
+                "Request too large: {} bytes (max: {})",
+                request_json.len(),
+                self.config.max_request_size
+            )));
+        }
+
         let response = tokio::time::timeout(
             self.config.request_timeout,
             self.client
@@ -180,6 +194,15 @@ impl MCPClient {
                 message: response.text().await.unwrap_or_default(),
                 metadata: None,
             });
+        }
+
+        // Check response size limit from Content-Length header
+        let content_length = response.content_length().unwrap_or(0);
+        if content_length > self.config.max_response_size as u64 {
+            return Err(Error::ConfigError(format!(
+                "Response too large: {} bytes (max: {})",
+                content_length, self.config.max_response_size
+            )));
         }
 
         let response_body = response.text().await.map_err(Error::HttpError)?;
@@ -319,7 +342,6 @@ mod tests {
             supports_sampling: None,
         };
         let result = client.initialize(capabilities).await;
-
         assert!(result.is_err());
         let error = result.unwrap_err();
         match &error {
@@ -362,8 +384,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore] // Temporarily disabled due to merge conflict issues
-    async fn test_request_size_validation() {
+    async fn test_request_size_limit() {
         let mock_server = MockServer::start().await;
 
         Mock::given(matchers::method("POST"))
@@ -381,11 +402,27 @@ mod tests {
 
         // Create a request that exceeds 512B by creating a very large protocol_version
         let large_protocol = "x".repeat(600); // This will exceed 512B limit
-        let capabilities = ClientCapabilities {
-            protocol_version: large_protocol,
-            supports_sampling: None,
+
+        // Create the request manually to test size validation
+        let request = JsonRpcRequest {
+            jsonrpc: "2.0".to_string(),
+            id: "test".to_string(),
+            method: "initialize".to_string(),
+            params: Some(serde_json::json!({
+                "protocolVersion": large_protocol,
+                "capabilities": {
+                    "sampling": {}
+                }
+            })),
+            protocol_version: Some("2025-03-26".to_string()),
         };
-        let result = client.initialize(capabilities).await;
+
+        // Test that the request size validation catches the large request
+        let request_json = serde_json::to_string(&request).unwrap();
+        assert!(request_json.len() > 512, "Request should exceed 512B limit");
+
+        // Try to send the request - it should fail with size validation
+        let result = client.send_request(request).await;
 
         assert!(result.is_err());
         let error = result.unwrap_err();
@@ -396,7 +433,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore] // Temporarily disabled due to merge conflict issues
     async fn test_concurrent_request_limiting() {
         let mock_server = MockServer::start().await;
 
@@ -473,7 +509,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore] // Temporarily disabled due to merge conflict issues
     async fn test_content_length_header_validation() {
         let mock_server = MockServer::start().await;
 
