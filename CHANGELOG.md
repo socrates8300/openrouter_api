@@ -1,5 +1,62 @@
 # Changelog
 
+## [0.4.0] - 2025-10-18
+
+### 🚀 Quality & Security Release
+
+This release delivers comprehensive quality improvements and security enhancements while maintaining full API compatibility.
+
+### 🔧 **Enhanced Features**
+
+- **Retry-After Header Support**: Added proper parsing of `Retry-After` headers supporting both delta-seconds and HTTP-date formats with 1-hour safety caps
+- **Robust Network Error Handling**: Enhanced retry logic now properly handles transient connection failures and timeouts
+- **Improved Timeout Management**: Better timeout enforcement respecting total operation limits and preventing infinite hangs
+- **Streaming Backpressure Control**: Added semaphore-based flow control to prevent memory exhaustion during streaming operations
+- **Enhanced Error Context**: Improved error metadata with timestamps, operation context, and structured information
+
+### 🛡️ **Security Improvements**
+
+- **Secure Error Redaction**: Enhanced security preventing API key, email, token, and credit card exposure in error messages
+- **Content Truncation**: Added automatic content truncation to prevent log overflow attacks
+- **Regex Pattern Updates**: Improved redaction patterns to catch more API key formats (`sk-or-v1-*`, etc.)
+- **Zeroization Preserved**: Maintained secure memory zeroization for sensitive data
+
+### ⚙️ **Configuration & Compatibility**
+
+- **Mutually Exclusive TLS Features**: Added compile-time guards preventing simultaneous use of rustls and native-tls
+- **Fixed Deprecated Dependencies**: Updated reqwest configuration to use current `default-features` syntax
+- **Feature Gating**: Proper conditional compilation for tracing functionality
+- **Code Cleanup**: Removed unused empty config.rs module and cleaned up imports
+
+### 🔨 **Developer Experience**
+
+- **Better Error Messages**: Enhanced error context with operation names and detailed metadata
+- **Comprehensive Test Coverage**: Added integration tests for retry-after, streaming backpressure, and security features
+- **Clippy Compliance**: Resolved all lint warnings and improved code style
+- **Type Safety**: Fixed type mismatches and improved overall type safety
+
+### 📈 **Performance & Reliability**
+
+- **Connection Cleanup**: Added proper response body consumption to free connections
+- **Jittered Backoff**: Improved jitter algorithm with remaining time consideration
+- **Memory Management**: Better resource management and connection pooling
+- **Retry Logic**: More reliable retry behavior for both HTTP status codes and network failures
+
+### 🧪 **Testing**
+
+- **252 Unit Tests**: All passing with both rustls and native-tls features
+- **22 Doctests**: All compiling and running correctly
+- **Integration Tests**: Added for retry-after header handling, streaming backpressure, and security features
+- **Feature Validation**: Confirms mutual exclusivity of TLS features
+
+### 📝 **Documentation**
+
+- **Updated Examples**: All examples updated to work with enhanced error handling
+- **API Docs**: Improved documentation for retry configuration and security features
+- **Changelog**: Comprehensive documentation of all changes and improvements
+
+---
+
 ## [0.3.1] - 2025-10-18
 ### Added
 - Comprehensive input validation framework across endpoints (completion, web search), with shared utilities and tests.

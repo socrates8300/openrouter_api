@@ -629,23 +629,39 @@ impl OpenRouterClient<Ready> {
             return Err(Error::ApiError {
                 code: status.as_u16(),
                 message: create_safe_error_message(&body, "API error"),
-                metadata: None,
+                metadata: Some(serde_json::json!({
+                    "response_text_length": body.len(),
+                    "timestamp": chrono::Utc::now().to_rfc3339(),
+                    "status_code": status.as_u16(),
+                    "has_structured_error": false
+                })),
             });
         }
         if body.trim().is_empty() {
             return Err(Error::ApiError {
                 code: status.as_u16(),
                 message: "Empty response body".into(),
-                metadata: None,
+                metadata: Some(serde_json::json!({
+                    "response_text_length": 0,
+                    "timestamp": chrono::Utc::now().to_rfc3339(),
+                    "status_code": status.as_u16(),
+                    "error_type": "empty_response"
+                })),
             });
         }
         serde_json::from_str::<T>(&body).map_err(|e| Error::ApiError {
             code: status.as_u16(),
             message: create_safe_error_message(
-                &format!("Failed to decode JSON: {e}. Body was: {body}"),
+                &format!("Failed to decode JSON: {e}"),
                 "JSON parsing error",
             ),
-            metadata: None,
+            metadata: Some(serde_json::json!({
+                "response_text_length": body.len(),
+                "timestamp": chrono::Utc::now().to_rfc3339(),
+                "status_code": status.as_u16(),
+                "error_type": "json_parsing",
+                "parsing_error": e.to_string()
+            })),
         })
     }
 

@@ -13,12 +13,18 @@ use futures::TryStreamExt;
 use reqwest::Client;
 use serde_json;
 use std::pin::Pin;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::sync::Semaphore;
 use tokio_util::codec::{FramedRead, LinesCodec};
 use tokio_util::io::StreamReader;
 
 // Streaming safety limits to prevent memory exhaustion
 const MAX_LINE_LENGTH: usize = 64 * 1024; // 64KB per line
 const MAX_TOTAL_CHUNKS: usize = 10_000; // Maximum chunks per stream
+const MAX_CONCURRENT_CHUNKS: usize = 10; // Maximum chunks processing concurrently
+const CHUNK_PROCESSING_DELAY_MS: u64 = 10; // Delay between chunks for backpressure
 
 /// API endpoint for chat completions.
 pub struct ChatApi {
@@ -108,45 +114,69 @@ impl ChatApi {
             return Box::pin(futures::stream::once(async { Err(e) }));
         }
 
+        // Set up backpressure control
+        let semaphore = Arc::new(Semaphore::new(MAX_CONCURRENT_CHUNKS));
+        let chunk_count = Arc::new(AtomicUsize::new(0));
+
+        // Build the URL for the chat completions endpoint.
+        let url = match self.config.base_url.join("chat/completions") {
+            Ok(url) => url,
+            Err(e) => {
+                return Box::pin(futures::stream::once(async move {
+                    Err(Error::ApiError {
+                        code: 400,
+                        message: format!("Invalid URL: {e}"),
+                        metadata: None,
+                    })
+                }));
+            }
+        };
+
+        // Serialize the request with streaming enabled.
+        let mut req_body = match serde_json::to_value(&request) {
+            Ok(body) => body,
+            Err(e) => {
+                return Box::pin(futures::stream::once(async move {
+                    Err(Error::ApiError {
+                        code: 500,
+                        message: format!("Request serialization error: {e}"),
+                        metadata: None,
+                    })
+                }));
+            }
+        };
+        req_body["stream"] = serde_json::Value::Bool(true);
+
+        // ApiConfig already contains headers
+
         let stream = try_stream! {
-            // Build the URL for the chat completions endpoint.
-            let url = self.config.base_url.join("chat/completions").map_err(|e| Error::ApiError {
-                code: 400,
-                message: format!("Invalid URL: {e}"),
-                metadata: None,
-            })?;
-
-            // Serialize the request with streaming enabled.
-            let mut req_body = serde_json::to_value(&request).map_err(|e| Error::ApiError {
-                code: 500,
-                message: format!("Request serialization error: {e}"),
-                metadata: None,
-            })?;
-            req_body["stream"] = serde_json::Value::Bool(true);
-
-            // Issue the POST request with error-for-status checking.
+            // Issue the POST request
             let response = client
                 .post(url)
-                .headers(headers.clone())
+                .headers(headers)
                 .json(&req_body)
                 .send()
-                .await?
-                .error_for_status()
+                .await
                 .map_err(|e| {
                     Error::ApiError {
-                        code: e.status().map(|s| s.as_u16()).unwrap_or(500),
-                        message: e.to_string(),
+                        code: 500,
+                        message: format!("Request failed: {e}"),
                         metadata: None,
                     }
                 })?;
+
+            let response = response.error_for_status().map_err(|e| {
+                Error::ApiError {
+                    code: e.status().map(|s| s.as_u16()).unwrap_or(500),
+                    message: e.to_string(),
+                    metadata: None,
+                }
+            })?;
 
             // Process the bytes stream as an asynchronous line stream.
             let byte_stream = response.bytes_stream().map_err(std::io::Error::other);
             let stream_reader = StreamReader::new(byte_stream);
             let mut lines = FramedRead::new(stream_reader, LinesCodec::new());
-
-            // Track chunk count for safety
-            let mut chunk_count = 0usize;
 
             while let Some(line_result) = lines.next().await {
                 let line = line_result.map_err(|e| Error::StreamingError(format!("Failed to read stream line: {e}")))?;
@@ -161,12 +191,19 @@ impl ChatApi {
                 }
 
                 // Safety check: Chunk count limit
-                chunk_count += 1;
-                if chunk_count > MAX_TOTAL_CHUNKS {
+                let current_chunk = chunk_count.fetch_add(1, Ordering::Relaxed) + 1;
+                if current_chunk > MAX_TOTAL_CHUNKS {
                       Err(Error::StreamingError(format!(
-                        "Too many chunks: {chunk_count} (max: {MAX_TOTAL_CHUNKS})"
+                        "Too many chunks: {current_chunk} (max: {MAX_TOTAL_CHUNKS})"
                     )))?;
                 }
+
+                // Apply backpressure - acquire semaphore permit
+                let _permit = semaphore.acquire().await
+                    .map_err(|_| Error::StreamingError("Failed to acquire backpressure permit".to_string()))?;
+
+                // Add small delay for backpressure control
+                tokio::time::sleep(Duration::from_millis(CHUNK_PROCESSING_DELAY_MS)).await;
 
                 if line.trim().is_empty() {
                     continue;
@@ -179,7 +216,10 @@ impl ChatApi {
                     }
 
                     match serde_json::from_str::<ChatCompletionChunk>(data_part) {
-                        Ok(chunk) => yield chunk,
+                        Ok(chunk) => {
+                            // Permit is automatically released when _permit goes out of scope
+                            yield chunk;
+                        },
                         Err(e) => {
                             let error_msg = create_safe_error_message(
                                 &format!("Failed to parse streaming chunk: {e}. Data: {data_part}"),
@@ -202,7 +242,10 @@ impl ChatApi {
                 } else {
                     // Try to parse as a regular JSON message (non-SSE format)
                     match serde_json::from_str::<ChatCompletionChunk>(&line) {
-                        Ok(chunk) => yield chunk,
+                        Ok(chunk) => {
+                            // Permit is automatically released when _permit goes out of scope
+                            yield chunk;
+                        },
                         Err(_) => continue,
                     }
                 }

@@ -4,15 +4,17 @@ use regex::Regex;
 use std::sync::LazyLock;
 
 // Pre-compiled regexes for performance
-static API_KEY_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"(?i)(sk-[A-Za-z0-9]{32,}|or-[A-Za-z0-9]{32,})").unwrap());
+static API_KEY_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)(sk-[A-Za-z0-9_-]{8,}|or-[A-Za-z0-9_-]{8,}|sk-or-v1-[A-Za-z0-9_-]{8,})")
+        .unwrap()
+});
 
 static EMAIL_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b").unwrap());
 
 static TOKEN_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
-        r#"(?i)(['"]?(?:token|bearer|auth)['"]?\s*[:=]\s*['"]?)([A-Za-z0-9\-_.]{20,})(['"]?)"#,
+        r#"(?i)(['"]?(?:token|bearer|auth)['"]?\s*[:=]\s*['"]?|bearer\s+)([A-Za-z0-9\-_.]{8,})(['"]?)"#,
     )
     .unwrap()
 });
@@ -92,48 +94,114 @@ pub fn redact_json_fields(content: &str) -> String {
     redacted
 }
 
-/// Creates a safe error message for logging while preserving debugging info
-pub fn create_safe_error_message(original_error: &str, context: &str) -> String {
-    let redacted = redact_sensitive_content(original_error);
-    let json_safe = redact_json_fields(&redacted);
+/// Creates a safe error message that redacts sensitive information
+pub fn create_safe_error_message(error_content: &str, fallback_message: &str) -> String {
+    if error_content.is_empty() {
+        fallback_message.to_string()
+    } else {
+        let redacted = redact_sensitive_content(error_content);
+        // If the redacted content is significantly different, it likely contained sensitive info
+        if redacted.len() < error_content.len() * 80 / 100 {
+            // Content was redacted, use a generic message
+            format!(
+                "{} [redacted {} chars]",
+                fallback_message,
+                error_content.len() - redacted.len()
+            )
+        } else {
+            // Content appears safe, use the redacted version
+            redacted
+        }
+    }
+}
 
-    format!("{context}: {json_safe}")
+/// Creates a safe error message for logging while preserving debugging info
+pub fn create_safe_error_message_for_logging(
+    error_content: &str,
+    fallback_message: &str,
+) -> String {
+    create_safe_error_message(error_content, fallback_message)
 }
 
 #[cfg(test)]
-mod tests {
+pub mod security_tests {
     use super::*;
 
     #[test]
-    fn test_api_key_redaction() {
-        let content = "Error with API key sk-1234567890abcdef1234567890abcdef in request";
-        let redacted = redact_sensitive_content(content);
-        assert!(redacted.contains("***REDACTED***"));
-        assert!(!redacted.contains("sk-1234567890abcdef1234567890abcdef"));
+    pub fn test_create_safe_error_message_with_api_key() {
+        let error_msg =
+            "Invalid API key: sk-or-v1-abc123def456ghi789jkl012mno345pqr678stu901vwx234yz";
+        let safe_msg = create_safe_error_message(error_msg, "Authentication error");
+
+        assert!(safe_msg.contains("redacted"));
+        assert!(!safe_msg.contains("sk-or-v1"));
     }
 
     #[test]
-    fn test_email_redaction() {
-        let content = "User email test@example.com caused error";
+    pub fn test_create_safe_error_message_without_secrets() {
+        let error_msg = "Request timeout after 30 seconds";
+        let safe_msg = create_safe_error_message(error_msg, "Network error");
+
+        assert_eq!(safe_msg, "Request timeout after 30 seconds");
+    }
+
+    #[test]
+    pub fn test_create_safe_error_message_empty() {
+        let safe_msg = create_safe_error_message("", "Generic error");
+        assert_eq!(safe_msg, "Generic error");
+    }
+
+    #[test]
+    pub fn test_redact_sensitive_content_with_multiple_secrets() {
+        let content = r#"{
+            "error": "Invalid API key: sk-or-v1-abc123def456",
+            "user_email": "user@example.com",
+            "details": "Token: Bearer xyz789token123"
+        }"#;
+
         let redacted = redact_sensitive_content(content);
+
+        assert!(redacted.contains("***REDACTED***"));
         assert!(redacted.contains("***EMAIL***"));
-        assert!(!redacted.contains("test@example.com"));
+        assert!(redacted.contains("***TOKEN***"));
+        assert!(!redacted.contains("sk-or-v1-abc123def456"));
+        assert!(!redacted.contains("user@example.com"));
+        assert!(!redacted.contains("xyz789token123"));
     }
 
     #[test]
-    fn test_json_field_redaction() {
-        let content = r#"{"api_key": "secret123", "user": "john"}"#;
+    pub fn test_redact_json_fields_with_sensitive_keys() {
+        let content = r#"{
+            "api_key": "sk-or-v1-secret123",
+            "model": "gpt-4",
+            "password": "secret123",
+            "data": {"token": "abc123"}
+        }"#;
+
         let redacted = redact_json_fields(content);
-        assert!(redacted.contains("***REDACTED***"));
-        assert!(!redacted.contains("secret123"));
-        assert!(redacted.contains("john")); // Non-sensitive field preserved
+
+        assert!(redacted.contains("\"api_key\": \"***REDACTED***\""));
+        assert!(redacted.contains("\"password\": \"***REDACTED***\""));
+        assert!(redacted.contains("\"token\": \"***REDACTED***\""));
+        assert!(redacted.contains("\"model\": \"gpt-4\"")); // Non-sensitive field preserved
     }
 
     #[test]
-    fn test_long_content_truncation() {
-        let long_content = "a".repeat(2000);
+    pub fn test_redact_credit_card_numbers() {
+        let content = "Payment failed for card 4111-1111-1111-1111 and 4242424242424242";
+        let redacted = redact_sensitive_content(content);
+
+        assert!(redacted.contains("****-****-****-****"));
+        assert!(!redacted.contains("4111-1111-1111-1111"));
+        assert!(!redacted.contains("4242424242424242"));
+    }
+
+    #[test]
+    pub fn test_long_content_truncation() {
+        let long_content = "A".repeat(2000);
         let redacted = redact_sensitive_content(&long_content);
-        assert!(redacted.len() < long_content.len());
-        assert!(redacted.contains("[truncated"));
+
+        assert!(redacted.len() <= 1000);
+        assert!(redacted.contains("...[truncated"));
     }
 }
