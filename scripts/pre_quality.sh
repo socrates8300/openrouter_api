@@ -29,7 +29,7 @@ fi
 
 # Lint check with native-tls
 echo "📝 Running clippy lints (native-tls)..."
-if ! cargo clippy --all-targets --features native-tls -- -D warnings; then
+if ! cargo clippy --all-targets --no-default-features --features native-tls -- -D warnings; then
     echo "❌ Clippy warnings found. Fix before proceeding."
     exit 1
 fi
@@ -43,21 +43,21 @@ fi
 
 # Build check with native-tls
 echo "🔨 Building project (native-tls)..."
-if ! cargo check --all-targets --features native-tls; then
+if ! cargo check --all-targets --no-default-features --features native-tls; then
     echo "❌ Build failed. Fix compilation errors."
     exit 1
 fi
 
 # Test check with rustls (default)
 echo "🧪 Running tests (rustls)..."
-if ! cargo test --features rustls; then
+if ! cargo test --workspace --features rustls --exclude mcp; then
     echo "❌ Tests failed. Fix failing tests."
     exit 1
 fi
 
 # Test check with native-tls
 echo "🧪 Running tests (native-tls)..."
-if ! cargo test --no-default-features --features native-tls; then
+if ! cargo test --workspace --no-default-features --features native-tls --exclude mcp; then
     echo "❌ Tests failed. Fix failing tests."
     exit 1
 fi
@@ -82,7 +82,7 @@ fi
 
 # Documentation check with native-tls
 echo "📚 Checking documentation builds (native-tls)..."
-if ! cargo doc --no-deps --features native-tls; then
+if ! cargo doc --no-deps --no-default-features --features native-tls; then
     echo "❌ Documentation build failed."
     exit 1
 fi
