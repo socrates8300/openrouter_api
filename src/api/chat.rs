@@ -20,14 +20,6 @@ use tokio::sync::Semaphore;
 use tokio_util::codec::{FramedRead, LinesCodec};
 use tokio_util::io::StreamReader;
 
-/// API endpoint for chat completions.
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
-use std::time::Duration;
-use tokio::sync::Semaphore;
-use tokio_util::codec::{FramedRead, LinesCodec};
-use tokio_util::io::StreamReader;
-
 // Streaming safety limits to prevent memory exhaustion
 const MAX_LINE_LENGTH: usize = 64 * 1024; // 64KB per line
 const MAX_TOTAL_CHUNKS: usize = 10_000; // Maximum chunks per stream
@@ -127,7 +119,7 @@ impl ChatApi {
         let chunk_count = Arc::new(AtomicUsize::new(0));
 
         // Build the URL for the chat completions endpoint.
-        let url = match config.base_url.join("chat/completions") {
+        let url = match self.config.base_url.join("chat/completions") {
             Ok(url) => url,
             Err(e) => {
                 return Box::pin(futures::stream::once(async move {
@@ -155,13 +147,7 @@ impl ChatApi {
         };
         req_body["stream"] = serde_json::Value::Bool(true);
 
-        // Build headers for the request
-        let headers = match config.build_headers() {
-            Ok(headers) => headers,
-            Err(e) => {
-                return Box::pin(futures::stream::once(async { Err(e) }));
-            }
-        };
+        // ApiConfig already contains headers
 
         let stream = try_stream! {
             // Issue the POST request

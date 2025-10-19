@@ -226,24 +226,6 @@ pub struct ToolCallResponse {
     pub result: serde_json::Value,
 }
 
-/// Configuration for MCP client behavior
-#[derive(Debug, Clone)]
-pub struct McpConfig {
-    /// Request timeout for individual MCP requests
-    pub request_timeout: Duration,
-    /// Maximum number of concurrent requests
-    pub max_concurrent_requests: usize,
-}
-
-impl Default for McpConfig {
-    fn default() -> Self {
-        Self {
-            request_timeout: Duration::from_secs(30),
-            max_concurrent_requests: 10,
-        }
-    }
-}
-
 /// Prompt execution parameters
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExecutePromptParams {

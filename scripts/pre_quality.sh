@@ -20,23 +20,44 @@ if ! cargo fmt --check; then
     exit 1
 fi
 
-# Lint check
-echo "📝 Running clippy lints..."
-if ! cargo clippy --all-targets --all-features -- -D warnings; then
+# Lint check with rustls (default)
+echo "📝 Running clippy lints (rustls)..."
+if ! cargo clippy --all-targets --features rustls -- -D warnings; then
     echo "❌ Clippy warnings found. Fix before proceeding."
     exit 1
 fi
 
-# Build check
-echo "🔨 Building project..."
-if ! cargo check --all-targets --all-features; then
+# Lint check with native-tls
+echo "📝 Running clippy lints (native-tls)..."
+if ! cargo clippy --all-targets --features native-tls -- -D warnings; then
+    echo "❌ Clippy warnings found. Fix before proceeding."
+    exit 1
+fi
+
+# Build check with rustls (default)
+echo "🔨 Building project (rustls)..."
+if ! cargo check --all-targets --features rustls; then
     echo "❌ Build failed. Fix compilation errors."
     exit 1
 fi
 
-# Test check
-echo "🧪 Running tests..."
-if ! cargo test --all-features; then
+# Build check with native-tls
+echo "🔨 Building project (native-tls)..."
+if ! cargo check --all-targets --features native-tls; then
+    echo "❌ Build failed. Fix compilation errors."
+    exit 1
+fi
+
+# Test check with rustls (default)
+echo "🧪 Running tests (rustls)..."
+if ! cargo test --features rustls; then
+    echo "❌ Tests failed. Fix failing tests."
+    exit 1
+fi
+
+# Test check with native-tls
+echo "🧪 Running tests (native-tls)..."
+if ! cargo test --no-default-features --features native-tls; then
     echo "❌ Tests failed. Fix failing tests."
     exit 1
 fi
@@ -52,9 +73,16 @@ else
     echo "⚠️  cargo-audit not installed. Install with: cargo install cargo-audit"
 fi
 
-# Documentation check
-echo "📚 Checking documentation builds..."
-if ! cargo doc --no-deps --all-features; then
+# Documentation check with rustls (default)
+echo "📚 Checking documentation builds (rustls)..."
+if ! cargo doc --no-deps --features rustls; then
+    echo "❌ Documentation build failed."
+    exit 1
+fi
+
+# Documentation check with native-tls
+echo "📚 Checking documentation builds (native-tls)..."
+if ! cargo doc --no-deps --features native-tls; then
     echo "❌ Documentation build failed."
     exit 1
 fi

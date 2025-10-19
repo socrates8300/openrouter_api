@@ -59,7 +59,9 @@ where
         let status_code = status.as_u16();
 
         // Check if we should retry based on status code and retry count
-        if config.retry_on_status_codes.contains(&status_code) && retry_count < config.max_retries {
+        if config.retry_on_status_codes.contains(&status_code)
+            && retry_count < config.max_retries as usize
+        {
             retry_count += 1;
 
             // Calculate next backoff with exponential increase
@@ -186,6 +188,8 @@ where
             }
         }
     }
+}
+
 /// FIX: Robust Retry-After parsing with single assignment and 1h cap.
 /// Supports both `delta-seconds` and RFC 1123 HTTP-date.
 fn parse_retry_after_ms(headers: &HeaderMap) -> Option<u64> {
