@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 /// Represents a description for a callable function (tool).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct FunctionDescription {
     /// The name of the function.
     pub name: String,
@@ -34,7 +34,7 @@ pub struct FunctionDescription {
 ///
 /// Currently, only function‑type tools are supported.
 /// In the future, this enum could be extended for other tool types.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum Tool {
     /// A function call tool with an associated [FunctionDescription].
@@ -47,7 +47,7 @@ pub enum Tool {
 /// Represents the specific function call requested by the model.
 ///
 /// The `arguments` field is a JSON‑encoded string that should be parseable into a structured object.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct FunctionCall {
     /// The name of the function to call.
     pub name: String,
@@ -59,7 +59,7 @@ pub struct FunctionCall {
 ///
 /// This structure appears in responses when the model indicates that a tool should be invoked.
 /// The `kind` field must be "function".
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ToolCall {
     /// A unique identifier for the tool call.
     pub id: String,

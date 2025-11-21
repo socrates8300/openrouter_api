@@ -3,7 +3,7 @@ use serde_json::{Map, Value};
 
 /// A strongly‑typed representation of a JSON Schema definition.
 /// This captures common validation properties.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct JsonSchemaDefinition {
     /// JSON Schema type (typically "object").
@@ -20,12 +20,12 @@ pub struct JsonSchemaDefinition {
 }
 
 /// JSON Schema configuration for requesting structured outputs.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct JsonSchemaConfig {
-    /// Name for the schema, used to identify the output type.
+    /// Name for schema, used to identify output type.
     pub name: String,
-    /// If true, the model response must strictly adhere to the schema.
+    /// If true, model response must strictly adhere to schema.
     pub strict: bool,
     /// The JSON Schema definition.
     pub schema: JsonSchemaDefinition,

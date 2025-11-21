@@ -13,7 +13,7 @@ pub enum ChatRole {
 }
 
 /// Stop sequence for chat completion - can be a string or array of strings.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(untagged)]
 pub enum StopSequence {
     Single(String),
@@ -21,7 +21,7 @@ pub enum StopSequence {
 }
 
 /// Prediction configuration for latency optimization.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PredictionConfig {
     #[serde(rename = "type")]
     pub prediction_type: String, // "content"
@@ -29,7 +29,7 @@ pub struct PredictionConfig {
 }
 
 /// Verbosity level for model responses.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum VerbosityLevel {
     Low,
@@ -38,7 +38,7 @@ pub enum VerbosityLevel {
 }
 
 /// Route strategy for model routing.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum RouteStrategy {
     Fallback,
@@ -105,6 +105,18 @@ pub struct Message {
     // Optionally include tool_calls when the assistant message contains a tool call.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_calls: Option<Vec<ToolCall>>,
+}
+
+impl Default for Message {
+    fn default() -> Self {
+        Self {
+            role: "user".to_string(),
+            content: MessageContent::Text("".to_string()),
+            name: None,
+            tool_call_id: None,
+            tool_calls: None,
+        }
+    }
 }
 
 impl Message {
@@ -262,6 +274,41 @@ pub struct ChatCompletionRequest {
     /// (Optional) Response verbosity level.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub verbosity: Option<VerbosityLevel>,
+}
+
+impl Default for ChatCompletionRequest {
+    fn default() -> Self {
+        Self {
+            model: String::new(),
+            messages: Vec::new(),
+            stream: None,
+            response_format: None,
+            tools: None,
+            tool_choice: None,
+            provider: None,
+            models: None,
+            transforms: None,
+            route: None,
+            user: None,
+            max_tokens: None,
+            temperature: None,
+            top_p: None,
+            top_k: None,
+            frequency_penalty: None,
+            presence_penalty: None,
+            repetition_penalty: None,
+            min_p: None,
+            top_a: None,
+            seed: None,
+            stop: None,
+            logit_bias: None,
+            logprobs: None,
+            top_logprobs: None,
+            prediction: None,
+            parallel_tool_calls: None,
+            verbosity: None,
+        }
+    }
 }
 
 /// A choice returned by the chat API.

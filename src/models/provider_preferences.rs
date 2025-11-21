@@ -8,7 +8,7 @@ use crate::error::Error;
 use serde::{Deserialize, Serialize};
 
 /// Defines the data collection policy when selecting providers.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum DataCollection {
     Allow,
@@ -16,7 +16,7 @@ pub enum DataCollection {
 }
 
 /// Defines provider sort preferences.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum ProviderSort {
     Price,
@@ -24,7 +24,7 @@ pub enum ProviderSort {
 }
 
 /// Defines quantization filtering options.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum Quantization {
     Int4,
@@ -38,7 +38,7 @@ pub enum Quantization {
 }
 
 /// Strongly‑typed provider preferences.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ProviderPreferences {
     /// Ordered list of provider names to prefer.

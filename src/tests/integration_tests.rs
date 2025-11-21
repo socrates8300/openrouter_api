@@ -1278,4 +1278,103 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_default_implementations() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::types::chat::{ChatCompletionRequest, Message, MessageContent};
+
+        // Test Message default
+        let default_message = Message::default();
+        assert_eq!(default_message.role, "user");
+        assert_eq!(default_message.content, MessageContent::Text("".to_string()));
+        assert_eq!(default_message.name, None);
+        assert_eq!(default_message.tool_call_id, None);
+        assert_eq!(default_message.tool_calls, None);
+
+        // Test ChatCompletionRequest default
+        let default_request = ChatCompletionRequest::default();
+        assert_eq!(default_request.model, "");
+        assert_eq!(default_request.messages.len(), 0);
+        assert_eq!(default_request.stream, None);
+        assert_eq!(default_request.response_format, None);
+        assert_eq!(default_request.tools, None);
+        assert_eq!(default_request.tool_choice, None);
+        assert_eq!(default_request.provider, None);
+        assert_eq!(default_request.models, None);
+        assert_eq!(default_request.transforms, None);
+        assert_eq!(default_request.route, None);
+        assert_eq!(default_request.user, None);
+        assert_eq!(default_request.max_tokens, None);
+        assert_eq!(default_request.temperature, None);
+        assert_eq!(default_request.top_p, None);
+        assert_eq!(default_request.top_k, None);
+        assert_eq!(default_request.frequency_penalty, None);
+        assert_eq!(default_request.presence_penalty, None);
+        assert_eq!(default_request.repetition_penalty, None);
+        assert_eq!(default_request.min_p, None);
+        assert_eq!(default_request.top_a, None);
+        assert_eq!(default_request.seed, None);
+        assert_eq!(default_request.stop, None);
+        assert_eq!(default_request.logit_bias, None);
+        assert_eq!(default_request.logprobs, None);
+        assert_eq!(default_request.top_logprobs, None);
+        assert_eq!(default_request.prediction, None);
+        assert_eq!(default_request.parallel_tool_calls, None);
+        assert_eq!(default_request.verbosity, None);
+
+        // Test the usage pattern from the issue - using ..Default::default()
+        let model_name = "openai/gpt-4o";
+        let text = "What is a phantom type in Rust?";
+
+        let request_with_default = ChatCompletionRequest {
+            model: model_name.to_string(),
+            messages: vec![Message {
+                role: "user".to_string(),
+                content: MessageContent::Text(text.to_string()),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+
+        assert_eq!(request_with_default.model, model_name);
+        assert_eq!(request_with_default.messages.len(), 1);
+        assert_eq!(request_with_default.messages[0].role, "user");
+        assert_eq!(
+            request_with_default.messages[0].content,
+            MessageContent::Text(text.to_string())
+        );
+        assert_eq!(request_with_default.messages[0].name, None);
+        assert_eq!(request_with_default.messages[0].tool_call_id, None);
+        assert_eq!(request_with_default.messages[0].tool_calls, None);
+
+        // Verify all optional fields are None
+        assert_eq!(request_with_default.stream, None);
+        assert_eq!(request_with_default.response_format, None);
+        assert_eq!(request_with_default.tools, None);
+        assert_eq!(request_with_default.tool_choice, None);
+        assert_eq!(request_with_default.provider, None);
+        assert_eq!(request_with_default.models, None);
+        assert_eq!(request_with_default.transforms, None);
+        assert_eq!(request_with_default.route, None);
+        assert_eq!(request_with_default.user, None);
+        assert_eq!(request_with_default.max_tokens, None);
+        assert_eq!(request_with_default.temperature, None);
+        assert_eq!(request_with_default.top_p, None);
+        assert_eq!(request_with_default.top_k, None);
+        assert_eq!(request_with_default.frequency_penalty, None);
+        assert_eq!(request_with_default.presence_penalty, None);
+        assert_eq!(request_with_default.repetition_penalty, None);
+        assert_eq!(request_with_default.min_p, None);
+        assert_eq!(request_with_default.top_a, None);
+        assert_eq!(request_with_default.seed, None);
+        assert_eq!(request_with_default.stop, None);
+        assert_eq!(request_with_default.logit_bias, None);
+        assert_eq!(request_with_default.logprobs, None);
+        assert_eq!(request_with_default.top_logprobs, None);
+        assert_eq!(request_with_default.prediction, None);
+        assert_eq!(request_with_default.parallel_tool_calls, None);
+        assert_eq!(request_with_default.verbosity, None);
+
+        Ok(())
+    }
 }

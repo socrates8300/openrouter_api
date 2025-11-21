@@ -20,7 +20,7 @@ use serde::Serialize;
 use serde_json::Value;
 
 /// Representation for enabling structured outputs in the request payload.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ResponseFormatConfig {
     /// Fixed string indicating the type of response format.
