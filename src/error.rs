@@ -40,6 +40,9 @@ pub enum Error {
     #[error("Invalid configuration: {0}")]
     ConfigError(String),
 
+    #[error("Protocol error: {0}")]
+    ProtocolError(String),
+
     #[error("Structured output not supported by the provider/model")]
     StructuredOutputNotSupported,
 

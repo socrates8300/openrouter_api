@@ -1,21 +1,41 @@
 //! MCP client implementation for connecting to MCP servers.
 
 use std::sync::Arc;
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 use url::Url;
 
 use crate::error::{Error, Result};
 use crate::mcp::types::*;
 
 /// MCP client for connecting to and interacting with MCP servers.
-#[derive(Clone)]
+///
+/// # Example
+///
+/// ```no_run
+/// use openrouter_api::mcp::client::MCPClient;
+/// use openrouter_api::mcp::types::ClientCapabilities;
+///
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// let client = MCPClient::new("http://localhost:8080")?;
+///
+/// let capabilities = ClientCapabilities {
+///     protocol_version: "2024-11-05".to_string(),
+///     supports_sampling: Some(true),
+/// };
+///
+/// let server_caps = client.initialize(capabilities).await?;
+/// println!("Connected to server with protocol version: {}", server_caps.protocol_version);
+/// # Ok(())
+/// # }
+/// ```
+#[derive(Clone, Debug)]
 pub struct MCPClient {
     /// The HTTP client for making requests
     client: reqwest::Client,
     /// The base URL of the MCP server
     server_url: Url,
     /// Server capabilities once initialized
-    capabilities: Arc<Mutex<Option<ServerCapabilities>>>,
+    capabilities: Arc<RwLock<Option<ServerCapabilities>>>,
     /// Client configuration for security and performance
     config: McpConfig,
     /// Semaphore for limiting concurrent requests
@@ -30,6 +50,8 @@ impl MCPClient {
 
     /// Create a new MCP client for the given server URL with custom configuration.
     pub fn new_with_config(server_url: impl AsRef<str>, config: McpConfig) -> Result<Self> {
+        config.validate()?;
+
         let server_url = Url::parse(server_url.as_ref())
             .map_err(|e| Error::ConfigError(format!("Invalid server URL: {e}")))?;
 
@@ -41,7 +63,7 @@ impl MCPClient {
         Ok(Self {
             client,
             server_url,
-            capabilities: Arc::new(Mutex::new(None)),
+            capabilities: Arc::new(RwLock::new(None)),
             config: config.clone(),
             semaphore: Arc::new(tokio::sync::Semaphore::new(config.max_concurrent_requests)),
         })
@@ -74,44 +96,54 @@ impl MCPClient {
         let capabilities = self.parse_response::<ServerCapabilities>(response)?;
 
         // Store the server capabilities
-        let mut caps = self.capabilities.lock().await;
+        let mut caps = self.capabilities.write().await;
         *caps = Some(capabilities.clone());
 
         Ok(capabilities)
     }
 
     /// Get a resource from the server.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use openrouter_api::mcp::client::MCPClient;
+    /// # use openrouter_api::mcp::types::GetResourceParams;
+    /// # async fn example(client: MCPClient) -> Result<(), Box<dyn std::error::Error>> {
+    /// let params = GetResourceParams {
+    ///     id: "file:///example.txt".to_string(),
+    ///     parameters: None,
+    /// };
+    ///
+    /// let response = client.get_resource(params).await?;
+    /// println!("Resource content: {:?}", response.contents);
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn get_resource(&self, params: GetResourceParams) -> Result<ResourceResponse> {
-        // Check if initialized
-        self.ensure_initialized().await?;
-
-        let request = JsonRpcRequest {
-            jsonrpc: "2.0".to_string(),
-            id: Self::generate_id(),
-            method: "getResource".to_string(),
-            params: Some(serde_json::to_value(params).map_err(Error::SerializationError)?),
-            protocol_version: Some(MCP_PROTOCOL_VERSION.to_string()),
-        };
-
-        let response = self.send_request(request).await?;
-        self.parse_response::<ResourceResponse>(response)
+        self.send_method("getResource", params).await
     }
 
     /// Call a tool on the server.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use openrouter_api::mcp::client::MCPClient;
+    /// # use openrouter_api::mcp::types::ToolCallParams;
+    /// # async fn example(client: MCPClient) -> Result<(), Box<dyn std::error::Error>> {
+    /// let params = ToolCallParams {
+    ///     id: "calculator".to_string(),
+    ///     parameters: serde_json::json!({ "expression": "2 + 2" }),
+    /// };
+    ///
+    /// let response = client.tool_call(params).await?;
+    /// println!("Tool result: {:?}", response.result);
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn tool_call(&self, params: ToolCallParams) -> Result<ToolCallResponse> {
-        // Check if initialized
-        self.ensure_initialized().await?;
-
-        let request = JsonRpcRequest {
-            jsonrpc: "2.0".to_string(),
-            id: Self::generate_id(),
-            method: "toolCall".to_string(),
-            params: Some(serde_json::to_value(params).map_err(Error::SerializationError)?),
-            protocol_version: Some(MCP_PROTOCOL_VERSION.to_string()),
-        };
-
-        let response = self.send_request(request).await?;
-        self.parse_response::<ToolCallResponse>(response)
+        self.send_method("toolCall", params).await
     }
 
     /// Execute a prompt on the server.
@@ -119,19 +151,7 @@ impl MCPClient {
         &self,
         params: ExecutePromptParams,
     ) -> Result<ExecutePromptResponse> {
-        // Check if initialized
-        self.ensure_initialized().await?;
-
-        let request = JsonRpcRequest {
-            jsonrpc: "2.0".to_string(),
-            id: Self::generate_id(),
-            method: "executePrompt".to_string(),
-            params: Some(serde_json::to_value(params).map_err(Error::SerializationError)?),
-            protocol_version: Some(MCP_PROTOCOL_VERSION.to_string()),
-        };
-
-        let response = self.send_request(request).await?;
-        self.parse_response::<ExecutePromptResponse>(response)
+        self.send_method("executePrompt", params).await
     }
 
     /// Send a sampling response to the server.
@@ -151,79 +171,72 @@ impl MCPClient {
 
     /// Get the server capabilities.
     pub async fn capabilities(&self) -> Option<ServerCapabilities> {
-        self.capabilities.lock().await.clone()
+        self.capabilities.read().await.clone()
+    }
+
+    /// Send a generic method call to the server.
+    async fn send_method<P: serde::Serialize, R: serde::de::DeserializeOwned>(
+        &self,
+        method: &str,
+        params: P,
+    ) -> Result<R> {
+        // Check if initialized
+        self.ensure_initialized().await?;
+
+        let request = JsonRpcRequest {
+            jsonrpc: "2.0".to_string(),
+            id: Self::generate_id(),
+            method: method.to_string(),
+            params: Some(serde_json::to_value(params).map_err(Error::SerializationError)?),
+            protocol_version: Some(MCP_PROTOCOL_VERSION.to_string()),
+        };
+
+        let response = self.send_request(request).await?;
+        self.parse_response::<R>(response)
     }
 
     /// Send a JSON-RPC request to the server.
     async fn send_request(&self, request: JsonRpcRequest) -> Result<JsonRpcResponse> {
         // Acquire semaphore permit to limit concurrent requests
-        let _permit = self
-            .semaphore
-            .acquire()
-            .await
-            .map_err(|_| Error::ConfigError("Too many concurrent MCP requests".to_string()))?;
+        let _permit =
+            self.semaphore.acquire().await.map_err(|_| {
+                Error::ProtocolError("Too many concurrent MCP requests".to_string())
+            })?;
 
         // Check request size limit before sending
-        let request_json = serde_json::to_string(&request).map_err(Error::SerializationError)?;
-        if request_json.len() > self.config.max_request_size {
-            return Err(Error::ConfigError(format!(
-                "Request too large: {} bytes (max: {})",
-                request_json.len(),
-                self.config.max_request_size
-            )));
-        }
+        // Serialize request with strict size limit
+        let mut writer = LimitedWriter::new(self.config.max_request_size);
+        serde_json::to_writer(&mut writer, &request).map_err(|e| {
+            if e.is_io() {
+                Error::ProtocolError(format!(
+                    "Request too large (limit: {} bytes)",
+                    self.config.max_request_size
+                ))
+            } else {
+                Error::SerializationError(e)
+            }
+        })?;
+        let request_body = writer.into_inner();
 
-        let response = tokio::time::timeout(
-            self.config.request_timeout,
-            self.client
-                .post(self.server_url.clone())
-                .json(&request)
-                .send(),
-        )
-        .await
-        .map_err(|_| {
-            Error::TimeoutError(format!(
-                "MCP request timeout after {:?}",
-                self.config.request_timeout
-            ))
-        })?
-        .map_err(Error::HttpError)?;
+        let response = self
+            .client
+            .post(self.server_url.clone())
+            .body(request_body) // Use the pre-serialized body
+            .header("Content-Type", "application/json")
+            .send()
+            .await
+            .map_err(Error::HttpError)?;
 
-        if !response.status().is_success() {
+        let status = response.status();
+        let response_body = self.read_response_body(response).await?;
+
+        if !status.is_success() {
             return Err(Error::ApiError {
-                code: response.status().as_u16(),
-                message: response.text().await.unwrap_or_default(),
+                code: status.as_u16(),
+                message: response_body,
                 metadata: None,
             });
         }
-
-        // Check response size limit from Content-Length header
-        let content_length = response.content_length().unwrap_or(0);
-        if content_length > self.config.max_response_size as u64 {
-            return Err(Error::ConfigError(format!(
-                "Response too large: {} bytes (max: {})",
-                content_length, self.config.max_response_size
-            )));
-        }
-
-        // Read body with strict size limit
-        use futures::StreamExt;
-        let mut stream = response.bytes_stream();
-        let mut body_bytes = Vec::new();
-
-        while let Some(chunk) = stream.next().await {
-            let chunk = chunk.map_err(Error::HttpError)?;
-            if body_bytes.len() + chunk.len() > self.config.max_response_size {
-                return Err(Error::ConfigError(format!(
-                    "Response body exceeded maximum size of {} bytes",
-                    self.config.max_response_size
-                )));
-            }
-            body_bytes.extend_from_slice(&chunk);
-        }
-
-        let response_body = String::from_utf8(body_bytes)
-            .map_err(|e| Error::ConfigError(format!("Invalid UTF-8 in response: {}", e)))?;
 
         let response: JsonRpcResponse =
             serde_json::from_str(&response_body).map_err(Error::SerializationError)?;
@@ -234,35 +247,35 @@ impl MCPClient {
     /// Send a JSON-RPC response to the server with security controls.
     async fn send_response(&self, response: JsonRpcResponse) -> Result<()> {
         // Acquire semaphore permit to limit concurrent requests
-        let _permit = self
-            .semaphore
-            .acquire()
-            .await
-            .map_err(|_| Error::ConfigError("Too many concurrent MCP requests".to_string()))?;
+        let _permit =
+            self.semaphore.acquire().await.map_err(|_| {
+                Error::ProtocolError("Too many concurrent MCP requests".to_string())
+            })?;
 
         // Validate response size before sending
         // Note: We use max_request_size for all outgoing messages (requests and responses)
-        let response_json = serde_json::to_string(&response).map_err(Error::SerializationError)?;
+        let mut writer = LimitedWriter::new(self.config.max_request_size);
+        serde_json::to_writer(&mut writer, &response).map_err(|e| {
+            if e.is_io() {
+                Error::ProtocolError(format!(
+                    "Response too large (limit: {} bytes)",
+                    self.config.max_request_size
+                ))
+            } else {
+                Error::SerializationError(e)
+            }
+        })?;
+        let response_body = writer.into_inner();
 
-        if response_json.len() > self.config.max_request_size {
-            return Err(Error::ConfigError(format!(
-                "Response too large: {} bytes (max: {})",
-                response_json.len(),
-                self.config.max_request_size
-            )));
-        }
-
-        // Send response with timeout
-        let _response = tokio::time::timeout(
-            self.config.request_timeout,
-            self.client
-                .post(self.server_url.clone())
-                .body(response_json)
-                .send(),
-        )
-        .await
-        .map_err(|_| Error::ConfigError("MCP response timed out".to_string()))?
-        .map_err(Error::HttpError)?;
+        // Send response with timeout (handled by reqwest client)
+        let _response = self
+            .client
+            .post(self.server_url.clone())
+            .body(response_body)
+            .header("Content-Type", "application/json")
+            .send()
+            .await
+            .map_err(Error::HttpError)?;
 
         Ok(())
     }
@@ -284,15 +297,82 @@ impl MCPClient {
         // Parse the result
         match response.result {
             Some(result) => serde_json::from_value(result).map_err(Error::SerializationError),
-            None => Err(Error::ConfigError("Response contains no result".into())),
+            None => Err(Error::ProtocolError("Response contains no result".into())),
         }
+    }
+
+    /// Read the response body with strict size limits.
+    async fn read_response_body(&self, response: reqwest::Response) -> Result<String> {
+        // Check response size limit from Content-Length header
+        let content_length = response.content_length().unwrap_or(0);
+        if content_length > self.config.max_response_size as u64 {
+            return Err(Error::ResponseTooLarge(
+                content_length as usize,
+                self.config.max_response_size,
+            ));
+        }
+
+        // Read body with strict size limit
+        use futures::StreamExt;
+        let mut stream = response.bytes_stream();
+        let mut body_bytes = Vec::new();
+
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk.map_err(Error::HttpError)?;
+            if body_bytes.len() + chunk.len() > self.config.max_response_size {
+                return Err(Error::ResponseTooLarge(
+                    body_bytes.len() + chunk.len(),
+                    self.config.max_response_size,
+                ));
+            }
+            body_bytes.extend_from_slice(&chunk);
+        }
+
+        String::from_utf8(body_bytes)
+            .map_err(|e| Error::ProtocolError(format!("Invalid UTF-8 in response: {}", e)))
     }
 
     /// Ensure the client has been initialized.
     async fn ensure_initialized(&self) -> Result<()> {
-        if self.capabilities.lock().await.is_none() {
-            return Err(Error::ConfigError("MCP client not initialized".into()));
+        if self.capabilities.read().await.is_none() {
+            return Err(Error::ProtocolError("MCP client not initialized".into()));
         }
+        Ok(())
+    }
+}
+
+/// A writer that enforces a maximum size limit.
+struct LimitedWriter {
+    buffer: Vec<u8>,
+    limit: usize,
+}
+
+impl LimitedWriter {
+    fn new(limit: usize) -> Self {
+        Self {
+            buffer: Vec::with_capacity(std::cmp::min(limit, 1024 * 1024)), // Pre-allocate up to 1MB
+            limit,
+        }
+    }
+
+    fn into_inner(self) -> Vec<u8> {
+        self.buffer
+    }
+}
+
+impl std::io::Write for LimitedWriter {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        if self.buffer.len() + buf.len() > self.limit {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Size limit exceeded",
+            ));
+        }
+        self.buffer.extend_from_slice(buf);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
         Ok(())
     }
 }
@@ -323,6 +403,35 @@ mod tests {
         assert_eq!(client.config.max_response_size, 1024);
         assert_eq!(client.config.max_request_size, 512);
         assert_eq!(client.config.max_concurrent_requests, 2);
+    }
+
+    #[tokio::test]
+    async fn test_invalid_config() {
+        let mock_server = MockServer::start().await;
+
+        // Test zero timeout
+        let config = McpConfig {
+            request_timeout: Duration::from_secs(0),
+            ..create_test_config()
+        };
+        let result = MCPClient::new_with_config(mock_server.uri(), config);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            Error::ConfigError(msg) => assert!(msg.contains("Request timeout")),
+            e => panic!("Expected ConfigError, got: {:?}", e),
+        }
+
+        // Test zero max response size
+        let config = McpConfig {
+            max_response_size: 0,
+            ..create_test_config()
+        };
+        let result = MCPClient::new_with_config(mock_server.uri(), config);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            Error::ConfigError(msg) => assert!(msg.contains("Max response size")),
+            e => panic!("Expected ConfigError, got: {:?}", e),
+        }
     }
 
     #[tokio::test]
@@ -365,7 +474,7 @@ mod tests {
         assert!(result.is_err());
         let error = result.unwrap_err();
         match &error {
-            Error::ConfigError(msg) => assert!(msg.contains("timed out")),
+            Error::ProtocolError(msg) => assert!(msg.contains("timed out")),
             Error::HttpError(_) => {} // HTTP timeout errors are also acceptable
             _ => panic!("Expected timeout error, got: {:?}", error),
         }
@@ -398,8 +507,11 @@ mod tests {
 
         assert!(result.is_err());
         match result.unwrap_err() {
-            Error::ConfigError(msg) => assert!(msg.contains("too large")),
-            _ => panic!("Expected size limit error"),
+            Error::ResponseTooLarge(size, limit) => {
+                assert!(size > limit);
+                assert_eq!(limit, 1024);
+            }
+            e => panic!("Expected ResponseTooLarge error, got: {:?}", e),
         }
     }
 
@@ -447,7 +559,7 @@ mod tests {
         assert!(result.is_err());
         let error = result.unwrap_err();
         match &error {
-            Error::ConfigError(msg) => assert!(msg.contains("Request too large")),
+            Error::ProtocolError(msg) => assert!(msg.contains("Request too large")),
             _ => panic!("Expected request size error, got: {:?}", error),
         }
     }
@@ -556,7 +668,7 @@ mod tests {
         assert!(result.is_err());
         let error = result.unwrap_err();
         match &error {
-            Error::ConfigError(msg) => assert!(msg.contains("too large")),
+            Error::ResponseTooLarge(_, _) => {}
             _ => panic!("Expected size validation error, got: {:?}", error),
         }
     }
@@ -592,8 +704,123 @@ mod tests {
         assert!(result.is_err());
         let error = result.unwrap_err();
         match &error {
-            Error::ConfigError(msg) => assert!(msg.contains("exceeded maximum size")),
+            Error::ResponseTooLarge(_, _) => {}
             _ => panic!("Expected size validation error, got: {:?}", error),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_large_error_response() {
+        let mock_server = MockServer::start().await;
+
+        // Create a large error response (larger than 1KB limit)
+        let large_error_msg = "x".repeat(2048);
+        Mock::given(matchers::method("POST"))
+            .respond_with(
+                ResponseTemplate::new(StatusCode::INTERNAL_SERVER_ERROR)
+                    .set_body_string(&large_error_msg),
+            )
+            .mount(&mock_server)
+            .await;
+
+        let client = MCPClient::new_with_config(mock_server.uri(), create_test_config()).unwrap();
+
+        let capabilities = ClientCapabilities {
+            protocol_version: "2025-03-26".to_string(),
+            supports_sampling: None,
+        };
+        let result = client.initialize(capabilities).await;
+
+        // Currently this fails because it returns ApiError with the full message
+        // We want it to fail with ResponseTooLarge
+        assert!(result.is_err());
+        let error = result.unwrap_err();
+        match &error {
+            Error::ResponseTooLarge(_, _) => {}
+            Error::ApiError { message, .. } => panic!(
+                "Should have failed with size limit, but got ApiError with len: {}",
+                message.len()
+            ),
+            _ => panic!("Expected size validation error, got: {:?}", error),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_request_size_limit_edge_cases() {
+        let mock_server = MockServer::start().await;
+        Mock::given(matchers::method("POST"))
+            .respond_with(
+                ResponseTemplate::new(StatusCode::OK).set_body_json(serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "id": "test",
+                    "result": {"protocolVersion": "2025-03-26"}
+                })),
+            )
+            .mount(&mock_server)
+            .await;
+
+        let config = McpConfig {
+            request_timeout: Duration::from_secs(1),
+            max_response_size: 1024,
+            max_request_size: 200, // Increased limit to accommodate basic request
+            max_concurrent_requests: 1,
+        };
+        let client = MCPClient::new_with_config(mock_server.uri(), config).unwrap();
+
+        // Case 1: Small request (should pass)
+        let small_caps = ClientCapabilities {
+            protocol_version: "v1".to_string(),
+            supports_sampling: None,
+        };
+        let result = client.initialize(small_caps).await;
+
+        // If 200 is too small, this will fail.
+        if let Err(Error::ProtocolError(msg)) = &result {
+            if msg.contains("Request too large") {
+                panic!(
+                    "Test config limit 200 is too small for basic initialize request. Msg: {}",
+                    msg
+                );
+            }
+        }
+
+        // Case 2: Request that definitely exceeds 200
+        let large_caps = ClientCapabilities {
+            protocol_version: "x".repeat(300), // 300 bytes > 200 limit
+            supports_sampling: None,
+        };
+        let result = client.initialize(large_caps).await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            Error::ProtocolError(msg) => {
+                // println!("Got ProtocolError: '{}'", msg);
+                assert!(msg.contains("Request too large"));
+            }
+            e => panic!("Expected ProtocolError, got {:?}", e),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_malformed_json_response() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(matchers::method("POST"))
+            .respond_with(ResponseTemplate::new(StatusCode::OK).set_body_string("{ invalid json }"))
+            .mount(&mock_server)
+            .await;
+
+        let client = MCPClient::new_with_config(mock_server.uri(), create_test_config()).unwrap();
+
+        let capabilities = ClientCapabilities {
+            protocol_version: "2025-03-26".to_string(),
+            supports_sampling: None,
+        };
+        let result = client.initialize(capabilities).await;
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            Error::SerializationError(_) => {}
+            e => panic!("Expected SerializationError, got: {:?}", e),
         }
     }
 }
