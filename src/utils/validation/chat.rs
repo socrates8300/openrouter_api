@@ -263,6 +263,22 @@ fn validate_content_part(part: &ContentPart, msg_index: usize, part_index: usize
                 )));
             }
         }
+        ContentPart::Audio(audio_content) => {
+            if audio_content.audio_url.url.trim().is_empty() {
+                return Err(Error::ConfigError(format!(
+                    "Audio URL cannot be empty for audio part {} at message {}",
+                    part_index, msg_index
+                )));
+            }
+        }
+        ContentPart::File(file_content) => {
+            if file_content.file_url.url.trim().is_empty() {
+                return Err(Error::ConfigError(format!(
+                    "File URL cannot be empty for file part {} at message {}",
+                    part_index, msg_index
+                )));
+            }
+        }
     }
 
     Ok(())
@@ -325,6 +341,8 @@ pub fn estimate_message_tokens(message: &Message) -> u32 {
                             // Images typically cost ~85-100 tokens each for vision models
                             85
                         }
+                        ContentPart::Audio(_) => 100,
+                        ContentPart::File(_) => 100,
                     }
                 })
                 .sum()
@@ -446,6 +464,7 @@ mod tests {
             prediction: None,
             parallel_tool_calls: None,
             verbosity: None,
+            plugins: None,
         }
     }
 

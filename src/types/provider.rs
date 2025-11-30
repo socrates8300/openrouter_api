@@ -7,6 +7,9 @@ pub struct ProviderPreferences {
     pub order: Option<Vec<String>>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub allow: Option<Vec<String>>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub allow_fallbacks: Option<bool>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -44,6 +47,7 @@ impl ProviderPreferences {
     pub fn new() -> Self {
         Self {
             order: None,
+            allow: None,
             allow_fallbacks: None,
             require_parameters: None,
             data_collection: None,
@@ -57,6 +61,11 @@ impl ProviderPreferences {
 
     pub fn with_order(mut self, order: Vec<String>) -> Self {
         self.order = Some(order);
+        self
+    }
+
+    pub fn with_allow(mut self, allow: Vec<String>) -> Self {
+        self.allow = Some(allow);
         self
     }
 

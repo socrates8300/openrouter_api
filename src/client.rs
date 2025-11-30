@@ -15,7 +15,12 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 pub mod config;
 pub use config::*;
 
-
+/// Routing shortcut for high-throughput.
+pub const ROUTING_NITRO: &str = ":nitro";
+/// Routing shortcut for lowest price.
+pub const ROUTING_FLOOR: &str = ":floor";
+/// Routing shortcut for web search.
+pub const ROUTING_ONLINE: &str = ":online";
 
 // Type‑state markers.
 #[derive(Debug)]
@@ -186,6 +191,11 @@ impl OpenRouterClient<Unconfigured> {
         self.config.max_response_bytes = bytes;
         self
     }
+
+    /// Helper to append a routing shortcut to a model ID.
+    pub fn model_with_shortcut(model: &str, shortcut: &str) -> String {
+        format!("{}{}", model, shortcut)
+    }
 }
 
 impl OpenRouterClient<NoAuth> {
@@ -304,6 +314,20 @@ impl OpenRouterClient<NoAuth> {
             profile,
             provider_preferences: None,
         });
+        self
+    }
+
+    /// Enables Zero Data Retention (ZDR) by setting data collection to "deny".
+    pub fn with_zdr(mut self) -> Self {
+        let router_config = self.router_config.get_or_insert(RouterConfig {
+            profile: PredefinedModelCoverageProfile::LowestCost,
+            provider_preferences: Some(crate::types::provider::ProviderPreferences::new()),
+        });
+
+        let prefs = router_config
+            .provider_preferences
+            .get_or_insert(crate::types::provider::ProviderPreferences::new());
+        prefs.data_collection = Some("deny".to_string());
         self
     }
 

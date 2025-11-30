@@ -53,7 +53,7 @@ where
 
         // Rebuild and send the request, bounded by the remaining overall time.
         let send_fut = request_builder().send();
-        
+
         // We use the remaining time as the timeout for this attempt
         match timeout(remaining, send_fut).await {
             // Outer timeout (this single attempt took too long relative to global timeout)

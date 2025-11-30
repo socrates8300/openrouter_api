@@ -77,12 +77,42 @@ pub struct ImageContent {
     pub image_url: ImageUrl,
 }
 
+/// Audio URL content for multimodal messages.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct AudioUrl {
+    pub url: String,
+}
+
+/// Audio content part for multimodal messages.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct AudioContent {
+    #[serde(rename = "type")]
+    pub content_type: String, // "audio_url"
+    pub audio_url: AudioUrl,
+}
+
+/// File URL content for multimodal messages (e.g. PDFs).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct FileUrl {
+    pub url: String,
+}
+
+/// File content part for multimodal messages.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct FileContent {
+    #[serde(rename = "type")]
+    pub content_type: String, // "file_url"
+    pub file_url: FileUrl,
+}
+
 /// Content parts for multimodal messages (user role only).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(untagged)]
 pub enum ContentPart {
     Text(TextContent),
     Image(ImageContent),
+    Audio(AudioContent),
+    File(FileContent),
 }
 
 /// Enhanced message content supporting both string and multimodal content.
@@ -210,6 +240,9 @@ pub struct ChatCompletionRequest {
     /// (Optional) Fallback models.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub models: Option<Vec<String>>,
+    /// (Optional) Plugins to enable (e.g. web search).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub plugins: Option<Vec<String>>,
     /// (Optional) Message transforms.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transforms: Option<Vec<String>>,

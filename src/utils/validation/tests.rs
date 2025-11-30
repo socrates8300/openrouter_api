@@ -76,6 +76,7 @@ mod validation_tests {
             prediction: None,
             parallel_tool_calls: None,
             verbosity: None,
+            plugins: None,
         };
 
         assert!(validate_chat_request(&request).is_ok());
@@ -154,6 +155,7 @@ mod validation_tests {
                 prediction: None,
                 parallel_tool_calls: None,
                 verbosity: None,
+                plugins: None,
             };
             let _ = validate_chat_request(&request);
         }

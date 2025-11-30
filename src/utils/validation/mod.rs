@@ -9,12 +9,12 @@
 //! - [`chat`] - Chat completion request validation
 //! - [`completion`] - Text completion request validation
 //! - [`web_search`] - Web search request validation
-//! - [`analytics`] - Analytics request validation
-//! - [`models`] - Models API request validation
-//! - [`credits`] - Credits API request validation
-//! - [`providers`] - Providers API request validation
-//! - [`generation`] - Generation API request validation
-//! - [`structured`] - Structured output request validation
+//! - `analytics` - Analytics request validation
+//! - `models` - Models API request validation
+//! - `credits` - Credits API request validation
+//! - `providers` - Providers API request validation
+//! - `generation` - Generation API request validation
+//! - `structured` - Structured output request validation
 //!
 //! # Usage
 //!

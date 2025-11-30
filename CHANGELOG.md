@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.5.0] - 2025-11-30
+### 🚀 OpenRouter 2025 API Updates
+This major release implements the comprehensive OpenRouter API updates for 2025, including multimodal support, web search integration, and advanced routing controls.
+
+### ✨ New Features
+- **Multimodal Support**: Added `Audio` and `File` (PDF) content types to `ContentPart` enum.
+- **Web Search**: Integrated web search plugin support via `plugins` field in `ChatCompletionRequest`.
+- **Routing Shortcuts**: Added helper constants (`:nitro`, `:floor`, `:online`) and `model_with_shortcut` helper.
+- **Policy Controls**:
+  - Added `allow` field to `ProviderPreferences` for explicit provider allowlists.
+  - Added `with_zdr()` helper for Zero Data Retention (sets `data_collection: "deny"`).
+
+### 🛡️ Security Fixes
+- **Dependency Updates**: Updated dependencies to resolve security advisory RUSTSEC-2024-0370 in `h2`.
+
 ## [0.4.3] - 2025-11-30
 
 ### 🛡️ Security & Robustness Release

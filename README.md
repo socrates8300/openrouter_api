@@ -35,6 +35,8 @@ A production-ready Rust client for the OpenRouter API with comprehensive securit
 - **Analytics API:** Comprehensive activity data retrieval with filtering and pagination
 - **Providers API:** Provider information management with search and filtering
 - **Enhanced Models API:** Advanced model discovery with filtering, sorting, and search
+- **Multimodal Support:** Audio and File (PDF) input support
+- **Policy Controls:** Granular routing control with allow/deny lists and Zero Data Retention (ZDR)
 
 ### 📡 **Model Context Protocol (MCP)**
 - **MCP Client:** Full JSON-RPC client implementation for the [Model Context Protocol](https://modelcontextprotocol.io/)
@@ -110,6 +112,73 @@ async fn main() -> Result<()> {
 }
 ```
 
+#### Multimodal Chat (Audio & PDF)
+
+```rust
+use openrouter_api::{OpenRouterClient, Result};
+use openrouter_api::types::chat::{ChatCompletionRequest, Message, ContentPart, AudioContent, AudioUrl, FileContent, FileUrl};
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let client = OpenRouterClient::from_env()?;
+
+    let request = ChatCompletionRequest {
+        model: "openai/gpt-4o".to_string(),
+        messages: vec![Message {
+            role: "user".to_string(),
+            content: openrouter_api::types::chat::MessageContent::Parts(vec![
+                ContentPart::Text(openrouter_api::types::chat::TextContent {
+                    text: "Analyze this audio and document".to_string(),
+                }),
+                ContentPart::Audio(AudioContent {
+                    content_type: "audio_url".to_string(),
+                    audio_url: AudioUrl {
+                        url: "https://example.com/audio.mp3".to_string(),
+                    },
+                }),
+                ContentPart::File(FileContent {
+                    content_type: "file_url".to_string(),
+                    file_url: FileUrl {
+                        url: "https://example.com/document.pdf".to_string(),
+                    },
+                }),
+            ]),
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+
+    let response = client.chat()?.chat_completion(request).await?;
+    Ok(())
+}
+```
+
+#### Routing Shortcuts & Web Search
+
+```rust
+use openrouter_api::{OpenRouterClient, Result, client::{ROUTING_NITRO, ROUTING_ONLINE}};
+use openrouter_api::types::chat::{ChatCompletionRequest, Message};
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let client = OpenRouterClient::from_env()?;
+
+    // Use routing shortcuts
+    let model = OpenRouterClient::model_with_shortcut("openai/gpt-4o", ROUTING_NITRO);
+
+    let request = ChatCompletionRequest {
+        model,
+        messages: vec![Message::text("user", "Search for latest Rust news")],
+        // Enable web search plugin
+        plugins: Some(vec!["web".to_string()]),
+        ..Default::default()
+    };
+
+    let response = client.chat()?.chat_completion(request).await?;
+    Ok(())
+}
+```
+
 #### Production Configuration
 
 ```rust
@@ -179,7 +248,9 @@ async fn main() -> Result<()> {
     let preferences = ProviderPreferences::new()
         .with_order(vec!["OpenAI".to_string(), "Anthropic".to_string()])
         .with_allow_fallbacks(true)
-        .with_data_collection(DataCollection::Deny)
+        .with_allow_fallbacks(true)
+        .with_data_collection(DataCollection::Deny) // Enable Zero Data Retention (ZDR)
+        .with_allow(vec!["OpenAI".to_string(), "Anthropic".to_string()]) // Explicit allowlist
         .with_sort(ProviderSort::Throughput);
     
     // Create a request builder with provider preferences
