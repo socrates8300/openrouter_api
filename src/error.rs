@@ -64,6 +64,9 @@ pub enum Error {
     #[error("Timeout error: {0}")]
     TimeoutError(String),
 
+    #[error("Response too large: {0} bytes (limit: {1} bytes)")]
+    ResponseTooLarge(usize, usize),
+
     #[error("Unknown error")]
     Unknown,
 }

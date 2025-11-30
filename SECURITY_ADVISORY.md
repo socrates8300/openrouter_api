@@ -1,3 +1,79 @@
+# Security Advisory: v0.4.2 - Critical Security Fixes
+
+**Advisory ID**: OPENROUTOR-API-2025-003
+**Release Date**: November 30, 2025
+**Version**: 0.4.2
+**Severity**: High
+**Status**: Resolved
+
+## Summary
+
+This security advisory addresses a high-severity vulnerability identified in the OpenRouter API Rust client library:
+
+- **SECURITY-02**: Unbounded Response Body Read in Main Client (HIGH)
+
+## Details
+
+### [SECURITY-02] Unbounded Response Body Read (Client)
+
+The main API client (`OpenRouterClient`) previously relied on `response.text().await` which reads the entire body into memory without a size limit.
+
+A malicious server could exploit this by sending a massive body, causing the client to allocate excessive memory and potentially crash (OOM).
+
+**Resolution**: The client now implements a `max_response_bytes` configuration (default 10MB). It checks the `Content-Length` header and enforces the limit on the actual bytes read using a bounded reader.
+
+## Affected Versions
+
+- **Vulnerable**: v0.4.1 and earlier
+- **Patched**: v0.4.2+
+- **Safe**: v0.4.2 (this release and later)
+
+## Recommendations
+
+### Immediate Actions
+1. **Update Dependencies**: Upgrade to v0.4.2 or later immediately.
+2. **Review Configuration**: Ensure `max_response_bytes` in `ClientConfig` is set to an appropriate limit for your environment (default is 10MB).
+
+---
+
+# Security Advisory: v0.4.1 - Critical Security Fixes
+
+**Advisory ID**: OPENROUTOR-API-2025-002
+**Release Date**: November 30, 2025
+**Version**: 0.4.1
+**Severity**: High
+**Status**: Resolved
+
+## Summary
+
+This security advisory addresses a high-severity vulnerability identified in the OpenRouter API Rust client library:
+
+- **SECURITY-01**: Unbounded Response Body Read in MCP Client (HIGH)
+
+## Details
+
+### [SECURITY-01] Unbounded Response Body Read
+
+The MCP client previously relied on the `Content-Length` header to enforce the `max_response_size` configuration. However, it subsequently called `response.text().await`, which reads the entire body into memory regardless of the configuration if the `Content-Length` header is missing or misleading (e.g., smaller than the actual body).
+
+A malicious server could exploit this by sending a massive body with a small or missing `Content-Length` header, causing the client to allocate excessive memory and potentially crash (OOM).
+
+**Resolution**: The client now uses a bounded stream reader (`response.bytes_stream()`) to read the response body. It enforces the `max_response_size` limit on the actual bytes read, ensuring that the client never allocates more memory than configured, regardless of the headers provided by the server.
+
+## Affected Versions
+
+- **Vulnerable**: v0.4.0 and earlier
+- **Patched**: v0.4.1+
+- **Safe**: v0.4.1 (this release and later)
+
+## Recommendations
+
+### Immediate Actions
+1. **Update Dependencies**: Upgrade to v0.4.1 or later immediately.
+2. **Review Configuration**: Ensure `max_response_size` in `McpConfig` is set to an appropriate limit for your environment (default is 10MB).
+
+---
+
 # Security Advisory: v0.3.2 - Critical Security Fixes
 
 **Advisory ID**: OPENROUTOR-API-2025-001  

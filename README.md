@@ -19,6 +19,7 @@ A production-ready Rust client for the OpenRouter API with comprehensive securit
 - **Standardized Error Handling:** Enterprise-grade retry logic with exponential backoff and jitter across all endpoints
 - **Memory Safety:** Secure API key handling with automatic memory zeroing
 - **Response Redaction:** Automatic sanitization of error messages to prevent sensitive data exposure
+- **Bounded Response Reading:** Strict, configurable size limits on response body reading to prevent OOM attacks (default 10MB)
 - **Streaming Safety:** Buffer limits and backpressure handling for streaming responses
 - **Input Validation:** Comprehensive validation of requests and parameters
 - **Automatic Retries:** Configurable retry behavior for network failures and rate limiting
@@ -146,6 +147,7 @@ async fn main() -> Result<()> {
         .with_retries(3, 500)      // 3 retries, 500ms initial backoff
         .with_http_referer("https://myapp.com")
         .with_site_title("My Application")
+        .with_max_response_bytes(10 * 1024 * 1024) // 10MB limit (default)
         .with_api_key("sk-or-v1-...")?;
     
     // Ready to use

@@ -186,7 +186,7 @@ impl Message {
 }
 
 /// Chat completion request matching the OpenRouter API schema.
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Clone, Default)]
 pub struct ChatCompletionRequest {
     /// The model ID to use.
     pub model: String,
@@ -274,41 +274,6 @@ pub struct ChatCompletionRequest {
     /// (Optional) Response verbosity level.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub verbosity: Option<VerbosityLevel>,
-}
-
-impl Default for ChatCompletionRequest {
-    fn default() -> Self {
-        Self {
-            model: String::new(),
-            messages: Vec::new(),
-            stream: None,
-            response_format: None,
-            tools: None,
-            tool_choice: None,
-            provider: None,
-            models: None,
-            transforms: None,
-            route: None,
-            user: None,
-            max_tokens: None,
-            temperature: None,
-            top_p: None,
-            top_k: None,
-            frequency_penalty: None,
-            presence_penalty: None,
-            repetition_penalty: None,
-            min_p: None,
-            top_a: None,
-            seed: None,
-            stop: None,
-            logit_bias: None,
-            logprobs: None,
-            top_logprobs: None,
-            prediction: None,
-            parallel_tool_calls: None,
-            verbosity: None,
-        }
-    }
 }
 
 /// A choice returned by the chat API.

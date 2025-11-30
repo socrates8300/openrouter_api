@@ -140,6 +140,7 @@ mod tests {
                 user_id: None, // Add this field
                 timeout: std::time::Duration::from_secs(30),
                 retry_config: RetryConfig::default(), // Add this field
+                max_response_bytes: 10 * 1024 * 1024,
             },
             http_client: None,
             _state: std::marker::PhantomData,
@@ -224,6 +225,7 @@ mod tests {
                 user_id: None, // Add this field
                 timeout: std::time::Duration::from_secs(30),
                 retry_config: RetryConfig::default(), // Add this field
+                max_response_bytes: 10 * 1024 * 1024,
             },
             http_client: None,
             _state: std::marker::PhantomData,
@@ -1286,7 +1288,10 @@ mod tests {
         // Test Message default
         let default_message = Message::default();
         assert_eq!(default_message.role, "user");
-        assert_eq!(default_message.content, MessageContent::Text("".to_string()));
+        assert_eq!(
+            default_message.content,
+            MessageContent::Text("".to_string())
+        );
         assert_eq!(default_message.name, None);
         assert_eq!(default_message.tool_call_id, None);
         assert_eq!(default_message.tool_calls, None);

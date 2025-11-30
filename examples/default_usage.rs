@@ -1,5 +1,5 @@
 //! Example demonstrating the new Default implementations for ChatCompletionRequest and Message
-//! 
+//!
 //! This example shows how the Default trait reduces boilerplate when creating
 //! chat completion requests and messages.
 
@@ -59,12 +59,12 @@ fn main() {
     println!("Model: {}", concise_request.model);
     println!("Messages: {}", concise_request.messages.len());
     println!("First message role: {}", concise_request.messages[0].role);
-    
+
     // You can also create a default message and then modify it:
     let mut default_message = Message::default();
     default_message.role = "system".to_string();
     default_message.content = MessageContent::Text("You are a helpful assistant.".to_string());
-    
+
     println!("\nDefault message modified:");
     println!("Role: {}", default_message.role);
     println!("Content: {:?}", default_message.content);
