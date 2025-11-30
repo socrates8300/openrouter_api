@@ -26,7 +26,7 @@ futures = "0.3"
 async-stream = "0.3"
 fastrand = "2.0"
 tokio-util = { version = "0.7", features = ["codec", "io"] }
-uuid = "1.16.0"
+uuid = { version = "1.16.0", features = ["v4"] }
 zeroize = { version = "1.8", features = ["derive"] }
 regex = "1.11"
 chrono = { version = "0.4", features = ["serde"] }
