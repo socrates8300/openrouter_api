@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.4.3] - 2025-11-30
+
+### 🛡️ Security & Robustness Release
+
+This release addresses critical security findings, improves MCP client robustness, and enhances codebase maintainability.
+
+### 🔒 **Security Improvements**
+
+- **Predictable ID Generation**: Replaced `SystemTime`-based IDs with UUID v4 in MCP client to prevent collisions and predictability
+- **Concurrency Limiting**: Added semaphore acquisition to `send_request` in MCP client to properly enforce concurrent request limits
+- **Size Configuration**: Clarified that `max_request_size` applies to all outgoing messages (requests and responses)
+
+### 🐛 **Bug Fixes**
+
+- **Retry Logic**: Fixed a bug where `execute_with_retry_builder` could potentially send duplicate requests
+- **Clippy Warnings**: Resolved `derivable_impls` warning in `ChatCompletionRequest`
+
+### 🔧 **Refactoring**
+
+- **Client Module Split**: Extracted `ClientConfig`, `RetryConfig`, and `SecureApiKey` into `src/client/config.rs` for better maintainability
+- **Retry Logic Simplification**: Refactored retry loop for better readability and correctness
+
 ## [0.4.2] - 2025-11-30
 
 ### 🛡️ Security Fixes
@@ -19,7 +41,6 @@
   - Prevents potential OOM attacks from malicious servers.
 
 ---
-
 ## [0.4.0] - 2025-10-18
 
 ### 🚀 Quality & Security Release

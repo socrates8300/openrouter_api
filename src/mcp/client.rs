@@ -47,15 +47,9 @@ impl MCPClient {
         })
     }
 
-    /// Generate a simple request ID
+    /// Generate a unique request ID
     fn generate_id() -> String {
-        // Use a simple timestamp-based ID instead of UUID
-        use std::time::{SystemTime, UNIX_EPOCH};
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos();
-        format!("req-{timestamp}")
+        uuid::Uuid::new_v4().to_string()
     }
 
     /// Initialize the connection to the MCP server.
@@ -162,6 +156,13 @@ impl MCPClient {
 
     /// Send a JSON-RPC request to the server.
     async fn send_request(&self, request: JsonRpcRequest) -> Result<JsonRpcResponse> {
+        // Acquire semaphore permit to limit concurrent requests
+        let _permit = self
+            .semaphore
+            .acquire()
+            .await
+            .map_err(|_| Error::ConfigError("Too many concurrent MCP requests".to_string()))?;
+
         // Check request size limit before sending
         let request_json = serde_json::to_string(&request).map_err(Error::SerializationError)?;
         if request_json.len() > self.config.max_request_size {
@@ -240,6 +241,7 @@ impl MCPClient {
             .map_err(|_| Error::ConfigError("Too many concurrent MCP requests".to_string()))?;
 
         // Validate response size before sending
+        // Note: We use max_request_size for all outgoing messages (requests and responses)
         let response_json = serde_json::to_string(&response).map_err(Error::SerializationError)?;
 
         if response_json.len() > self.config.max_request_size {

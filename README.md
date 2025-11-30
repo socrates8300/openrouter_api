@@ -41,6 +41,8 @@ A production-ready Rust client for the OpenRouter API with comprehensive securit
 - **Resource Access:** Retrieve resources from MCP servers
 - **Tool Invocation:** Execute tools provided by MCP servers
 - **Context Integration:** Seamless context sharing between applications and LLMs
+- **Concurrency Control:** Semaphore-based limiting for concurrent requests
+- **Secure ID Generation:** UUID v4 usage for request tracking
 
 ### 🧪 **Quality & Testing**
 - **100% Test Coverage:** 162 comprehensive unit and integration tests
@@ -624,9 +626,9 @@ This is a production-ready library with comprehensive functionality:
 - **Advanced Filtering:** Sophisticated query builders for analytics, providers, and models
 - **Convenience Methods:** Helper methods for common operations like domain extraction
 - **Production Reliability:** Exponential backoff with jitter, rate limit handling, and consistent retry behavior
+- **Retry-After Support:** Respects server-provided retry guidance (headers) for rate limiting
 
 ### 🔄 **Future Enhancements**
-- **Retry-After Header Support:** Respect server-provided retry guidance
 - **Circuit Breaker Pattern:** Prevent cascading failures
 - **Retry Budget Management:** Prevent excessive retries in high-throughput scenarios
 - **Performance Optimizations:** Connection pooling and caching

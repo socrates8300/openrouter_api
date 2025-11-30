@@ -44,7 +44,6 @@ where
         // Remaining time against the overall cap.
         let remaining = config.total_timeout.saturating_sub(start_time.elapsed());
         if remaining.is_zero() {
-            // FIX: Use TimeoutError (more semantically accurate than ConfigError here).
             return Err(Error::TimeoutError(format!(
                 "Retry timeout exceeded for {}: {}ms limit",
                 operation_name,
@@ -52,71 +51,22 @@ where
             )));
         }
 
-        // Build a fresh request for each attempt
-        let response = request_builder().send().await?;
-
-        let status = response.status();
-        let status_code = status.as_u16();
-
-        // Check if we should retry based on status code and retry count
-        if config.retry_on_status_codes.contains(&status_code)
-            && retry_count < config.max_retries as usize
-        {
-            retry_count += 1;
-
-            // Calculate next backoff with exponential increase
-            backoff_ms = std::cmp::min(backoff_ms * 2, config.max_backoff_ms);
-
-            // Apply max retry interval cap
-            let backoff_duration = Duration::from_millis(backoff_ms);
-            let capped_backoff = std::cmp::min(backoff_duration, config.max_retry_interval);
-
-            // Add jitter to prevent thundering herd (±25% random variation)
-            let jitter_factor = rng.f64() * 0.5 + 0.75; // Range: 0.75 to 1.25
-            let jittered_backoff =
-                Duration::from_millis((capped_backoff.as_millis() as f64 * jitter_factor) as u64);
-
-            // Check if the next retry would exceed the total timeout
-            if start_time.elapsed() + jittered_backoff > config.total_timeout {
-                return Err(Error::ConfigError(format!(
-                    "Next retry would exceed timeout for {}: remaining time {}ms < required backoff {}ms",
-                    operation_name,
-                    (config.total_timeout - start_time.elapsed()).as_millis(),
-                    jittered_backoff.as_millis()
-                )));
-            }
-
-            // Log retry attempt
-            eprintln!(
-                "Retrying {} request ({}/{}) after {}ms (base: {}ms, capped: {}ms, jitter: {:.2}%) due to status code {}",
-                operation_name, retry_count, config.max_retries, jittered_backoff.as_millis(), backoff_ms,
-                capped_backoff.as_millis(), (jitter_factor - 1.0) * 100.0, status_code
-            );
-
-            // Wait before retrying
-            sleep(jittered_backoff).await;
-            continue;
-        }
-
         // Rebuild and send the request, bounded by the remaining overall time.
         let send_fut = request_builder().send();
+        
+        // We use the remaining time as the timeout for this attempt
         match timeout(remaining, send_fut).await {
-            // Outer timeout (this single attempt took too long)
+            // Outer timeout (this single attempt took too long relative to global timeout)
             Err(_) => {
                 if retry_count < config.max_retries as usize {
                     retry_count += 1;
-
-                    // Wait with jitter, but never sleep past the remaining overall time.
-                    let sleep_ms =
-                        jittered_backoff_ms(backoff_ms, config.max_backoff_ms, &mut rng, remaining);
                     eprintln!(
-                        "Retrying {} request due to attempt timeout ({}/{}) in {} ms",
-                        operation_name, retry_count, config.max_retries, sleep_ms
+                        "Retrying {} request due to global timeout proximity ({}/{})",
+                        operation_name, retry_count, config.max_retries
                     );
-                    sleep(Duration::from_millis(sleep_ms)).await;
-
-                    // Exponential step for next time.
-                    backoff_ms = next_backoff(backoff_ms, config.max_backoff_ms);
+                    // If we timed out, we might not have much time left, but let's try to backoff if possible
+                    // However, if remaining is zero, the loop check at top will catch it.
+                    // We just continue to let the loop check handle the exit.
                     continue;
                 } else {
                     return Err(Error::TimeoutError(format!(
@@ -128,7 +78,7 @@ where
 
             // The send completed; now check whether it succeeded or failed with a network error.
             Ok(Err(e)) => {
-                // NEW: Treat transient network failures as retryable (connect/timeouts).
+                // Treat transient network failures as retryable (connect/timeouts).
                 if is_retryable_reqwest_error(&e) && retry_count < config.max_retries as usize {
                     retry_count += 1;
 
