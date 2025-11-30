@@ -61,9 +61,11 @@ fn main() {
     println!("First message role: {}", concise_request.messages[0].role);
 
     // You can also create a default message and then modify it:
-    let mut default_message = Message::default();
-    default_message.role = "system".to_string();
-    default_message.content = MessageContent::Text("You are a helpful assistant.".to_string());
+    let default_message = Message {
+        role: "system".to_string(),
+        content: MessageContent::Text("You are a helpful assistant.".to_string()),
+        ..Default::default()
+    };
 
     println!("\nDefault message modified:");
     println!("Role: {}", default_message.role);

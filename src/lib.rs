@@ -1,6 +1,13 @@
 //! # OpenRouter API Client Library
 //!
 //! A Rust client for interfacing with the OpenRouter API.
+//!
+//! ## Model Context Protocol (MCP)
+//!
+//! This library includes a client implementation for the Model Context Protocol (MCP),
+//! allowing connection to MCP servers for resource retrieval, tool execution, and prompt handling.
+//!
+//! See [`MCPClient`] for more details.
 
 pub mod api;
 pub mod client;

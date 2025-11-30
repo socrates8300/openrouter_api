@@ -15,8 +15,6 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 pub mod config;
 pub use config::*;
 
-
-
 // Type‑state markers.
 #[derive(Debug)]
 pub struct Unconfigured;

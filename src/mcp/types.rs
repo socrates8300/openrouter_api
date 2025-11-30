@@ -3,6 +3,8 @@
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
+use crate::error::{Error, Result};
+
 /// The base protocol version
 pub const MCP_PROTOCOL_VERSION: &str = "2025-03-26";
 
@@ -198,6 +200,33 @@ pub struct McpConfig {
     pub max_request_size: usize,
     /// Maximum concurrent requests
     pub max_concurrent_requests: usize,
+}
+
+impl McpConfig {
+    /// Validate the configuration.
+    pub fn validate(&self) -> Result<()> {
+        if self.request_timeout.is_zero() {
+            return Err(Error::ConfigError(
+                "Request timeout must be greater than 0".into(),
+            ));
+        }
+        if self.max_response_size == 0 {
+            return Err(Error::ConfigError(
+                "Max response size must be greater than 0".into(),
+            ));
+        }
+        if self.max_request_size == 0 {
+            return Err(Error::ConfigError(
+                "Max request size must be greater than 0".into(),
+            ));
+        }
+        if self.max_concurrent_requests == 0 {
+            return Err(Error::ConfigError(
+                "Max concurrent requests must be greater than 0".into(),
+            ));
+        }
+        Ok(())
+    }
 }
 
 impl Default for McpConfig {
