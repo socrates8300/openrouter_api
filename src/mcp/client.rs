@@ -209,7 +209,7 @@ impl MCPClient {
         use futures::StreamExt;
         let mut stream = response.bytes_stream();
         let mut body_bytes = Vec::new();
-        
+
         while let Some(chunk) = stream.next().await {
             let chunk = chunk.map_err(Error::HttpError)?;
             if body_bytes.len() + chunk.len() > self.config.max_response_size {
@@ -223,7 +223,7 @@ impl MCPClient {
 
         let response_body = String::from_utf8(body_bytes)
             .map_err(|e| Error::ConfigError(format!("Invalid UTF-8 in response: {}", e)))?;
-            
+
         let response: JsonRpcResponse =
             serde_json::from_str(&response_body).map_err(Error::SerializationError)?;
 
@@ -574,7 +574,7 @@ mod tests {
                         "result": {"data": large_result}
                     }))
                     // Remove Content-Length to force chunked encoding or at least bypass the header check
-                    .append_header("Transfer-Encoding", "chunked"), 
+                    .append_header("Transfer-Encoding", "chunked"),
             )
             .mount(&mock_server)
             .await;

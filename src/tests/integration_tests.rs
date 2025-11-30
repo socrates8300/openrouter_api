@@ -1288,7 +1288,10 @@ mod tests {
         // Test Message default
         let default_message = Message::default();
         assert_eq!(default_message.role, "user");
-        assert_eq!(default_message.content, MessageContent::Text("".to_string()));
+        assert_eq!(
+            default_message.content,
+            MessageContent::Text("".to_string())
+        );
         assert_eq!(default_message.name, None);
         assert_eq!(default_message.tool_call_id, None);
         assert_eq!(default_message.tool_calls, None);

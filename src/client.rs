@@ -643,7 +643,7 @@ impl OpenRouterClient<Ready> {
         T: serde::de::DeserializeOwned,
     {
         let status = response.status();
-        
+
         // Check Content-Length header first if available
         if let Some(content_length) = response.content_length() {
             if content_length > self.config.max_response_bytes as u64 {
@@ -662,7 +662,7 @@ impl OpenRouterClient<Ready> {
                 self.config.max_response_bytes,
             ));
         }
-        
+
         // Convert to string (lossy is fine here as we expect JSON/text)
         let body = String::from_utf8_lossy(&body_bytes).to_string();
         if !status.is_success() {

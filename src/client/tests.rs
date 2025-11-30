@@ -271,9 +271,8 @@ mod tests {
 
     #[test]
     fn test_client_max_response_bytes_config() {
-        let client = OpenRouterClient::<Unconfigured>::new()
-            .with_max_response_bytes(1024);
-        
+        let client = OpenRouterClient::<Unconfigured>::new().with_max_response_bytes(1024);
+
         assert_eq!(client.config.max_response_bytes, 1024);
     }
 }
