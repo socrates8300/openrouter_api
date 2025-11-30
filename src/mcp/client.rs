@@ -205,7 +205,25 @@ impl MCPClient {
             )));
         }
 
-        let response_body = response.text().await.map_err(Error::HttpError)?;
+        // Read body with strict size limit
+        use futures::StreamExt;
+        let mut stream = response.bytes_stream();
+        let mut body_bytes = Vec::new();
+        
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk.map_err(Error::HttpError)?;
+            if body_bytes.len() + chunk.len() > self.config.max_response_size {
+                return Err(Error::ConfigError(format!(
+                    "Response body exceeded maximum size of {} bytes",
+                    self.config.max_response_size
+                )));
+            }
+            body_bytes.extend_from_slice(&chunk);
+        }
+
+        let response_body = String::from_utf8(body_bytes)
+            .map_err(|e| Error::ConfigError(format!("Invalid UTF-8 in response: {}", e)))?;
+            
         let response: JsonRpcResponse =
             serde_json::from_str(&response_body).map_err(Error::SerializationError)?;
 
@@ -537,6 +555,42 @@ mod tests {
         let error = result.unwrap_err();
         match &error {
             Error::ConfigError(msg) => assert!(msg.contains("too large")),
+            _ => panic!("Expected size validation error, got: {:?}", error),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_response_size_limit_with_chunked_encoding() {
+        let mock_server = MockServer::start().await;
+
+        // Create a large response with chunked encoding (no Content-Length)
+        let large_result = "x".repeat(2048); // 2KB, larger than 1KB limit
+        Mock::given(matchers::method("POST"))
+            .respond_with(
+                ResponseTemplate::new(StatusCode::OK)
+                    .set_body_json(serde_json::json!({
+                        "jsonrpc": "2.0",
+                        "id": "test",
+                        "result": {"data": large_result}
+                    }))
+                    // Remove Content-Length to force chunked encoding or at least bypass the header check
+                    .append_header("Transfer-Encoding", "chunked"), 
+            )
+            .mount(&mock_server)
+            .await;
+
+        let client = MCPClient::new_with_config(mock_server.uri(), create_test_config()).unwrap();
+
+        let capabilities = ClientCapabilities {
+            protocol_version: "2025-03-26".to_string(),
+            supports_sampling: None,
+        };
+        let result = client.initialize(capabilities).await;
+
+        assert!(result.is_err());
+        let error = result.unwrap_err();
+        match &error {
+            Error::ConfigError(msg) => assert!(msg.contains("exceeded maximum size")),
             _ => panic!("Expected size validation error, got: {:?}", error),
         }
     }

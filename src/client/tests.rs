@@ -195,6 +195,7 @@ mod tests {
             user_id: None,
             timeout: Duration::from_secs(30),
             retry_config: RetryConfig::default(),
+            max_response_bytes: 10 * 1024 * 1024,
         };
 
         let headers = config.build_headers().unwrap();
@@ -214,6 +215,7 @@ mod tests {
             user_id: None,
             timeout: Duration::from_secs(30),
             retry_config: RetryConfig::default(),
+            max_response_bytes: 10 * 1024 * 1024,
         };
 
         let headers = config.build_headers().unwrap();
@@ -233,6 +235,7 @@ mod tests {
             user_id: Some("user123".to_string()),
             timeout: Duration::from_secs(30),
             retry_config: RetryConfig::default(),
+            max_response_bytes: 10 * 1024 * 1024,
         };
 
         let headers = config.build_headers().unwrap();
@@ -258,10 +261,19 @@ mod tests {
             user_id: None,
             timeout: Duration::from_secs(30),
             retry_config: RetryConfig::default(),
+            max_response_bytes: 10 * 1024 * 1024,
         };
 
         let result = config.build_headers();
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), Error::ConfigError(_)));
+    }
+
+    #[test]
+    fn test_client_max_response_bytes_config() {
+        let client = OpenRouterClient::<Unconfigured>::new()
+            .with_max_response_bytes(1024);
+        
+        assert_eq!(client.config.max_response_bytes, 1024);
     }
 }

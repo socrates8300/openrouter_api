@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.4.2] - 2025-11-30
+
+### 🛡️ Security Fixes
+
+- **[SECURITY-02] Unbounded Response Body Read (Client)**: Fixed a vulnerability where the main API client could read unbounded response bodies if the server provided a misleading or missing `Content-Length` header.
+  - Implemented `max_response_bytes` configuration (default 10MB).
+  - Enforces limit on both `Content-Length` header and actual bytes read.
+  - Prevents potential OOM attacks from malicious servers.
+
+## [0.4.1] - 2025-11-30
+
+### 🛡️ Security Fixes
+
+- **[SECURITY-01] Unbounded Response Body Read**: Fixed a vulnerability where the MCP client could read unbounded response bodies if the server provided a misleading or missing `Content-Length` header.
+  - Replaced `response.text().await` with a bounded stream reader.
+  - Enforces `max_response_size` configuration on the actual bytes read.
+  - Prevents potential OOM attacks from malicious servers.
+
+---
+
 ## [0.4.0] - 2025-10-18
 
 ### 🚀 Quality & Security Release

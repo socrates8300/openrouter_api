@@ -86,6 +86,7 @@ pub struct ClientConfig {
     pub user_id: Option<String>,
     pub timeout: Duration,
     pub retry_config: RetryConfig,
+    pub max_response_bytes: usize,
 }
 
 /// Configuration for API instances that doesn't include sensitive data
@@ -97,6 +98,7 @@ pub struct ApiConfig {
     pub user_id: Option<String>,
     pub timeout: Duration,
     pub retry_config: RetryConfig,
+    pub max_response_bytes: usize,
     pub headers: HeaderMap,
 }
 
@@ -139,6 +141,7 @@ impl ClientConfig {
             user_id: self.user_id.clone(),
             timeout: self.timeout,
             retry_config: self.retry_config.clone(),
+            max_response_bytes: self.max_response_bytes,
             headers: self.build_headers()?,
         })
     }
@@ -284,6 +287,8 @@ impl OpenRouterClient<Unconfigured> {
                 user_id: None,
                 timeout: Duration::from_secs(30),
                 retry_config: RetryConfig::default(),
+                // Default to 10MB limit
+                max_response_bytes: 10 * 1024 * 1024,
             },
             http_client: None,
             _state: PhantomData,
@@ -343,6 +348,13 @@ impl OpenRouterClient<Unconfigured> {
             _state: PhantomData,
             router_config: self.router_config,
         }
+    }
+
+    /// Sets the maximum response size in bytes.
+    /// Defaults to 10MB (10 * 1024 * 1024 bytes).
+    pub fn with_max_response_bytes(mut self, bytes: usize) -> Self {
+        self.config.max_response_bytes = bytes;
+        self
     }
 }
 
@@ -440,6 +452,13 @@ impl OpenRouterClient<NoAuth> {
     pub fn with_retries(mut self, max_retries: u32, initial_backoff_ms: u64) -> Self {
         self.config.retry_config.max_retries = max_retries;
         self.config.retry_config.initial_backoff_ms = initial_backoff_ms;
+        self
+    }
+
+    /// Sets the maximum response size in bytes.
+    /// Defaults to 10MB (10 * 1024 * 1024 bytes).
+    pub fn with_max_response_bytes(mut self, bytes: usize) -> Self {
+        self.config.max_response_bytes = bytes;
         self
     }
 
@@ -624,7 +643,28 @@ impl OpenRouterClient<Ready> {
         T: serde::de::DeserializeOwned,
     {
         let status = response.status();
-        let body = response.text().await?;
+        
+        // Check Content-Length header first if available
+        if let Some(content_length) = response.content_length() {
+            if content_length > self.config.max_response_bytes as u64 {
+                return Err(Error::ResponseTooLarge(
+                    content_length as usize,
+                    self.config.max_response_bytes,
+                ));
+            }
+        }
+
+        // Read body with limit
+        let body_bytes = response.bytes().await?;
+        if body_bytes.len() > self.config.max_response_bytes {
+            return Err(Error::ResponseTooLarge(
+                body_bytes.len(),
+                self.config.max_response_bytes,
+            ));
+        }
+        
+        // Convert to string (lossy is fine here as we expect JSON/text)
+        let body = String::from_utf8_lossy(&body_bytes).to_string();
         if !status.is_success() {
             return Err(Error::ApiError {
                 code: status.as_u16(),

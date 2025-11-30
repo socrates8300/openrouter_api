@@ -140,6 +140,7 @@ mod tests {
                 user_id: None, // Add this field
                 timeout: std::time::Duration::from_secs(30),
                 retry_config: RetryConfig::default(), // Add this field
+                max_response_bytes: 10 * 1024 * 1024,
             },
             http_client: None,
             _state: std::marker::PhantomData,
@@ -224,6 +225,7 @@ mod tests {
                 user_id: None, // Add this field
                 timeout: std::time::Duration::from_secs(30),
                 retry_config: RetryConfig::default(), // Add this field
+                max_response_bytes: 10 * 1024 * 1024,
             },
             http_client: None,
             _state: std::marker::PhantomData,

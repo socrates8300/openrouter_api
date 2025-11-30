@@ -387,6 +387,7 @@ mod tests {
             site_title: None,
             user_id: None,
             retry_config: RetryConfig::default(),
+            max_response_bytes: 10 * 1024 * 1024,
         };
 
         let client = Client::new();
