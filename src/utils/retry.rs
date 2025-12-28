@@ -112,7 +112,13 @@ where
                     let retry_after_ms = parse_retry_after_ms(response.headers());
 
                     // Consume body to free the connection.
-                    let _ = response.bytes().await;
+                    if let Err(e) = response.bytes().await {
+                        eprintln!(
+                            "Warning: Failed to consume response body during retry for {}: {}",
+                            operation_name, e
+                        );
+                        // Continue anyway since we're retrying
+                    }
 
                     // Decide sleep time: prefer Retry-After, else exponential.
                     let base_ms = retry_after_ms.unwrap_or(backoff_ms);
