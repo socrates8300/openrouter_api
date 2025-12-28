@@ -1,21 +1,13 @@
-warning: unused variable: `s`
-  --> tests/type_safety/consumed_after_into.rs:14:9
-   |
-14 |     let s: String = id.into();
-   |         ^ help: if this is intentional, prefix it with an underscore: `_s`
-   |
-   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
-
 error[E0382]: borrow of moved value: `id`
-  --> tests/type_safety/consumed_after_into.rs:18:13
+  --> tests/type_safety/consumed_after_into.rs:19:13
    |
 11 |     let id = ModelId::new("test-id");
    |         -- move occurs because `id` has type `ModelId`, which does not implement the `Copy` trait
 ...
-14 |     let s: String = id.into();
-   |                        ------ `id` moved due to this method call
+14 |     let _s: String = id.into();
+   |                         ------ `id` moved due to this method call
 ...
-18 |     let _ = id.as_str();
+19 |     let _ = id.as_str();
    |             ^^ value borrowed here after move
    |
 note: `into` takes ownership of the receiver `self`, which moves `id`
@@ -25,5 +17,5 @@ note: `into` takes ownership of the receiver `self`, which moves `id`
    |             ^^^^
 help: you can `clone` the value and consume it, but this might not be your desired behavior
    |
-14 |     let s: String = id.clone().into();
-   |                       ++++++++
+14 |     let _s: String = id.clone().into();
+   |                        ++++++++

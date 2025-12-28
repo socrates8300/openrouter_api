@@ -11,10 +11,11 @@ fn main() {
     let id = ModelId::new("test-id");
 
     // This consumes `id` and converts it to a String
-    let s: String = id.into();
+    let _s: String = id.into();
 
     // This should fail to compile: `id` was moved in the previous line
-    // and is no longer accessible
+    // and is no longer accessible. Annotate the error for trybuild/compiletest:
+    //~ ERROR use of moved value: `id`
     let _ = id.as_str();
 
     // Expected error:
