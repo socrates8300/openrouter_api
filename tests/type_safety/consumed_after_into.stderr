@@ -1,0 +1,21 @@
+error[E0382]: borrow of moved value: `id`
+  --> tests/type_safety/consumed_after_into.rs:19:13
+   |
+11 |     let id = ModelId::new("test-id");
+   |         -- move occurs because `id` has type `ModelId`, which does not implement the `Copy` trait
+...
+14 |     let _s: String = id.into();
+   |                         ------ `id` moved due to this method call
+...
+19 |     let _ = id.as_str();
+   |             ^^ value borrowed here after move
+   |
+note: `into` takes ownership of the receiver `self`, which moves `id`
+  --> $RUST/core/src/convert/mod.rs
+   |
+   |     fn into(self) -> T;
+   |             ^^^^
+help: you can `clone` the value and consume it, but this might not be your desired behavior
+   |
+14 |     let _s: String = id.clone().into();
+   |                        ++++++++

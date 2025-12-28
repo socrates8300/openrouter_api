@@ -1,9 +1,11 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use super::ids::{ModelId, Price};
+
 /// A model capability, such as "completion" or "chat".
 /// This is used for filtering in `ModelsRequest`.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum ModelCapability {
     Chat,
@@ -29,76 +31,35 @@ pub struct ArchitectureDetails {
 }
 
 /// Nested structure for pricing information within ModelInfo.
-/// Prices are represented as strings, as returned by the API.
+/// Prices are strongly-typed Price values for type safety and validation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PricingInfo {
-    pub prompt: String,
-    pub completion: String,
+    pub prompt: Price,
+    pub completion: Price,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub request: Option<String>,
+    pub request: Option<Price>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub image: Option<String>,
-    // These fields appear to be consistently present in the API response (e.g., as "0")
+    pub image: Option<Price>,
+    // These fields appear to be consistently present in API response (e.g., as "0")
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub web_search: Option<String>,
+    pub web_search: Option<Price>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub internal_reasoning: Option<String>,
+    pub internal_reasoning: Option<Price>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub input_cache_read: Option<String>,
+    pub input_cache_read: Option<Price>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub input_cache_write: Option<String>,
+    pub input_cache_write: Option<Price>,
 }
 
 impl PricingInfo {
-    /// Validates that all pricing strings represent valid non-negative numbers
-    pub fn validate(&self) -> Result<(), String> {
-        if self.prompt.parse::<f64>().is_err() {
-            return Err("Invalid prompt price format".to_string());
-        }
-        if self.completion.parse::<f64>().is_err() {
-            return Err("Invalid completion price format".to_string());
-        }
-        if let Some(ref request) = self.request {
-            if request.parse::<f64>().is_err() {
-                return Err("Invalid request price format".to_string());
-            }
-        }
-        if let Some(ref image) = self.image {
-            if image.parse::<f64>().is_err() {
-                return Err("Invalid image price format".to_string());
-            }
-        }
-        if let Some(ref web_search) = self.web_search {
-            if web_search.parse::<f64>().is_err() {
-                return Err("Invalid web search price format".to_string());
-            }
-        }
-        if let Some(ref internal_reasoning) = self.internal_reasoning {
-            if internal_reasoning.parse::<f64>().is_err() {
-                return Err("Invalid internal reasoning price format".to_string());
-            }
-        }
-        if let Some(ref input_cache_read) = self.input_cache_read {
-            if input_cache_read.parse::<f64>().is_err() {
-                return Err("Invalid input cache read price format".to_string());
-            }
-        }
-        if let Some(ref input_cache_write) = self.input_cache_write {
-            if input_cache_write.parse::<f64>().is_err() {
-                return Err("Invalid input cache write price format".to_string());
-            }
-        }
-        Ok(())
+    /// Gets the prompt price as f64
+    pub fn prompt_price(&self) -> f64 {
+        self.prompt.as_f64()
     }
 
-    /// Gets the prompt price as f64, returns None if invalid
-    pub fn prompt_price(&self) -> Option<f64> {
-        self.prompt.parse().ok()
-    }
-
-    /// Gets the completion price as f64, returns None if invalid
-    pub fn completion_price(&self) -> Option<f64> {
-        self.completion.parse().ok()
+    /// Gets the completion price as f64
+    pub fn completion_price(&self) -> f64 {
+        self.completion.as_f64()
     }
 }
 
@@ -113,7 +74,7 @@ pub struct TopProviderInfo {
 /// Information about a specific model, updated to match the API response.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelInfo {
-    pub id: String,
+    pub id: ModelId,
     pub name: String,
     pub description: Option<String>,
     pub context_length: u32, // Top-level context_length for the model entry
@@ -200,17 +161,33 @@ mod tests {
 
         let model_info = model_info.unwrap();
 
-        assert_eq!(model_info.id, "moonshotai/kimi-dev-72b:free");
+        assert_eq!(model_info.id, "moonshotai/kimi-dev-72b:free".into());
         assert_eq!(model_info.name, "Kimi Dev 72b (free)");
         assert!(model_info.description.is_some()); // Check it's present
         assert_eq!(model_info.context_length, 131072);
         assert_eq!(model_info.architecture.modality, "text->text");
         assert_eq!(model_info.architecture.input_modalities, vec!["text"]);
-        assert_eq!(model_info.pricing.prompt, "0");
-        assert_eq!(model_info.pricing.request.as_deref(), Some("0"));
-        assert_eq!(model_info.pricing.image.as_deref(), Some("0"));
-        assert_eq!(model_info.pricing.web_search.as_deref(), Some("0"));
-        assert_eq!(model_info.pricing.internal_reasoning.as_deref(), Some("0"));
+        assert_eq!(model_info.pricing.prompt.as_f64(), 0.0);
+        assert_eq!(
+            model_info.pricing.request.as_ref().map(|p| p.as_f64()),
+            Some(0.0)
+        );
+        assert_eq!(
+            model_info.pricing.image.as_ref().map(|p| p.as_f64()),
+            Some(0.0)
+        );
+        assert_eq!(
+            model_info.pricing.web_search.as_ref().map(|p| p.as_f64()),
+            Some(0.0)
+        );
+        assert_eq!(
+            model_info
+                .pricing
+                .internal_reasoning
+                .as_ref()
+                .map(|p| p.as_f64()),
+            Some(0.0)
+        );
         assert!(!model_info.top_provider.is_moderated);
         assert!(model_info.per_request_limits.is_none());
         assert_eq!(
@@ -278,7 +255,7 @@ mod tests {
         );
         let models_response = models_response.unwrap();
         assert_eq!(models_response.data.len(), 1);
-        assert_eq!(models_response.data[0].id, "openai/gpt-4o");
+        assert_eq!(models_response.data[0].id, "openai/gpt-4o".into());
     }
 
     #[test]
@@ -332,66 +309,49 @@ mod tests {
     fn test_pricing_info_validation() {
         // Test valid pricing
         let valid_pricing = PricingInfo {
-            prompt: "0.001".to_string(),
-            completion: "0.002".to_string(),
-            request: Some("0.0001".to_string()),
-            image: Some("0.01".to_string()),
-            web_search: Some("0".to_string()),
-            internal_reasoning: Some("0.005".to_string()),
-            input_cache_read: Some("0.0005".to_string()),
-            input_cache_write: Some("0.001".to_string()),
+            prompt: Price::new(0.001).unwrap(),
+            completion: Price::new(0.002).unwrap(),
+            request: Some(Price::new(0.003).unwrap()),
+            image: Some(Price::new(0.01).unwrap()),
+            web_search: Some(Price::new(0.0).unwrap()),
+            internal_reasoning: Some(Price::new(0.005).unwrap()),
+            input_cache_read: Some(Price::new(0.0005).unwrap()),
+            input_cache_write: Some(Price::new(0.001).unwrap()),
         };
 
-        assert!(valid_pricing.validate().is_ok());
-        assert_eq!(valid_pricing.prompt_price(), Some(0.001));
-        assert_eq!(valid_pricing.completion_price(), Some(0.002));
-
-        // Test invalid pricing
-        let invalid_pricing = PricingInfo {
-            prompt: "invalid".to_string(),
-            completion: "0.002".to_string(),
-            request: None,
-            image: None,
-            web_search: None,
-            internal_reasoning: None,
-            input_cache_read: None,
-            input_cache_write: None,
-        };
-
-        assert!(invalid_pricing.validate().is_err());
-        assert_eq!(invalid_pricing.prompt_price(), None);
-        assert_eq!(invalid_pricing.completion_price(), Some(0.002));
+        assert_eq!(valid_pricing.prompt_price(), 0.001);
+        assert_eq!(valid_pricing.completion_price(), 0.002);
 
         // Test negative pricing (should parse but might be invalid business logic)
-        let negative_pricing = PricingInfo {
-            prompt: "-0.001".to_string(),
-            completion: "0.002".to_string(),
-            request: None,
-            image: None,
-            web_search: None,
-            internal_reasoning: None,
-            input_cache_read: None,
-            input_cache_write: None,
+        // Test positive pricing (negative prices are rejected by Price::new)
+        let positive_pricing = PricingInfo {
+            prompt: Price::new(0.001).unwrap(),
+            completion: Price::new(0.002).unwrap(),
+            request: Some(Price::new(0.003).unwrap()),
+            image: Some(Price::new(0.01).unwrap()),
+            web_search: Some(Price::new(0.0).unwrap()),
+            internal_reasoning: Some(Price::new(0.005).unwrap()),
+            input_cache_read: Some(Price::new(0.001).unwrap()),
+            input_cache_write: Some(Price::new(0.002).unwrap()),
         };
 
-        assert!(negative_pricing.validate().is_ok()); // Negative numbers are valid f64
-        assert_eq!(negative_pricing.prompt_price(), Some(-0.001));
+        assert_eq!(positive_pricing.prompt_price(), 0.001);
+        assert_eq!(positive_pricing.completion_price(), 0.002);
 
         // Test zero pricing
         let zero_pricing = PricingInfo {
-            prompt: "0".to_string(),
-            completion: "0".to_string(),
-            request: Some("0".to_string()),
-            image: Some("0".to_string()),
-            web_search: Some("0".to_string()),
-            internal_reasoning: Some("0".to_string()),
-            input_cache_read: Some("0".to_string()),
-            input_cache_write: Some("0".to_string()),
+            prompt: Price::new(0.0).unwrap(),
+            completion: Price::new(0.0).unwrap(),
+            request: Some(Price::new(0.0).unwrap()),
+            image: Some(Price::new(0.0).unwrap()),
+            web_search: Some(Price::new(0.0).unwrap()),
+            internal_reasoning: Some(Price::new(0.0).unwrap()),
+            input_cache_read: Some(Price::new(0.0).unwrap()),
+            input_cache_write: Some(Price::new(0.0).unwrap()),
         };
 
-        assert!(zero_pricing.validate().is_ok());
-        assert_eq!(zero_pricing.prompt_price(), Some(0.0));
-        assert_eq!(zero_pricing.completion_price(), Some(0.0));
+        assert_eq!(zero_pricing.prompt_price(), 0.0);
+        assert_eq!(zero_pricing.completion_price(), 0.0);
     }
 
     #[test]
@@ -449,7 +409,7 @@ mod tests {
         assert!(model_info.is_ok());
 
         let model = model_info.unwrap();
-        assert_eq!(model.id, "test/minimal");
+        assert_eq!(model.id, "test/minimal".into());
         assert_eq!(model.name, "Minimal Model");
         assert!(model.description.is_none());
         assert!(model.canonical_slug.is_none());
@@ -506,6 +466,7 @@ mod tests {
         assert!(model.hugging_face_id.is_some());
         assert!(model.per_request_limits.is_some());
         assert!(model.supported_parameters.is_some());
-        assert!(model.pricing.validate().is_ok());
+        // Pricing is validated at construction time via Price::new
+        assert!(model.pricing.prompt_price() >= 0.0);
     }
 }

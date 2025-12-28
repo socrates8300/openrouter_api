@@ -1,7 +1,7 @@
 use serde::Serialize;
 use std::collections::HashMap;
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct ProviderPreferences {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub order: Option<Vec<String>>,

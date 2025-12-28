@@ -4,8 +4,7 @@
 mod tests {
     use crate::client::{OpenRouterClient, RetryConfig, Unconfigured};
     #[allow(unused_imports)]
-    use crate::models::chat::{ChatMessage, ChatRole};
-    #[allow(unused_imports)]
+    use crate::models::chat::ChatMessage;
     use crate::models::provider_preferences::{
         DataCollection, ProviderPreferences, ProviderSort, Quantization,
     };
@@ -13,9 +12,12 @@ mod tests {
     use crate::models::structured::{JsonSchemaConfig, JsonSchemaDefinition};
     #[allow(unused_imports)]
     use crate::models::tool::{FunctionCall, FunctionDescription, Tool, ToolCall};
+    use crate::types::chat::ChatRole;
     use crate::types::chat::{
         ChatCompletionRequest, ChatCompletionResponse, Message, MessageContent,
     };
+    use crate::types::ids::{ActivityId, GenerationId};
+    use crate::types::status::{CancellationStatus, StreamingStatus};
     use serde_json::{json, Value};
     use url::Url;
 
@@ -39,7 +41,10 @@ mod tests {
         // Create a basic chat completion request.
         let _request = ChatCompletionRequest {
             model: "openai/gpt-4o".to_string(),
-            messages: vec![Message::text("user", "What is a phantom type in Rust?")],
+            messages: vec![Message::text(
+                ChatRole::User,
+                "What is a phantom type in Rust?",
+            )],
             stream: None,
             response_format: None,
             tools: None,
@@ -94,7 +99,7 @@ mod tests {
         "#;
         let response = deserialize_chat_response(simulated_response_json);
         assert!(!response.choices.is_empty());
-        assert_eq!(response.choices[0].message.role, "assistant");
+        assert_eq!(response.choices[0].message.role, ChatRole::Assistant);
 
         Ok(())
     }
@@ -186,7 +191,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_invalid_tool_call_response() -> Result<(), Box<dyn std::error::Error>> {
-        // Simulate an invalid ChatCompletionResponse where the tool call kind is not "function".
+        // Simulate an invalid ChatCompletionResponse where` tool call kind is not "function".
+        // With the introduction of ToolType enum, invalid types are rejected at deserialization time.
         let simulated_response_json = r#"
         {
             "id": "gen-invalid-tool",
@@ -211,39 +217,11 @@ mod tests {
             "object": "chat.completion"
         }
         "#;
-        let response = deserialize_chat_response(simulated_response_json);
 
-        // Create a dummy client to perform validation.
-        let client = OpenRouterClient::<crate::client::Ready> {
-            config: crate::client::ClientConfig {
-                api_key: Some(
-                    crate::client::SecureApiKey::new("sk-1234567890abcdef1234567890abcdef")
-                        .unwrap(),
-                ),
-                base_url: Url::parse("https://dummy/").unwrap(),
-                http_referer: None,
-                site_title: None,
-                user_id: None, // Add this field
-                timeout: std::time::Duration::from_secs(30),
-                retry_config: RetryConfig::default(), // Add this field
-                max_response_bytes: 10 * 1024 * 1024,
-            },
-            http_client: None,
-            _state: std::marker::PhantomData,
-            router_config: None, // Add this field
-        };
-
-        // Validate the tool calls – should return a SchemaValidationError.
-        let validation_result = client.validate_tool_calls(&response);
-        assert!(validation_result.is_err());
-        if let Err(err) = validation_result {
-            match err {
-                crate::error::Error::SchemaValidationError(msg) => {
-                    assert!(msg.contains("Invalid tool call kind"));
-                }
-                _ => panic!("Expected a SchemaValidationError"),
-            }
-        }
+        // Deserialization should fail because "invalid" is not a valid ToolType variant.
+        let deserialization_result: Result<ChatCompletionResponse, serde_json::Error> =
+            serde_json::from_str(simulated_response_json);
+        assert!(deserialization_result.is_err());
 
         Ok(())
     }
@@ -338,7 +316,10 @@ mod tests {
         // Create a chat completion request with provider preferences
         let request = ChatCompletionRequest {
             model: "openai/gpt-4o".to_string(),
-            messages: vec![Message::text("user", "Hello with provider preferences!")],
+            messages: vec![Message::text(
+                ChatRole::User,
+                "Hello with provider preferences!",
+            )],
             stream: None,
             response_format: None,
             tools: None,
@@ -606,7 +587,7 @@ mod tests {
 
         // Test generation data methods
         let generation_data = GenerationData {
-            id: "gen-test".to_string(),
+            id: GenerationId::new("gen-test"),
             upstream_id: None,
             total_cost: 0.01,
             cache_discount: None,
@@ -614,8 +595,8 @@ mod tests {
             created_at: "2024-01-15T10:30:00Z".to_string(),
             model: "openai/gpt-3.5-turbo".to_string(),
             app_id: None,
-            streamed: Some(false),
-            cancelled: Some(false),
+            streamed: StreamingStatus::NotStarted,
+            cancelled: CancellationStatus::NotCancelled,
             provider_name: Some("OpenAI".to_string()),
             latency: Some(800),
             moderation_latency: None,
@@ -649,7 +630,7 @@ mod tests {
 
         // Test edge cases
         let minimal_generation = GenerationData {
-            id: "gen-minimal".to_string(),
+            id: GenerationId::new("gen-minimal"),
             upstream_id: None,
             total_cost: 0.005,
             cache_discount: None,
@@ -657,8 +638,8 @@ mod tests {
             created_at: "2024-01-15T10:30:00Z".to_string(),
             model: "openai/gpt-3.5-turbo".to_string(),
             app_id: None,
-            streamed: None,
-            cancelled: None,
+            streamed: StreamingStatus::default(),
+            cancelled: CancellationStatus::default(),
             provider_name: None,
             latency: None,
             moderation_latency: None,
@@ -719,7 +700,7 @@ mod tests {
 
         let original = GenerationResponse {
             data: GenerationData {
-                id: "gen-roundtrip".to_string(),
+                id: GenerationId::new("gen-roundtrip"),
                 upstream_id: Some("upstream-456".to_string()),
                 total_cost: 0.015,
                 cache_discount: Some(0.002),
@@ -727,8 +708,8 @@ mod tests {
                 created_at: "2024-01-15T11:00:00Z".to_string(),
                 model: "anthropic/claude-3-opus".to_string(),
                 app_id: Some(67890),
-                streamed: Some(true),
-                cancelled: Some(false),
+                streamed: StreamingStatus::Complete,
+                cancelled: CancellationStatus::NotCancelled,
                 provider_name: Some("Anthropic".to_string()),
                 latency: Some(2000),
                 moderation_latency: Some(150),
@@ -784,7 +765,7 @@ mod tests {
 
         for (total_cost, cache_discount, expected_effective) in scenarios {
             let data = GenerationData {
-                id: "gen-cost-test".to_string(),
+                id: GenerationId::new("gen-cost-test"),
                 upstream_id: None,
                 total_cost,
                 cache_discount,
@@ -792,8 +773,8 @@ mod tests {
                 created_at: "2024-01-15T10:30:00Z".to_string(),
                 model: "openai/gpt-4".to_string(),
                 app_id: None,
-                streamed: None,
-                cancelled: None,
+                streamed: StreamingStatus::default(),
+                cancelled: CancellationStatus::default(),
                 provider_name: None,
                 latency: None,
                 moderation_latency: None,
@@ -855,7 +836,7 @@ mod tests {
 
         let original = ActivityResponse {
             data: vec![ActivityData {
-                id: "test-123".to_string(),
+                id: ActivityId::new("test-123"),
                 created_at: Utc::now(),
                 model: "test-model".to_string(),
                 total_cost: Some(0.001),
@@ -863,8 +844,8 @@ mod tests {
                 tokens_completion: Some(20),
                 total_tokens: Some(30),
                 provider: Some("test-provider".to_string()),
-                streamed: Some(true),
-                cancelled: Some(false),
+                streamed: StreamingStatus::Complete,
+                cancelled: CancellationStatus::NotCancelled,
                 web_search: Some(true),
                 media: Some(false),
                 reasoning: Some(false),
@@ -930,7 +911,7 @@ mod tests {
         use chrono::Utc;
 
         let activity = ActivityData {
-            id: "test-123".to_string(),
+            id: ActivityId::new("test-123"),
             created_at: Utc::now(),
             model: "test-model".to_string(),
             total_cost: Some(0.001),
@@ -938,8 +919,8 @@ mod tests {
             tokens_completion: Some(20),
             total_tokens: Some(30),
             provider: Some("test-provider".to_string()),
-            streamed: Some(true),
-            cancelled: Some(false),
+            streamed: StreamingStatus::Complete,
+            cancelled: CancellationStatus::NotCancelled,
             web_search: Some(true),
             media: Some(false),
             reasoning: Some(false),
@@ -980,13 +961,13 @@ mod tests {
 
         let activities = vec![
             ActivityData {
-                id: "test-1".to_string(),
+                id: ActivityId::new("test-1"),
                 created_at: Utc::now(),
                 model: "model-a".to_string(),
                 total_cost: Some(0.001),
                 total_tokens: Some(100),
-                cancelled: Some(false),
-                streamed: Some(true),
+                cancelled: CancellationStatus::NotCancelled,
+                streamed: StreamingStatus::Complete,
                 web_search: Some(true),
                 media: Some(false),
                 reasoning: Some(false),
@@ -995,13 +976,13 @@ mod tests {
                 ..Default::default()
             },
             ActivityData {
-                id: "test-2".to_string(),
+                id: ActivityId::new("test-2"),
                 created_at: Utc::now(),
                 model: "model-b".to_string(),
                 total_cost: Some(0.002),
                 total_tokens: Some(200),
-                cancelled: Some(true),
-                streamed: Some(false),
+                cancelled: CancellationStatus::Completed,
+                streamed: StreamingStatus::NotStarted,
                 web_search: Some(false),
                 media: Some(true),
                 reasoning: Some(true),
@@ -1289,7 +1270,7 @@ mod tests {
 
         // Test Message default
         let default_message = Message::default();
-        assert_eq!(default_message.role, "user");
+        assert_eq!(default_message.role, ChatRole::User);
         assert_eq!(
             default_message.content,
             MessageContent::Text("".to_string())
@@ -1336,7 +1317,7 @@ mod tests {
         let request_with_default = ChatCompletionRequest {
             model: model_name.to_string(),
             messages: vec![Message {
-                role: "user".to_string(),
+                role: ChatRole::User,
                 content: MessageContent::Text(text.to_string()),
                 ..Default::default()
             }],
@@ -1345,7 +1326,7 @@ mod tests {
 
         assert_eq!(request_with_default.model, model_name);
         assert_eq!(request_with_default.messages.len(), 1);
-        assert_eq!(request_with_default.messages[0].role, "user");
+        assert_eq!(request_with_default.messages[0].role, ChatRole::User);
         assert_eq!(
             request_with_default.messages[0].content,
             MessageContent::Text(text.to_string())

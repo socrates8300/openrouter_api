@@ -103,6 +103,7 @@ impl<T: Serialize> RequestBuilder<T> {
     /// - `config`: A [JsonSchemaConfig] defining the expected structure of the response.
     /// - `validate`: Whether to perform JSON Schema validation against the response.
     /// - `fallback`: Whether to fallback to an unstructured response if validation fails.
+    #[must_use]
     pub fn with_structured_output(
         mut self,
         config: JsonSchemaConfig,
@@ -123,6 +124,7 @@ impl<T: Serialize> RequestBuilder<T> {
     /// # Parameters
     ///
     /// - `tools`: A vector of [Tool] objects representing callable functions.
+    #[must_use]
     pub fn with_tools(mut self, tools: Vec<Tool>) -> Self {
         self.tools = Some(tools);
         self
@@ -132,8 +134,9 @@ impl<T: Serialize> RequestBuilder<T> {
     ///
     /// # Returns
     ///
-    /// A [RequestPayload] that includes the model, messages, structured output settings,
+    /// A [RequestPayload] that includes to model, messages, structured output settings,
     /// tool calling instructions, and extra parameters.
+    #[must_use]
     pub fn build(self) -> RequestPayload<T> {
         RequestPayload {
             model: self.model,
@@ -150,7 +153,7 @@ impl RequestBuilder<Value> {
     /// Adds provider preferences into the request payload.
     ///
     /// This method accepts a strongly‑typed `ProviderPreferences` instance and serializes it
-    /// into the JSON payload under the "provider" key. It validates the preferences and returns
+    /// into the JSON payload under the "provider" key. It validates to preferences and returns
     /// an error if validation fails.
     ///
     /// # Returns
@@ -179,6 +182,7 @@ impl RequestBuilder<Value> {
     ///     .with_provider_preferences(prefs)
     ///     .expect("Valid provider preferences");
     /// ```
+    #[must_use = "returns the updated builder that should be used for constructing the request"]
     pub fn with_provider_preferences(
         mut self,
         preferences: crate::models::provider_preferences::ProviderPreferences,

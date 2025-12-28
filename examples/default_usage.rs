@@ -3,14 +3,14 @@
 //! This example shows how the Default trait reduces boilerplate when creating
 //! chat completion requests and messages.
 
-use openrouter_api::types::chat::{ChatCompletionRequest, Message, MessageContent};
+use openrouter_api::types::chat::{ChatCompletionRequest, ChatRole, Message, MessageContent};
 
 fn main() {
     // Before Default implementation - verbose:
     let _verbose_request = ChatCompletionRequest {
         model: "openai/gpt-4o".to_string(),
         messages: vec![Message {
-            role: "user".to_string(),
+            role: ChatRole::User,
             content: MessageContent::Text("Hello, world!".to_string()),
             name: None,
             tool_calls: None,
@@ -49,7 +49,7 @@ fn main() {
     let concise_request = ChatCompletionRequest {
         model: "openai/gpt-4o".to_string(),
         messages: vec![Message {
-            role: "user".to_string(),
+            role: ChatRole::User,
             content: MessageContent::Text("Hello, world!".to_string()),
             ..Default::default()
         }],
@@ -63,7 +63,7 @@ fn main() {
 
     // You can also create a default message and then modify it:
     let default_message = Message {
-        role: "system".to_string(),
+        role: ChatRole::System,
         content: MessageContent::Text("You are a helpful assistant.".to_string()),
         ..Default::default()
     };

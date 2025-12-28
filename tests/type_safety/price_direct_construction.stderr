@@ -1,0 +1,19 @@
+error[E0423]: cannot initialize a tuple struct which contains private fields
+  --> tests/type_safety/price_direct_construction.rs:14:25
+   |
+14 |     let invalid_price = Price(f64::NAN);
+   |                         ^^^^^
+   |
+note: constructor is not visible here due to private fields
+  --> src/types/ids.rs
+   |
+   | pub struct Price(f64);
+   |                  ^^^ private field
+help: you might have meant to use the `new_unchecked` associated function
+   |
+14 |     let invalid_price = Price::new_unchecked(f64::NAN);
+   |                              +++++++++++++++
+help: consider importing this unit variant instead
+   |
+ 8 + use openrouter_api::models::provider_preferences::ProviderSort::Price;
+   |

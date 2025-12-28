@@ -2,21 +2,22 @@ use openrouter_api::client::{
     OpenRouterClient, Unconfigured, ROUTING_FLOOR, ROUTING_NITRO, ROUTING_ONLINE,
 };
 use openrouter_api::types::chat::{
-    AudioContent, AudioUrl, ChatCompletionRequest, ContentPart, FileContent, FileUrl, Message,
+    AudioContent, AudioUrl, ChatCompletionRequest, ChatRole, ContentPart, ContentType, FileContent,
+    FileUrl, Message,
 };
 use openrouter_api::types::provider::ProviderPreferences;
 
 #[test]
 fn test_multimodal_serialization() {
     let audio_part = ContentPart::Audio(AudioContent {
-        content_type: "audio_url".to_string(),
+        content_type: ContentType::AudioUrl,
         audio_url: AudioUrl {
             url: "https://example.com/audio.mp3".to_string(),
         },
     });
 
     let file_part = ContentPart::File(FileContent {
-        content_type: "file_url".to_string(),
+        content_type: ContentType::FileUrl,
         file_url: FileUrl {
             url: "https://example.com/document.pdf".to_string(),
         },
@@ -66,7 +67,7 @@ fn test_policy_controls() {
 fn test_web_search_plugin() {
     let request = ChatCompletionRequest {
         model: "openai/gpt-4o".to_string(),
-        messages: vec![Message::text("user", "Search for Rust news")],
+        messages: vec![Message::text(ChatRole::User, "Search for Rust news")],
         plugins: Some(vec!["web".to_string()]),
         ..Default::default()
     };

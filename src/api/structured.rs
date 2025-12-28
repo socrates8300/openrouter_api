@@ -3,6 +3,7 @@
 use crate::error::{Error, Result};
 use crate::models::structured::{JsonSchemaConfig, JsonSchemaDefinition};
 use crate::types::chat::{ChatCompletionRequest, ChatCompletionResponse, Message, MessageContent};
+use crate::types::status::StreamingStatus;
 use crate::utils::{
     retry::execute_with_retry_builder, retry::handle_response_json,
     retry::operations::STRUCTURED_GENERATE,
@@ -19,6 +20,7 @@ pub struct StructuredApi {
 
 impl StructuredApi {
     /// Creates a new StructuredApi with the given reqwest client and configuration.
+    #[must_use = "returns an API client that should be used for API calls"]
     pub fn new(client: Client, config: &crate::client::ClientConfig) -> Result<Self> {
         Ok(Self {
             client,
@@ -41,7 +43,7 @@ impl StructuredApi {
         let request = ChatCompletionRequest {
             model: model.to_string(),
             messages,
-            stream: Some(false),
+            stream: Some(StreamingStatus::NotStarted),
             response_format: Some(crate::api::request::ResponseFormatConfig {
                 format_type: "json_schema".to_string(),
                 json_schema: JsonSchemaConfig {
@@ -104,15 +106,12 @@ impl StructuredApi {
             },
         });
 
-        // Use pre-built headers from config
-        let headers = self.config.headers.clone();
-
         // Execute request with retry logic
         let response =
             execute_with_retry_builder(&self.config.retry_config, STRUCTURED_GENERATE, || {
                 self.client
                     .post(url.clone())
-                    .headers(headers.clone())
+                    .headers((*self.config.headers).clone())
                     .json(&body)
             })
             .await?;
@@ -165,14 +164,15 @@ impl StructuredApi {
 
     /// Simple schema validation for required fields and top-level type checking
     fn basic_schema_validation(&self, schema: &Value, data: &Value) -> Result<()> {
-        // Check if schema is an object
-        if !schema.is_object() {
-            return Err(Error::SchemaValidationError(
-                "Schema must be an object".into(),
-            ));
-        }
-
-        let schema_obj = schema.as_object().unwrap();
+        // Check if schema is an object and extract it in one operation
+        let schema_obj = match schema.as_object() {
+            Some(obj) => obj,
+            None => {
+                return Err(Error::SchemaValidationError(
+                    "Schema must be an object".into(),
+                ));
+            }
+        };
 
         // Check type
         if let Some(type_val) = schema_obj.get("type") {
@@ -239,5 +239,245 @@ impl StructuredApi {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::error::Error;
+    use serde_json::json;
+
+    #[test]
+    fn test_basic_schema_validation_non_object_schema() {
+        let schema = json!("not an object");
+        let data = json!({"key": "value"});
+        let api = StructuredApi::new(
+            reqwest::Client::new(),
+            &crate::client::ClientConfig::default(),
+        )
+        .unwrap();
+
+        let result = api.basic_schema_validation(&schema, &data);
+        assert!(result.is_err());
+        match result {
+            Err(Error::SchemaValidationError(msg)) => {
+                assert_eq!(msg, "Schema must be an object");
+            }
+            _ => panic!("Expected SchemaValidationError"),
+        }
+    }
+
+    #[test]
+    fn test_basic_schema_validation_object_type_mismatch() {
+        let schema = json!({"type": "object"});
+        let data = json!("not an object");
+        let api = StructuredApi::new(
+            reqwest::Client::new(),
+            &crate::client::ClientConfig::default(),
+        )
+        .unwrap();
+
+        let result = api.basic_schema_validation(&schema, &data);
+        assert!(result.is_err());
+        match result {
+            Err(Error::SchemaValidationError(msg)) => {
+                assert!(msg.contains("Expected an object"));
+            }
+            _ => panic!("Expected SchemaValidationError"),
+        }
+    }
+
+    #[test]
+    fn test_basic_schema_validation_array_type_mismatch() {
+        let schema = json!({"type": "array"});
+        let data = json!("not an array");
+        let api = StructuredApi::new(
+            reqwest::Client::new(),
+            &crate::client::ClientConfig::default(),
+        )
+        .unwrap();
+
+        let result = api.basic_schema_validation(&schema, &data);
+        assert!(result.is_err());
+        match result {
+            Err(Error::SchemaValidationError(msg)) => {
+                assert!(msg.contains("Expected an array"));
+            }
+            _ => panic!("Expected SchemaValidationError"),
+        }
+    }
+
+    #[test]
+    fn test_basic_schema_validation_string_type_mismatch() {
+        let schema = json!({"type": "string"});
+        let data = json!(123);
+        let api = StructuredApi::new(
+            reqwest::Client::new(),
+            &crate::client::ClientConfig::default(),
+        )
+        .unwrap();
+
+        let result = api.basic_schema_validation(&schema, &data);
+        assert!(result.is_err());
+        match result {
+            Err(Error::SchemaValidationError(msg)) => {
+                assert!(msg.contains("Expected a string"));
+            }
+            _ => panic!("Expected SchemaValidationError"),
+        }
+    }
+
+    #[test]
+    fn test_basic_schema_validation_number_type_mismatch() {
+        let schema = json!({"type": "number"});
+        let data = json!("not a number");
+        let api = StructuredApi::new(
+            reqwest::Client::new(),
+            &crate::client::ClientConfig::default(),
+        )
+        .unwrap();
+
+        let result = api.basic_schema_validation(&schema, &data);
+        assert!(result.is_err());
+        match result {
+            Err(Error::SchemaValidationError(msg)) => {
+                assert!(msg.contains("Expected a number"));
+            }
+            _ => panic!("Expected SchemaValidationError"),
+        }
+    }
+
+    #[test]
+    fn test_basic_schema_validation_boolean_type_mismatch() {
+        let schema = json!({"type": "boolean"});
+        let data = json!("not a boolean");
+        let api = StructuredApi::new(
+            reqwest::Client::new(),
+            &crate::client::ClientConfig::default(),
+        )
+        .unwrap();
+
+        let result = api.basic_schema_validation(&schema, &data);
+        assert!(result.is_err());
+        match result {
+            Err(Error::SchemaValidationError(msg)) => {
+                assert!(msg.contains("Expected a boolean"));
+            }
+            _ => panic!("Expected SchemaValidationError"),
+        }
+    }
+
+    #[test]
+    fn test_basic_schema_validation_missing_required_field() {
+        let schema = json!({
+            "type": "object",
+            "required": ["title", "author"]
+        });
+        let data = json!({
+            "title": "Test"
+        });
+        let api = StructuredApi::new(
+            reqwest::Client::new(),
+            &crate::client::ClientConfig::default(),
+        )
+        .unwrap();
+
+        let result = api.basic_schema_validation(&schema, &data);
+        assert!(result.is_err());
+        match result {
+            Err(Error::SchemaValidationError(msg)) => {
+                assert!(msg.contains("Required field 'author' is missing"));
+            }
+            _ => panic!("Expected SchemaValidationError"),
+        }
+    }
+
+    #[test]
+    fn test_basic_schema_validation_valid_object() {
+        let schema = json!({
+            "type": "object",
+            "required": ["title", "author"]
+        });
+        let data = json!({
+            "title": "Test",
+            "author": "Author"
+        });
+        let api = StructuredApi::new(
+            reqwest::Client::new(),
+            &crate::client::ClientConfig::default(),
+        )
+        .unwrap();
+
+        let result = api.basic_schema_validation(&schema, &data);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_basic_schema_validation_valid_array() {
+        let schema = json!({"type": "array"});
+        let data = json!([1, 2, 3]);
+        let api = StructuredApi::new(
+            reqwest::Client::new(),
+            &crate::client::ClientConfig::default(),
+        )
+        .unwrap();
+
+        let result = api.basic_schema_validation(&schema, &data);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_basic_schema_validation_unknown_type_skips() {
+        let schema = json!({"type": "unknown_type"});
+        let data = json!("any value");
+        let api = StructuredApi::new(
+            reqwest::Client::new(),
+            &crate::client::ClientConfig::default(),
+        )
+        .unwrap();
+
+        // Unknown types should be skipped (not validated)
+        let result = api.basic_schema_validation(&schema, &data);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_basic_schema_validation_no_type_field_skips() {
+        let schema = json!({"required": ["field1"]});
+        let data = json!({"field1": "value"});
+        let api = StructuredApi::new(
+            reqwest::Client::new(),
+            &crate::client::ClientConfig::default(),
+        )
+        .unwrap();
+
+        // No type field means no type validation, but required fields still checked
+        let result = api.basic_schema_validation(&schema, &data);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_basic_schema_validation_non_object_data_skips_required() {
+        let schema = json!({
+            "type": "object",
+            "required": ["field1"]
+        });
+        let data = json!("not an object");
+        let api = StructuredApi::new(
+            reqwest::Client::new(),
+            &crate::client::ClientConfig::default(),
+        )
+        .unwrap();
+
+        // Non-object data should skip required field check
+        let result = api.basic_schema_validation(&schema, &data);
+        assert!(result.is_err()); // But should fail type check
+        match result {
+            Err(Error::SchemaValidationError(msg)) => {
+                assert!(msg.contains("Expected an object"));
+            }
+            _ => panic!("Expected SchemaValidationError"),
+        }
     }
 }

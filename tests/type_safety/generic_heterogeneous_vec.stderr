@@ -1,0 +1,5 @@
+error[E0308]: mismatched types
+  --> tests/type_safety/generic_heterogeneous_vec.rs:14:9
+   |
+14 |         GenerationId::new("gen-1"), // ERROR: type mismatch with previous element
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `ModelId`, found `GenerationId`

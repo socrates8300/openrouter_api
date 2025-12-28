@@ -1,0 +1,7 @@
+error[E0277]: the trait bound `ChatRole: From<&str>` is not satisfied
+  --> tests/type_safety/enum_invalid_construction.rs:10:34
+   |
+10 |     let role: ChatRole = "admin".into();
+   |                                  ^^^^ the trait `From<&str>` is not implemented for `ChatRole`
+   |
+   = note: required for `&str` to implement `Into<ChatRole>`

@@ -1,5 +1,4 @@
 //! Type definitions for the Model Context Protocol.
-#![allow(unused)]
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 

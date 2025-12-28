@@ -11,7 +11,8 @@ pub struct CreditsApi {
 }
 
 impl CreditsApi {
-    /// Creates a new CreditsApi with the given reqwest client and configuration.
+    /// Creates a new CreditsApi with given reqwest client and configuration.
+    #[must_use = "returns an API client that should be used for API calls"]
     pub fn new(client: Client, config: &crate::client::ClientConfig) -> Result<Self> {
         Ok(Self {
             client,
@@ -71,12 +72,11 @@ impl CreditsApi {
                 metadata: None,
             })?;
 
-        // Use pre-built headers from config
-        let headers = self.config.headers.clone();
-
         // Execute request with retry logic
         let response = execute_with_retry_builder(&self.config.retry_config, GET_BALANCE, || {
-            self.client.get(url.clone()).headers(headers.clone())
+            self.client
+                .get(url.clone())
+                .headers((*self.config.headers).clone())
         })
         .await?;
 
@@ -111,6 +111,7 @@ mod tests {
 
         // Verify that the API config was created successfully
         // The API key should NOT be stored in the API config for security reasons
+        // headers is now Arc<HeaderMap>, but Arc implements Deref so methods work the same
         assert!(!credits_api.config.headers.is_empty());
         assert!(credits_api.config.headers.contains_key("authorization"));
     }

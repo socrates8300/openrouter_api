@@ -13,16 +13,19 @@ pub struct CreditsData {
 
 impl CreditsData {
     /// Calculate remaining credits.
+    #[must_use]
     pub fn remaining(&self) -> f64 {
         self.total_credits - self.total_usage
     }
 
     /// Check if user has credits available.
+    #[must_use]
     pub fn has_credits(&self) -> bool {
         self.remaining() > 0.0
     }
 
     /// Get usage percentage (0.0 to 1.0).
+    #[must_use]
     pub fn usage_percentage(&self) -> f64 {
         if self.total_credits == 0.0 {
             0.0
@@ -46,26 +49,31 @@ impl CreditsResponse {
     }
 
     /// Get total credits purchased.
+    #[must_use]
     pub fn total_credits(&self) -> f64 {
         self.data.total_credits
     }
 
     /// Get total credits used.
+    #[must_use]
     pub fn total_usage(&self) -> f64 {
         self.data.total_usage
     }
 
     /// Get remaining credits.
+    #[must_use]
     pub fn remaining_credits(&self) -> f64 {
         self.data.remaining()
     }
 
     /// Check if user has credits available.
+    #[must_use]
     pub fn has_credits(&self) -> bool {
         self.data.has_credits()
     }
 
     /// Get usage percentage (0.0 to 1.0).
+    #[must_use]
     pub fn usage_percentage(&self) -> f64 {
         self.data.usage_percentage()
     }

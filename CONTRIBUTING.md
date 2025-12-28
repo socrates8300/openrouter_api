@@ -136,6 +136,311 @@ return Err(Error::ApiError { message: raw_response, .. });
 - `utils/`: Shared utilities (auth, validation, security)
 - `error.rs`: Centralized error handling
 
+## Type Design Guidelines
+
+This library uses a strongly-typed system to prevent bugs and improve code safety. All new types must follow these principles.
+
+### Core Principles
+
+1. **Prefer Newtypes over Primitives**: Wrap strings and numbers to prevent mixing incompatible values
+2. **Enum over String**: Use enums for fixed sets of values (roles, types, states)
+3. **Transparent Serialization**: Serialize as plain values for API compatibility
+4. **Custom Deserialization**: Accept both formats when APIs vary (strings vs numbers)
+5. **Comprehensive Traits**: All newtypes should implement standard traits
+
+### Newtype Pattern
+
+Use newtypes for entity identifiers and validated primitives:
+
+```rust
+/// Strongly-typed identifier for entities.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct EntityId(String);
+
+impl EntityId {
+    pub fn new(id: impl Into<String>) -> Self {
+        Self(id.into())
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
+impl From<String> for EntityId { /* ... */ }
+impl From<&str> for EntityId { /* ... */ }
+impl AsRef<str> for EntityId { /* ... */ }
+impl fmt::Display for EntityId { /* ... */ }
+impl Into<String> for EntityId { /* ... */ }
+```
+
+**Required Traits:**
+- `Debug`: For logging and debugging
+- `Clone`: For passing values around
+- `PartialEq`, `Eq`: For comparisons and HashMap keys
+- `Hash`: For HashSet and HashMap usage
+- `Serialize`, `Deserialize`: For JSON API compatibility
+- `Display`: For formatting in logs and errors
+- `AsRef<str>` or `AsRef<T>`: For conversion helpers
+- `Into<String>` or `Into<T>`: For explicit conversions
+
+**Required Attributes:**
+- `#[serde(transparent)]`: Serialize as plain values, not wrapped objects
+
+### Enum over String
+
+Use enums instead of string validation:
+
+```rust
+// ✅ GOOD - compile-time validation
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum ChatRole {
+    User,
+    Assistant,
+    System,
+    Tool,
+}
+
+impl fmt::Display for ChatRole {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ChatRole::User => write!(f, "user"),
+            ChatRole::Assistant => write!(f, "assistant"),
+            ChatRole::System => write!(f, "system"),
+            ChatRole::Tool => write!(f, "tool"),
+        }
+    }
+}
+
+// ❌ BAD - runtime validation, easy to make typos
+pub fn parse_role(role: &str) -> Result<String> {
+    match role {
+        "user" | "assistant" | "system" | "tool" => Ok(role.to_string()),
+        _ => Err("Invalid role".into()),
+    }
+}
+```
+
+**When to use enums:**
+- Fixed, finite sets of values (roles, types, states)
+- Values used in match statements
+- Values that need serialization control (rename_all)
+
+### Validated Newtypes
+
+For values that need validation at creation:
+
+```rust
+/// Price with validation for non-negative values.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(transparent)]
+pub struct Price(f64);
+
+impl<'de> Deserialize<'de> for Price {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where D: serde::Deserializer<'de>
+    {
+        struct PriceVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for PriceVisitor {
+            type Value = Price;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a number or string representing a price")
+            }
+
+            fn visit_f64<E>(self, value: f64) -> Result<Self::Value, E> {
+                if value.is_finite() {
+                    Ok(Price(value))
+                } else {
+                    Err(serde::de::Error::custom("price must be finite"))
+                }
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<Self::Value, E> {
+                value.parse::<f64>()
+                    .map_err(|e| serde::de::Error::custom(e))
+                    .and_then(|v| {
+                        if v.is_finite() {
+                            Ok(Price(v))
+                        } else {
+                            Err(serde::de::Error::custom("price must be finite"))
+                        }
+                    })
+            }
+        }
+
+        deserializer.deserialize_any(PriceVisitor)
+    }
+}
+
+impl Price {
+    pub fn new(value: impl Into<f64>) -> Option<Self> {
+        let v = value.into();
+        if v.is_finite() {
+            Some(Self(v))
+        } else {
+            None
+        }
+    }
+
+    pub fn is_valid_business_logic(&self) -> bool {
+        self.0 >= 0.0
+    }
+}
+```
+
+**When to use validated newtypes:**
+- Numeric values with business logic constraints
+- Values that need validation at API boundary
+- Values where API may return special indicators (negative, null)
+
+### API Compatibility
+
+The OpenRouter API may return data in multiple formats. Handle both:
+
+```rust
+// API returns prices as strings: "0.001", "0", "-1" (special indicator)
+// But we want to use as numbers internally
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(transparent)]
+pub struct Price(f64);
+
+impl<'de> Deserialize<'de> for Price {
+    // Custom deserializer handles both:
+    // - Numbers: 0.001
+    // - Strings: "0.001", "-1"
+    // - Nulls: treat as default value
+}
+```
+
+### Type Safety Examples
+
+**Prevent mixing different IDs:**
+```rust
+// ✅ GOOD - compile-time safety
+let model_id: ModelId = "openai/gpt-4".into();
+let gen_id: GenerationId = "gen-123".into();
+
+// These won't compile:
+// let x: ModelId = gen_id;  // ❌ Type mismatch!
+// let y: GenerationId = model_id;  // ❌ Type mismatch!
+```
+
+**Prevent invalid states:**
+```rust
+// ✅ GOOD - enum makes invalid states unrepresentable
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum StreamingStatus {
+    NotStarted,
+    InProgress,
+    Complete,
+    Cancelled,
+}
+
+// ❌ BAD - many invalid combinations possible
+pub struct StreamingState {
+    is_streaming: bool,
+    is_complete: bool,
+    is_cancelled: bool,
+}
+```
+
+### Testing Requirements
+
+All newtypes must have comprehensive tests:
+
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_newtype_creation() {
+        let id = MyId::new("test-id");
+        assert_eq!(id.as_str(), "test-id");
+    }
+
+    #[test]
+    fn test_newtype_serialization() {
+        let id = MyId::new("test-id");
+        let json = serde_json::to_value(&id).unwrap();
+        assert_eq!(json, "test-id"); // Transparent, not {"id": "test-id"}
+    }
+
+    #[test]
+    fn test_newtype_roundtrip() {
+        let original = MyId::new("test-id");
+        let json = serde_json::to_string(&original).unwrap();
+        let deserialized: MyId = serde_json::from_str(&json).unwrap();
+        assert_eq!(original, deserialized);
+    }
+
+    #[test]
+    fn test_newtype_traits() {
+        let id = MyId::new("test-id");
+
+        // Clone
+        let _ = id.clone();
+
+        // PartialEq
+        assert_eq!(id, MyId::new("test-id"));
+
+        // Hash
+        let mut set = std::collections::HashSet::new();
+        set.insert(id);
+
+        // Display
+        format!("{}", id);
+
+        // AsRef
+        let s: &str = id.as_ref();
+        assert_eq!(s, "test-id");
+    }
+}
+```
+
+### Documentation Requirements
+
+All newtypes must document:
+1. Purpose and what it prevents
+2. API compatibility notes (e.g., "Accepts negative for API compatibility")
+3. Validation rules (what's valid vs invalid)
+4. When to use `new()` vs `new_unchecked()`
+5. Trait implementations provided
+
+```rust
+/// Strongly-typed identifier for AI models.
+///
+/// Prevents accidental mixing of model IDs with other entity IDs.
+/// The OpenRouter API uses string IDs, but this wrapper provides compile-time
+/// type safety.
+///
+/// # Examples
+///
+/// ```rust
+/// let model_id = ModelId::new("openai/gpt-4");
+/// ```
+///
+/// # API Compatibility
+///
+/// Serializes as a plain string for seamless API integration.
+/// 
+/// # Validation
+///
+/// - `new()` accepts any string (no validation)
+/// - `as_str()` returns the underlying value
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ModelId(String);
+```
+
 ## Testing Guidelines
 
 ### Writing Tests

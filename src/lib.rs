@@ -19,5 +19,7 @@ pub use mcp::client::MCPClient; // Re-export MCPClient
 pub use mcp::types as mcp_types; // Re-export MCP types
 
 // Ensure TLS features are mutually exclusive
-#[cfg(all(feature = "rustls", feature = "native-tls"))]
-compile_error!("rustls and native-tls features are mutually exclusive. Please choose one.");
+#[cfg(all(feature = "tls-rustls", feature = "tls-native-tls"))]
+compile_error!(
+    "TLS features tls-rustls and tls-native-tls are mutually exclusive. Please choose only one."
+);

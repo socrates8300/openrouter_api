@@ -2,6 +2,9 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use crate::types::ids::ActivityId;
+use crate::types::status::{CancellationStatus, StreamingStatus};
+
 /// Constants for analytics validation and defaults
 pub mod constants {
     /// Standard date format length (YYYY-MM-DD)
@@ -24,7 +27,7 @@ pub mod constants {
 }
 
 /// Sort order for activity queries
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SortOrder {
     Ascending,
     Descending,
@@ -40,7 +43,7 @@ impl SortOrder {
 }
 
 /// Sort field for activity queries
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SortField {
     CreatedAt,
     Cost,
@@ -63,7 +66,7 @@ impl SortField {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ActivityData {
     /// Unique identifier for the request
-    pub id: String,
+    pub id: ActivityId,
     /// Timestamp when the request was made
     pub created_at: DateTime<Utc>,
     /// Model used for the request
@@ -79,9 +82,9 @@ pub struct ActivityData {
     /// Provider that handled the request
     pub provider: Option<String>,
     /// Whether the request was streamed
-    pub streamed: Option<bool>,
+    pub streamed: StreamingStatus,
     /// Whether the request was cancelled
-    pub cancelled: Option<bool>,
+    pub cancelled: CancellationStatus,
     /// Whether web search was used
     pub web_search: Option<bool>,
     /// Whether media was included
@@ -145,14 +148,14 @@ impl ActivityData {
             .map(|ms| ms as f64 / constants::MS_PER_SECOND)
     }
 
-    /// Returns true if the request was successful (not cancelled)
+    /// Returns true if request was successful (not cancelled)
     pub fn is_successful(&self) -> bool {
-        !self.cancelled.unwrap_or(false)
+        !self.cancelled.is_cancelled()
     }
 
-    /// Returns true if the request was streamed
+    /// Returns true if request was streamed
     pub fn was_streamed(&self) -> bool {
-        self.streamed.unwrap_or(false)
+        self.streamed.is_active()
     }
 
     /// Returns true if the request used web search
@@ -601,7 +604,7 @@ fn is_leap_year(year: u32) -> bool {
 impl Default for ActivityData {
     fn default() -> Self {
         Self {
-            id: String::new(),
+            id: ActivityId::new(""),
             created_at: DateTime::parse_from_rfc3339("2024-01-01T00:00:00Z")
                 .unwrap()
                 .with_timezone(&Utc),
@@ -611,8 +614,8 @@ impl Default for ActivityData {
             tokens_completion: None,
             total_tokens: None,
             provider: None,
-            streamed: None,
-            cancelled: None,
+            streamed: StreamingStatus::default(),
+            cancelled: CancellationStatus::default(),
             web_search: None,
             media: None,
             reasoning: None,
@@ -670,7 +673,7 @@ mod tests {
     #[test]
     fn test_activity_data_convenience_methods() {
         let activity = ActivityData {
-            id: "test-123".to_string(),
+            id: ActivityId::new("test-123"),
             created_at: Utc::now(),
             model: "test-model".to_string(),
             total_cost: Some(0.001),
@@ -678,8 +681,8 @@ mod tests {
             tokens_completion: Some(20),
             total_tokens: Some(30),
             provider: Some("test-provider".to_string()),
-            streamed: Some(true),
-            cancelled: Some(false),
+            streamed: StreamingStatus::Complete,
+            cancelled: CancellationStatus::NotCancelled,
             web_search: Some(true),
             media: Some(false),
             reasoning: Some(false),
@@ -715,13 +718,13 @@ mod tests {
     fn test_activity_response_aggregations() {
         let activities = vec![
             ActivityData {
-                id: "test-1".to_string(),
+                id: ActivityId::new("test-1"),
                 created_at: Utc::now(),
                 model: "model-a".to_string(),
                 total_cost: Some(0.001),
                 total_tokens: Some(100),
-                cancelled: Some(false),
-                streamed: Some(true),
+                cancelled: CancellationStatus::NotCancelled,
+                streamed: StreamingStatus::Complete,
                 web_search: Some(true),
                 media: Some(false),
                 reasoning: Some(false),
@@ -730,13 +733,13 @@ mod tests {
                 ..Default::default()
             },
             ActivityData {
-                id: "test-2".to_string(),
+                id: ActivityId::new("test-2"),
                 created_at: Utc::now(),
                 model: "model-b".to_string(),
                 total_cost: Some(0.002),
                 total_tokens: Some(200),
-                cancelled: Some(true),
-                streamed: Some(false),
+                cancelled: CancellationStatus::Completed,
+                streamed: StreamingStatus::NotStarted,
                 web_search: Some(false),
                 media: Some(true),
                 reasoning: Some(true),
@@ -790,18 +793,18 @@ mod tests {
 
         // Test response with missing optional fields
         let partial_activities = vec![ActivityData {
-            id: "partial-1".to_string(),
+            id: ActivityId::new("partial-1"),
             created_at: Utc::now(),
             model: "model-partial".to_string(),
-            total_cost: None,   // Missing cost
-            total_tokens: None, // Missing tokens
-            cancelled: None,    // Missing cancelled status
-            streamed: None,     // Missing streamed status
-            web_search: None,   // Missing web search status
-            media: None,        // Missing media status
-            reasoning: None,    // Missing reasoning status
-            provider: None,     // Missing provider
-            latency: None,      // Missing latency
+            total_cost: None,                         // Missing cost
+            total_tokens: None,                       // Missing tokens
+            cancelled: CancellationStatus::default(), // Missing cancelled status
+            streamed: StreamingStatus::default(),     // Missing streamed status
+            web_search: None,                         // Missing web search status
+            media: None,                              // Missing media status
+            reasoning: None,                          // Missing reasoning status
+            provider: None,                           // Missing provider
+            latency: None,                            // Missing latency
             ..Default::default()
         }];
 
@@ -822,7 +825,7 @@ mod tests {
     fn test_activity_data_edge_cases() {
         // Test with zero values
         let zero_activity = ActivityData {
-            id: "zero-test".to_string(),
+            id: ActivityId::new("zero-test"),
             created_at: Utc::now(),
             model: "test-model".to_string(),
             total_cost: Some(0.0),
@@ -840,7 +843,7 @@ mod tests {
 
         // Test with negative values (should be handled gracefully)
         let negative_activity = ActivityData {
-            id: "negative-test".to_string(),
+            id: ActivityId::new("negative-test"),
             created_at: Utc::now(),
             model: "test-model".to_string(),
             total_cost: Some(-0.001), // Negative cost
@@ -883,5 +886,52 @@ mod tests {
         assert_eq!(provider_stats.total_tokens, 0);
         assert_eq!(provider_stats.average_cost_per_request, None);
         assert_eq!(provider_stats.success_rate, 0.0);
+    }
+
+    #[test]
+    fn test_activity_id_serialization() {
+        let activity = ActivityData {
+            id: ActivityId::new("activity-12345"),
+            created_at: Utc::now(),
+            model: "test-model".to_string(),
+            ..Default::default()
+        };
+
+        // Test that ActivityId serializes as a plain string
+        let json = serde_json::to_string(&activity).unwrap();
+        assert!(json.contains("\"activity-12345\""));
+
+        // Test deserialization roundtrip
+        let deserialized: ActivityData = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.id.as_str(), "activity-12345");
+        assert_eq!(deserialized.streamed, StreamingStatus::NotStarted);
+        assert_eq!(deserialized.cancelled, CancellationStatus::NotCancelled);
+    }
+
+    #[test]
+    fn test_activity_id_from_string() {
+        let id: ActivityId = "string-id".into();
+        assert_eq!(id.as_str(), "string-id");
+
+        let id2: ActivityId = String::from("string-id-2").into();
+        assert_eq!(id2.as_str(), "string-id-2");
+    }
+
+    #[test]
+    fn test_activity_id_display() {
+        let id = ActivityId::new("test-display");
+        assert_eq!(format!("{}", id), "test-display");
+    }
+
+    #[test]
+    fn test_activity_id_hash() {
+        use std::collections::HashSet;
+
+        let mut set = HashSet::new();
+        set.insert(ActivityId::new("id-1"));
+        set.insert(ActivityId::new("id-2"));
+        set.insert(ActivityId::new("id-1")); // Duplicate
+
+        assert_eq!(set.len(), 2); // Should only have 2 unique IDs
     }
 }

@@ -3,6 +3,9 @@
 #![allow(unused)]
 // Fix for unused imports in src/client.rs
 use crate::error::{Error, Result};
+
+/// Note: These imports are used to implement the client builder pattern.
+/// The crate::types import provides type aliases and utility functions used throughout OpenRouterClient.
 use crate::types;
 use crate::types::routing::{PredefinedModelCoverageProfile, RouterConfig};
 use crate::utils::security::create_safe_error_message;
@@ -58,6 +61,7 @@ impl OpenRouterClient<Ready> {
     /// let client = OpenRouterClient::from_env()?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    #[must_use = "returns a configured client that should be used for API calls"]
     pub fn from_env() -> Result<Self> {
         let api_key = crate::utils::auth::load_api_key_from_env()?;
         OpenRouterClient::from_api_key(api_key)
@@ -77,6 +81,7 @@ impl OpenRouterClient<Ready> {
     /// )?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    #[must_use = "returns a configured client that should be used for API calls"]
     pub fn from_env_with_config(
         referer: Option<impl Into<String>>,
         title: Option<impl Into<String>>,
@@ -89,12 +94,14 @@ impl OpenRouterClient<Ready> {
 
     /// Creates a quick client for development/testing with minimal configuration.
     /// Uses environment API key and default settings.
+    #[must_use = "returns a configured client that should be used for API calls"]
     pub fn quick() -> Result<Self> {
         Self::from_env()
     }
 
     /// Creates a production-ready client with recommended settings.
     /// Includes reasonable timeouts and retry configuration.
+    #[must_use = "returns a configured client that should be used for API calls"]
     pub fn production(
         api_key: impl Into<String>,
         app_name: impl Into<String>,
@@ -111,6 +118,7 @@ impl OpenRouterClient<Ready> {
 impl OpenRouterClient<Unconfigured> {
     /// Creates a new unconfigured client with default settings.
     /// Uses the default OpenRouter base URL: <https://openrouter.ai/api/v1/>
+    #[must_use = "returns a client builder that should be configured and used for API calls"]
     pub fn new() -> Self {
         Self {
             config: ClientConfig {
@@ -133,12 +141,14 @@ impl OpenRouterClient<Unconfigured> {
 
     /// Creates a client directly from an API key using default settings.
     /// This is a convenience method for the most common use case.
+    #[must_use = "returns a configured client that should be used for API calls"]
     pub fn from_api_key(api_key: impl Into<String>) -> Result<OpenRouterClient<Ready>> {
         Self::new().skip_url_configuration().with_api_key(api_key)
     }
 
     /// Creates a client from an API key with a custom base URL.
     /// Convenience method for common configuration pattern.
+    #[must_use = "returns a configured client that should be used for API calls"]
     pub fn from_api_key_and_url(
         api_key: impl Into<String>,
         base_url: impl Into<String>,
@@ -148,6 +158,7 @@ impl OpenRouterClient<Unconfigured> {
 
     /// Skip URL configuration and use the default OpenRouter URL.
     /// Transitions directly to NoAuth state without requiring with_base_url().
+    #[must_use = "returns the updated client that should be configured and used for API calls"]
     pub fn skip_url_configuration(self) -> OpenRouterClient<NoAuth> {
         self.transition_to_no_auth()
     }
@@ -163,6 +174,7 @@ impl OpenRouterClient<Unconfigured> {
     ///     .with_base_url("https://custom-proxy.example.com/api/v1/")?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    #[must_use = "returns the updated client that should be used for API calls"]
     pub fn with_base_url(
         mut self,
         base_url: impl Into<String>,
@@ -185,21 +197,23 @@ impl OpenRouterClient<Unconfigured> {
         }
     }
 
-    /// Sets the maximum response size in bytes.
+    /// Sets maximum response size in bytes.
     /// Defaults to 10MB (10 * 1024 * 1024 bytes).
+    #[must_use = "returns the updated client that should be used for API calls"]
     pub fn with_max_response_bytes(mut self, bytes: usize) -> Self {
         self.config.max_response_bytes = bytes;
         self
     }
 
     /// Helper to append a routing shortcut to a model ID.
+    #[must_use = "returns a formatted model ID string that should be used in requests"]
     pub fn model_with_shortcut(model: &str, shortcut: &str) -> String {
         format!("{}{}", model, shortcut)
     }
 }
 
 impl OpenRouterClient<NoAuth> {
-    /// Supplies the API key and transitions to the Ready state.
+    /// Supplies API key and transitions to Ready state.
     ///
     /// # Examples
     /// ```rust,no_run
@@ -210,6 +224,7 @@ impl OpenRouterClient<NoAuth> {
     ///     .with_api_key("sk-your-api-key-here")?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    #[must_use = "returns the updated client that should be used for API calls"]
     pub fn with_api_key(mut self, api_key: impl Into<String>) -> Result<OpenRouterClient<Ready>> {
         self.config.api_key = Some(SecureApiKey::new(api_key)?);
         self.transition_to_ready()
@@ -217,6 +232,7 @@ impl OpenRouterClient<NoAuth> {
 
     /// Supplies a pre-validated SecureApiKey and transitions to the Ready state.
     /// This is useful when you already have a SecureApiKey instance.
+    #[must_use = "returns the updated client that should be used for API calls"]
     pub fn with_secure_api_key(mut self, api_key: SecureApiKey) -> Result<OpenRouterClient<Ready>> {
         self.config.api_key = Some(api_key);
         self.transition_to_ready()
@@ -224,6 +240,7 @@ impl OpenRouterClient<NoAuth> {
 
     /// Configures the client with multiple options at once.
     /// This is a convenience method for setting common options together.
+    #[must_use = "returns the updated client that should be used for API calls"]
     pub fn configure(
         mut self,
         api_key: impl Into<String>,
@@ -253,62 +270,72 @@ impl OpenRouterClient<NoAuth> {
     ///     .with_api_key("sk-your-api-key")?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    #[must_use = "returns the updated client that should be used for API calls"]
     pub fn with_timeout(mut self, timeout: Duration) -> Self {
         self.config.timeout = timeout;
         self
     }
 
-    /// Sets the request timeout in seconds (convenience method).
+    /// Sets request timeout in seconds (convenience method).
+    #[must_use = "returns the updated client that should be used for API calls"]
     pub fn with_timeout_secs(mut self, seconds: u64) -> Self {
         self.config.timeout = Duration::from_secs(seconds);
         self
     }
 
-    /// Optionally sets the HTTP referer header.
+    /// Optionally sets HTTP referer header.
+    #[must_use = "returns the updated client that should be used for API calls"]
     pub fn with_http_referer(mut self, referer: impl Into<String>) -> Self {
         self.config.http_referer = Some(referer.into());
         self
     }
 
-    /// Optionally sets the site title header.
+    /// Optionally sets site title header.
+    #[must_use = "returns the updated client that should be used for API calls"]
     pub fn with_site_title(mut self, title: impl Into<String>) -> Self {
         self.config.site_title = Some(title.into());
         self
     }
 
-    /// Optionally sets the user ID header for tracking specific users.
+    /// Optionally sets user ID header for tracking specific users.
+    #[must_use = "returns the updated client that should be used for API calls"]
     pub fn with_user_id(mut self, user_id: impl Into<String>) -> Self {
         self.config.user_id = Some(user_id.into());
         self
     }
 
     /// Configures retry behavior with a complete RetryConfig.
+    #[must_use = "returns the updated client that should be used for API calls"]
     pub fn with_retry_config(mut self, retry_config: RetryConfig) -> Self {
         self.config.retry_config = retry_config;
         self
     }
 
     /// Configures basic retry settings (convenience method).
+    #[must_use = "returns updated client that should be used for API calls"]
     pub fn with_retries(mut self, max_retries: u32, initial_backoff_ms: u64) -> Self {
         self.config.retry_config.max_retries = max_retries;
         self.config.retry_config.initial_backoff_ms = initial_backoff_ms;
         self
     }
 
-    /// Sets the maximum response size in bytes.
+    /// Sets maximum response size in bytes.
     /// Defaults to 10MB (10 * 1024 * 1024 bytes).
+    #[must_use = "returns updated client that should be used for API calls"]
     pub fn with_max_response_bytes(mut self, bytes: usize) -> Self {
         self.config.max_response_bytes = bytes;
         self
     }
 
     /// Disables automatic retries.
+    #[must_use = "returns updated client that should be used for API calls"]
     pub fn without_retries(mut self) -> Self {
         self.config.retry_config.max_retries = 0;
         self
     }
 
     /// Configures Model Coverage Profile for model selection and routing.
+    #[must_use = "returns updated client that should be used for API calls"]
     pub fn with_model_coverage_profile(mut self, profile: PredefinedModelCoverageProfile) -> Self {
         self.router_config = Some(RouterConfig {
             profile,
@@ -318,6 +345,7 @@ impl OpenRouterClient<NoAuth> {
     }
 
     /// Enables Zero Data Retention (ZDR) by setting data collection to "deny".
+    #[must_use = "returns updated client that should be used for API calls"]
     pub fn with_zdr(mut self) -> Self {
         let router_config = self.router_config.get_or_insert(RouterConfig {
             profile: PredefinedModelCoverageProfile::LowestCost,
@@ -560,22 +588,16 @@ impl OpenRouterClient<Ready> {
     }
 
     /// Validates tool calls in a chat completion response.
+    ///
+    /// Note: With the introduction of `ToolType` enum, tool call kind is now
+    /// type-safe at compile time. The only valid variant is `ToolType::Function`,
+    /// so this validation is redundant. This function is kept for API compatibility
+    /// but always returns `Ok(())`.
     pub fn validate_tool_calls(
         &self,
-        response: &crate::types::chat::ChatCompletionResponse,
+        _response: &crate::types::chat::ChatCompletionResponse,
     ) -> Result<()> {
-        for choice in &response.choices {
-            if let Some(tool_calls) = &choice.message.tool_calls {
-                for tc in tool_calls {
-                    if tc.kind != "function" {
-                        return Err(Error::SchemaValidationError(format!(
-                            "Invalid tool call kind: {}. Expected 'function'",
-                            tc.kind
-                        )));
-                    }
-                }
-            }
-        }
+        // Type system guarantees tool calls are valid
         Ok(())
     }
 }

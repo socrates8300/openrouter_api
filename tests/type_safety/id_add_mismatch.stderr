@@ -1,0 +1,32 @@
+error[E0308]: mismatched types
+  --> tests/type_safety/id_add_mismatch.rs:17:35
+   |
+17 |     let _ = combine_ids(model_id, gen_id);
+   |             ----------- --------  ^^^^^^ expected `ModelId`, found `GenerationId`
+   |             |           |
+   |             |           expected all arguments to be this `ModelId` type because they need to match the type of this parameter
+   |             arguments to this function are incorrect
+   |
+help: the return type of this call is `GenerationId` due to the type of the argument passed
+  --> tests/type_safety/id_add_mismatch.rs:17:13
+   |
+17 |     let _ = combine_ids(model_id, gen_id);
+   |             ^^^^^^^^^^^^^^^^^^^^^^------^
+   |                                   |
+   |                                   this argument influences the return type of `combine_ids`
+note: function defined here
+  --> tests/type_safety/id_add_mismatch.rs:8:4
+   |
+ 8 | fn combine_ids<T>(a: T, b: T) -> T {
+   |    ^^^^^^^^^^^ -  ----  ---- this parameter needs to match the `ModelId` type of `a`
+   |                |  |
+   |                |  `b` needs to match the `ModelId` type of this parameter
+   |                `a` and `b` both reference this parameter `T`
+
+warning: unused variable: `b`
+ --> tests/type_safety/id_add_mismatch.rs:8:25
+  |
+8 | fn combine_ids<T>(a: T, b: T) -> T {
+  |                         ^ help: if this is intentional, prefix it with an underscore: `_b`
+  |
+  = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
