@@ -37,6 +37,16 @@ where
     }
 
     /// Gets a value from the cache if it exists and hasn't expired
+    ///
+    /// # Mutation Behavior
+    /// This method mutates the cache by removing expired entries.
+    /// This is a lazy cleanup strategy to avoid periodic background tasks.
+    /// If you need a non-mutating getter, consider using a different
+    /// caching strategy or implementing a separate `peek()` method.
+    ///
+    /// # Returns
+    /// * `Some(V)` if the key exists and hasn't expired
+    /// * `None` if the key doesn't exist or has expired
     pub fn get(&mut self, key: &K) -> Option<V> {
         if let Some(entry) = self.data.get(key) {
             if entry.expires_at > Instant::now() {
