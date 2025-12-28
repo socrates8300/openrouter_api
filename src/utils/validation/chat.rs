@@ -136,10 +136,10 @@ fn validate_sampling_parameters(request: &ChatCompletionRequest) -> Result<()> {
 fn validate_message(message: &Message, index: usize) -> Result<()> {
     // Role validation - ChatRole enum ensures only valid values
     match message.role {
-        crate::types::chat::ChatRole::User |
-        crate::types::chat::ChatRole::Assistant |
-        crate::types::chat::ChatRole::System |
-        crate::types::chat::ChatRole::Tool => {}
+        crate::types::chat::ChatRole::User
+        | crate::types::chat::ChatRole::Assistant
+        | crate::types::chat::ChatRole::System
+        | crate::types::chat::ChatRole::Tool => {}
     }
 
     // Content validation based on role
@@ -179,8 +179,7 @@ fn validate_message(message: &Message, index: usize) -> Result<()> {
 
     // Tool call ID validation for tool messages
     if message.role == crate::types::chat::ChatRole::Tool
-        && (message.tool_call_id.is_none()
-            || message.tool_call_id.as_ref().unwrap().is_empty())
+        && (message.tool_call_id.is_none() || message.tool_call_id.as_ref().unwrap().is_empty())
     {
         return Err(Error::ConfigError(format!(
             "Tool message at index {} must have a non-empty tool_call_id",
@@ -196,7 +195,10 @@ fn validate_message_content(message: &Message, index: usize) -> Result<()> {
     match &message.content {
         MessageContent::Text(text) => {
             // For tool messages, content can be empty (some providers allow empty results)
-            if message.role != crate::types::chat::ChatRole::Tool && text.trim().is_empty() && message.tool_calls.is_none() {
+            if message.role != crate::types::chat::ChatRole::Tool
+                && text.trim().is_empty()
+                && message.tool_calls.is_none()
+            {
                 return Err(Error::ConfigError(format!(
                     "Message at index {} must have either non-empty content or tool_calls",
                     index
@@ -435,7 +437,10 @@ mod tests {
     fn create_valid_chat_request() -> ChatCompletionRequest {
         ChatCompletionRequest {
             model: "openai/gpt-4o".to_string(),
-            messages: vec![Message::text(crate::types::chat::ChatRole::User, "Hello, world!")],
+            messages: vec![Message::text(
+                crate::types::chat::ChatRole::User,
+                "Hello, world!",
+            )],
             stream: None,
             response_format: None,
             tools: None,

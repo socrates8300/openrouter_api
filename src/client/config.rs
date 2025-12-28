@@ -124,36 +124,36 @@ impl ClientConfig {
             headers.insert("X-User-ID", user_value);
         }
         Ok(headers)
-        }
+    }
 
-        /// Create an ApiConfig for API instances (excludes sensitive API key).
-        ///
-        /// # Ownership Semantics
-        /// This method clones string values (`base_url`, `http_referer`, etc.)
-        /// to ensure `ApiConfig` owns its data independently of the parent
-        /// `ClientConfig`. This is intentional design:
-        ///
-        /// - `ApiConfig` is meant to be thread-safe and independently usable
-        /// - Clones happen once per client creation, not per request
-        /// - Headers and retry_config are wrapped in `Arc` for shared access
-        /// - Performance impact is negligible for typical configuration sizes
-        ///
-        /// # Hot Path Optimization
-        /// The `retry_config` and `headers` are wrapped in `Arc` to avoid
-        /// expensive clones on API request hot paths.
-        pub fn to_api_config(&self) -> Result<ApiConfig> {
-            let headers = self.build_headers()?;
-            Ok(ApiConfig {
-                base_url: self.base_url.clone(),
-                http_referer: self.http_referer.clone(),
-                site_title: self.site_title.clone(),
-                user_id: self.user_id.clone(),
-                timeout: self.timeout,
-                retry_config: Arc::new(self.retry_config.clone()),
-                max_response_bytes: self.max_response_bytes,
-                headers: Arc::new(headers),
-            })
-        }
+    /// Create an ApiConfig for API instances (excludes sensitive API key).
+    ///
+    /// # Ownership Semantics
+    /// This method clones string values (`base_url`, `http_referer`, etc.)
+    /// to ensure `ApiConfig` owns its data independently of the parent
+    /// `ClientConfig`. This is intentional design:
+    ///
+    /// - `ApiConfig` is meant to be thread-safe and independently usable
+    /// - Clones happen once per client creation, not per request
+    /// - Headers and retry_config are wrapped in `Arc` for shared access
+    /// - Performance impact is negligible for typical configuration sizes
+    ///
+    /// # Hot Path Optimization
+    /// The `retry_config` and `headers` are wrapped in `Arc` to avoid
+    /// expensive clones on API request hot paths.
+    pub fn to_api_config(&self) -> Result<ApiConfig> {
+        let headers = self.build_headers()?;
+        Ok(ApiConfig {
+            base_url: self.base_url.clone(),
+            http_referer: self.http_referer.clone(),
+            site_title: self.site_title.clone(),
+            user_id: self.user_id.clone(),
+            timeout: self.timeout,
+            retry_config: Arc::new(self.retry_config.clone()),
+            max_response_bytes: self.max_response_bytes,
+            headers: Arc::new(headers),
+        })
+    }
 }
 
 impl Default for ClientConfig {

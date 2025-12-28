@@ -255,7 +255,8 @@ mod tests {
         let api = StructuredApi::new(
             reqwest::Client::new(),
             &crate::client::ClientConfig::default(),
-        ).unwrap();
+        )
+        .unwrap();
 
         let result = api.basic_schema_validation(&schema, &data);
         assert!(result.is_err());
@@ -274,7 +275,8 @@ mod tests {
         let api = StructuredApi::new(
             reqwest::Client::new(),
             &crate::client::ClientConfig::default(),
-        ).unwrap();
+        )
+        .unwrap();
 
         let result = api.basic_schema_validation(&schema, &data);
         assert!(result.is_err());
@@ -293,7 +295,8 @@ mod tests {
         let api = StructuredApi::new(
             reqwest::Client::new(),
             &crate::client::ClientConfig::default(),
-        ).unwrap();
+        )
+        .unwrap();
 
         let result = api.basic_schema_validation(&schema, &data);
         assert!(result.is_err());
@@ -312,7 +315,8 @@ mod tests {
         let api = StructuredApi::new(
             reqwest::Client::new(),
             &crate::client::ClientConfig::default(),
-        ).unwrap();
+        )
+        .unwrap();
 
         let result = api.basic_schema_validation(&schema, &data);
         assert!(result.is_err());
@@ -331,7 +335,8 @@ mod tests {
         let api = StructuredApi::new(
             reqwest::Client::new(),
             &crate::client::ClientConfig::default(),
-        ).unwrap();
+        )
+        .unwrap();
 
         let result = api.basic_schema_validation(&schema, &data);
         assert!(result.is_err());
@@ -350,7 +355,8 @@ mod tests {
         let api = StructuredApi::new(
             reqwest::Client::new(),
             &crate::client::ClientConfig::default(),
-        ).unwrap();
+        )
+        .unwrap();
 
         let result = api.basic_schema_validation(&schema, &data);
         assert!(result.is_err());
@@ -374,7 +380,8 @@ mod tests {
         let api = StructuredApi::new(
             reqwest::Client::new(),
             &crate::client::ClientConfig::default(),
-        ).unwrap();
+        )
+        .unwrap();
 
         let result = api.basic_schema_validation(&schema, &data);
         assert!(result.is_err());
@@ -399,7 +406,8 @@ mod tests {
         let api = StructuredApi::new(
             reqwest::Client::new(),
             &crate::client::ClientConfig::default(),
-        ).unwrap();
+        )
+        .unwrap();
 
         let result = api.basic_schema_validation(&schema, &data);
         assert!(result.is_ok());
@@ -412,7 +420,8 @@ mod tests {
         let api = StructuredApi::new(
             reqwest::Client::new(),
             &crate::client::ClientConfig::default(),
-        ).unwrap();
+        )
+        .unwrap();
 
         let result = api.basic_schema_validation(&schema, &data);
         assert!(result.is_ok());
@@ -425,7 +434,8 @@ mod tests {
         let api = StructuredApi::new(
             reqwest::Client::new(),
             &crate::client::ClientConfig::default(),
-        ).unwrap();
+        )
+        .unwrap();
 
         // Unknown types should be skipped (not validated)
         let result = api.basic_schema_validation(&schema, &data);
@@ -439,7 +449,8 @@ mod tests {
         let api = StructuredApi::new(
             reqwest::Client::new(),
             &crate::client::ClientConfig::default(),
-        ).unwrap();
+        )
+        .unwrap();
 
         // No type field means no type validation, but required fields still checked
         let result = api.basic_schema_validation(&schema, &data);
@@ -456,7 +467,8 @@ mod tests {
         let api = StructuredApi::new(
             reqwest::Client::new(),
             &crate::client::ClientConfig::default(),
-        ).unwrap();
+        )
+        .unwrap();
 
         // Non-object data should skip required field check
         let result = api.basic_schema_validation(&schema, &data);

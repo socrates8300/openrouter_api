@@ -168,10 +168,26 @@ mod tests {
         assert_eq!(model_info.architecture.modality, "text->text");
         assert_eq!(model_info.architecture.input_modalities, vec!["text"]);
         assert_eq!(model_info.pricing.prompt.as_f64(), 0.0);
-        assert_eq!(model_info.pricing.request.as_ref().map(|p| p.as_f64()), Some(0.0));
-        assert_eq!(model_info.pricing.image.as_ref().map(|p| p.as_f64()), Some(0.0));
-        assert_eq!(model_info.pricing.web_search.as_ref().map(|p| p.as_f64()), Some(0.0));
-        assert_eq!(model_info.pricing.internal_reasoning.as_ref().map(|p| p.as_f64()), Some(0.0));
+        assert_eq!(
+            model_info.pricing.request.as_ref().map(|p| p.as_f64()),
+            Some(0.0)
+        );
+        assert_eq!(
+            model_info.pricing.image.as_ref().map(|p| p.as_f64()),
+            Some(0.0)
+        );
+        assert_eq!(
+            model_info.pricing.web_search.as_ref().map(|p| p.as_f64()),
+            Some(0.0)
+        );
+        assert_eq!(
+            model_info
+                .pricing
+                .internal_reasoning
+                .as_ref()
+                .map(|p| p.as_f64()),
+            Some(0.0)
+        );
         assert!(!model_info.top_provider.is_moderated);
         assert!(model_info.per_request_limits.is_none());
         assert_eq!(

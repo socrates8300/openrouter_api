@@ -9,8 +9,8 @@
 
 use openrouter_api::models::tool::ToolType;
 use openrouter_api::types::chat::{
-    AudioContent, AudioUrl, ChatRole, ContentPart, ContentType, FileContent, FileUrl,
-    ImageContent, ImageUrl, Message, MessageContent, TextContent,
+    AudioContent, AudioUrl, ChatRole, ContentPart, ContentType, FileContent, FileUrl, ImageContent,
+    ImageUrl, Message, MessageContent, TextContent,
 };
 
 use openrouter_api::types::ids::ToolCallId;
@@ -23,7 +23,7 @@ fn test_message_uses_chat_role_enum() {
 
     // This should compile - role is ChatRole, not String
     match msg.role {
-        ChatRole::User => {}, // ✅ Should match
+        ChatRole::User => {} // ✅ Should match
         ChatRole::Assistant => panic!("Wrong role"),
         ChatRole::System => panic!("Wrong role"),
         ChatRole::Tool => panic!("Wrong role"),
@@ -247,7 +247,6 @@ fn test_tool_message() {
 fn test_assistant_with_tools() {
     use openrouter_api::models::tool::{FunctionCall, ToolCall};
 
-
     let tool_calls = vec![ToolCall {
         id: ToolCallId::new("call_123"),
         kind: ToolType::Function,
@@ -310,8 +309,6 @@ fn test_message_roundtrip_serialization() {
     assert_eq!(original.name, deserialized.name);
     assert_eq!(original.tool_call_id, deserialized.tool_call_id);
 }
-
-
 
 /// Test that invalid role strings are rejected during deserialization
 #[test]

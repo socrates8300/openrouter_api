@@ -793,18 +793,18 @@ mod tests {
 
         // Test response with missing optional fields
         let partial_activities = vec![ActivityData {
-        id: ActivityId::new("partial-1"),
-        created_at: Utc::now(),
-        model: "model-partial".to_string(),
-        total_cost: None,   // Missing cost
-        total_tokens: None, // Missing tokens
-        cancelled: CancellationStatus::default(),    // Missing cancelled status
-        streamed: StreamingStatus::default(),     // Missing streamed status
-            web_search: None,   // Missing web search status
-            media: None,        // Missing media status
-            reasoning: None,    // Missing reasoning status
-            provider: None,     // Missing provider
-            latency: None,      // Missing latency
+            id: ActivityId::new("partial-1"),
+            created_at: Utc::now(),
+            model: "model-partial".to_string(),
+            total_cost: None,                         // Missing cost
+            total_tokens: None,                       // Missing tokens
+            cancelled: CancellationStatus::default(), // Missing cancelled status
+            streamed: StreamingStatus::default(),     // Missing streamed status
+            web_search: None,                         // Missing web search status
+            media: None,                              // Missing media status
+            reasoning: None,                          // Missing reasoning status
+            provider: None,                           // Missing provider
+            latency: None,                            // Missing latency
             ..Default::default()
         }];
 

@@ -49,7 +49,10 @@ mod validation_tests {
     fn test_chat_validation_integration() {
         let request = ChatCompletionRequest {
             model: "openai/gpt-4".to_string(),
-            messages: vec![Message::text(crate::types::chat::ChatRole::User, "Hello, world!")],
+            messages: vec![Message::text(
+                crate::types::chat::ChatRole::User,
+                "Hello, world!",
+            )],
             stream: None,
             response_format: None,
             tools: None,
@@ -128,7 +131,10 @@ mod validation_tests {
         for _ in 0..1000 {
             let request = ChatCompletionRequest {
                 model: "openai/gpt-4".to_string(),
-                messages: vec![Message::text(crate::types::chat::ChatRole::User, "Hello, world!")],
+                messages: vec![Message::text(
+                    crate::types::chat::ChatRole::User,
+                    "Hello, world!",
+                )],
                 stream: None,
                 response_format: None,
                 tools: None,
@@ -232,5 +238,4 @@ mod validation_tests {
         assert!(validate_sampling_parameters(None, None, Some(0), None, None).is_ok());
         // 0 is allowed
     }
-
 }

@@ -1,7 +1,8 @@
 use crate::error::{Error, Result};
 use crate::models::tool::ToolType;
 use crate::types::chat::{
-    ChatCompletionChunk, ChatCompletionRequest, ChatCompletionResponse, ChatRole, Message, MessageContent,
+    ChatCompletionChunk, ChatCompletionRequest, ChatCompletionResponse, ChatRole, Message,
+    MessageContent,
 };
 use crate::utils::{
     retry::execute_with_retry_builder, retry::handle_response_json,

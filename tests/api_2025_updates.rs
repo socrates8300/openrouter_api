@@ -2,8 +2,8 @@ use openrouter_api::client::{
     OpenRouterClient, Unconfigured, ROUTING_FLOOR, ROUTING_NITRO, ROUTING_ONLINE,
 };
 use openrouter_api::types::chat::{
-    AudioContent, AudioUrl, ChatCompletionRequest, ChatRole, ContentPart, ContentType, FileContent, FileUrl,
-    Message,
+    AudioContent, AudioUrl, ChatCompletionRequest, ChatRole, ContentPart, ContentType, FileContent,
+    FileUrl, Message,
 };
 use openrouter_api::types::provider::ProviderPreferences;
 

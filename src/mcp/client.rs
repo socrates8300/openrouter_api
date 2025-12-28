@@ -48,14 +48,14 @@ impl MCPClient {
     }
 
     /// Generate a unique request ID
-        fn generate_id() -> String {
-            uuid::Uuid::new_v4().to_string()
-        }
+    fn generate_id() -> String {
+        uuid::Uuid::new_v4().to_string()
+    }
 
     /// Check if ID validation should be skipped (for testing with mock servers)
-        fn should_skip_id_validation() -> bool {
-            cfg!(test)
-        }
+    fn should_skip_id_validation() -> bool {
+        cfg!(test)
+    }
 
     /// Initialize the connection to the MCP server.
     pub async fn initialize(

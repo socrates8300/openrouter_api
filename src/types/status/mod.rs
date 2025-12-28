@@ -6,7 +6,6 @@
 
 use serde::{Deserialize, Serialize};
 
-
 /// Status of streaming operations.
 ///
 /// Replaces `Option<bool>` to make invalid states unrepresentable.
@@ -27,7 +26,10 @@ impl StreamingStatus {
     /// Returns true if streaming is currently active or was active.
     #[must_use]
     pub fn is_active(&self) -> bool {
-        matches!(self, StreamingStatus::InProgress | StreamingStatus::Complete)
+        matches!(
+            self,
+            StreamingStatus::InProgress | StreamingStatus::Complete
+        )
     }
 
     /// Returns true if streaming is complete (either success or not started).
@@ -58,8 +60,6 @@ impl StreamingStatus {
         matches!(self, StreamingStatus::InProgress)
     }
 }
-
-
 
 impl std::fmt::Display for StreamingStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -171,7 +171,10 @@ impl CancellationStatus {
     /// Returns true if cancellation is final (completed or failed).
     #[must_use]
     pub fn is_final(&self) -> bool {
-        matches!(self, CancellationStatus::Completed | CancellationStatus::Failed)
+        matches!(
+            self,
+            CancellationStatus::Completed | CancellationStatus::Failed
+        )
     }
 
     /// Creates CancellationStatus from boolean (legacy API compatibility).
@@ -201,8 +204,6 @@ impl CancellationStatus {
     }
 }
 
-
-
 impl std::fmt::Display for CancellationStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -231,9 +232,8 @@ impl<'de> Deserialize<'de> for CancellationStatus {
             type Value = CancellationStatus;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str(
-                    "a boolean, integer, or string representing cancellation status",
-                )
+                formatter
+                    .write_str("a boolean, integer, or string representing cancellation status")
             }
 
             fn visit_bool<E>(self, value: bool) -> Result<Self::Value, E>
@@ -295,10 +295,7 @@ mod tests {
     // StreamingStatus tests
     #[test]
     fn test_streaming_status_from_bool() {
-        assert_eq!(
-            StreamingStatus::from_bool(true),
-            StreamingStatus::Complete
-        );
+        assert_eq!(StreamingStatus::from_bool(true), StreamingStatus::Complete);
         assert_eq!(
             StreamingStatus::from_bool(false),
             StreamingStatus::NotStarted
@@ -372,7 +369,6 @@ mod tests {
         let deserialized: StreamingStatus = from_str(&json).unwrap();
         assert_eq!(original, deserialized);
     }
-
 
     #[test]
     fn test_streaming_status_default() {
@@ -469,7 +465,6 @@ mod tests {
         let deserialized: CancellationStatus = from_str(&json).unwrap();
         assert_eq!(original, deserialized);
     }
-
 
     #[test]
     fn test_cancellation_status_default() {

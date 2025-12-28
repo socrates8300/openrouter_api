@@ -143,7 +143,10 @@ impl AnalyticsApi {
 
         // Execute request with retry logic
         let response = execute_with_retry_builder(&self.config.retry_config, GET_ACTIVITY, || {
-            let mut req_builder = self.client.get(url.clone()).headers((*self.config.headers).clone());
+            let mut req_builder = self
+                .client
+                .get(url.clone())
+                .headers((*self.config.headers).clone());
 
             // Add query parameters if any
             if !query_params.is_empty() {

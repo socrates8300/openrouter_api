@@ -74,7 +74,9 @@ impl CreditsApi {
 
         // Execute request with retry logic
         let response = execute_with_retry_builder(&self.config.retry_config, GET_BALANCE, || {
-            self.client.get(url.clone()).headers((*self.config.headers).clone())
+            self.client
+                .get(url.clone())
+                .headers((*self.config.headers).clone())
         })
         .await?;
 

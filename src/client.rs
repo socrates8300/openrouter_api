@@ -117,7 +117,7 @@ impl OpenRouterClient<Ready> {
 
 impl OpenRouterClient<Unconfigured> {
     /// Creates a new unconfigured client with default settings.
-    /// Uses the default OpenRouter base URL: https://openrouter.ai/api/v1/
+    /// Uses the default OpenRouter base URL: <https://openrouter.ai/api/v1/>
     #[must_use = "returns a client builder that should be configured and used for API calls"]
     pub fn new() -> Self {
         Self {

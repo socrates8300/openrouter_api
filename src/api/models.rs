@@ -36,7 +36,10 @@ impl ModelsApi {
 
         // Execute request with retry logic
         let response = execute_with_retry_builder(&self.config.retry_config, LIST_MODELS, || {
-            let mut req_builder = self.client.get(url.clone()).headers((*self.config.headers).clone());
+            let mut req_builder = self
+                .client
+                .get(url.clone())
+                .headers((*self.config.headers).clone());
 
             if let Some(ref req) = request {
                 req_builder = req_builder.query(req);

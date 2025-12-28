@@ -251,8 +251,14 @@ fn test_id_as_hashmap_key() {
     map.insert(ModelId::new("model-1"), "Description 1".to_string());
     map.insert(ModelId::new("model-2"), "Description 2".to_string());
 
-    assert_eq!(map.get(&ModelId::new("model-1")), Some(&"Description 1".to_string()));
-    assert_eq!(map.get(&ModelId::new("model-2")), Some(&"Description 2".to_string()));
+    assert_eq!(
+        map.get(&ModelId::new("model-1")),
+        Some(&"Description 1".to_string())
+    );
+    assert_eq!(
+        map.get(&ModelId::new("model-2")),
+        Some(&"Description 2".to_string())
+    );
     assert_eq!(map.get(&ModelId::new("model-3")), None);
 }
 
@@ -285,7 +291,10 @@ fn test_id_pattern_matching() {
     }
 
     assert_eq!(describe_id(&ModelId::new("openai/gpt-4")), "OpenAI model");
-    assert_eq!(describe_id(&ModelId::new("anthropic/claude-3")), "Anthropic model");
+    assert_eq!(
+        describe_id(&ModelId::new("anthropic/claude-3")),
+        "Anthropic model"
+    );
     assert_eq!(describe_id(&ModelId::new("custom/model")), "Other model");
 }
 
@@ -314,10 +323,16 @@ fn test_price_creation() {
 #[test]
 fn test_price_new_accepts_negative() {
     let price = Price::new(-0.001);
-    assert!(price.is_some(), "Price::new should accept negative values for API compatibility");
+    assert!(
+        price.is_some(),
+        "Price::new should accept negative values for API compatibility"
+    );
     assert_eq!(price.clone().unwrap().as_f64(), -0.001);
     assert!(price.clone().unwrap().is_negative());
-    assert!(!price.unwrap().is_valid_business_logic(), "Negative prices should be invalid business logic");
+    assert!(
+        !price.unwrap().is_valid_business_logic(),
+        "Negative prices should be invalid business logic"
+    );
 }
 
 /// Test that Price::new_unchecked accepts negative values (changed for API compatibility)

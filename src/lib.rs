@@ -20,4 +20,6 @@ pub use mcp::types as mcp_types; // Re-export MCP types
 
 // Ensure TLS features are mutually exclusive
 #[cfg(all(feature = "tls-rustls", feature = "tls-native-tls"))]
-compile_error!("TLS features tls-rustls and tls-native-tls are mutually exclusive. Please choose only one.");
+compile_error!(
+    "TLS features tls-rustls and tls-native-tls are mutually exclusive. Please choose only one."
+);

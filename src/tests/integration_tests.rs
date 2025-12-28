@@ -5,9 +5,6 @@ mod tests {
     use crate::client::{OpenRouterClient, RetryConfig, Unconfigured};
     #[allow(unused_imports)]
     use crate::models::chat::ChatMessage;
-    use crate::types::chat::ChatRole;
-    use crate::types::ids::{ActivityId, GenerationId};
-    use crate::types::status::{CancellationStatus, StreamingStatus};
     use crate::models::provider_preferences::{
         DataCollection, ProviderPreferences, ProviderSort, Quantization,
     };
@@ -15,9 +12,12 @@ mod tests {
     use crate::models::structured::{JsonSchemaConfig, JsonSchemaDefinition};
     #[allow(unused_imports)]
     use crate::models::tool::{FunctionCall, FunctionDescription, Tool, ToolCall};
+    use crate::types::chat::ChatRole;
     use crate::types::chat::{
         ChatCompletionRequest, ChatCompletionResponse, Message, MessageContent,
     };
+    use crate::types::ids::{ActivityId, GenerationId};
+    use crate::types::status::{CancellationStatus, StreamingStatus};
     use serde_json::{json, Value};
     use url::Url;
 
@@ -41,7 +41,10 @@ mod tests {
         // Create a basic chat completion request.
         let _request = ChatCompletionRequest {
             model: "openai/gpt-4o".to_string(),
-            messages: vec![Message::text(ChatRole::User, "What is a phantom type in Rust?")],
+            messages: vec![Message::text(
+                ChatRole::User,
+                "What is a phantom type in Rust?",
+            )],
             stream: None,
             response_format: None,
             tools: None,
@@ -313,7 +316,10 @@ mod tests {
         // Create a chat completion request with provider preferences
         let request = ChatCompletionRequest {
             model: "openai/gpt-4o".to_string(),
-            messages: vec![Message::text(ChatRole::User, "Hello with provider preferences!")],
+            messages: vec![Message::text(
+                ChatRole::User,
+                "Hello with provider preferences!",
+            )],
             stream: None,
             response_format: None,
             tools: None,
