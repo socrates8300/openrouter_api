@@ -39,11 +39,18 @@ tokio-test = "0.4"
 wiremock = "0.5"
 test-case = "3.3"
 serial_test = "3.0"
+trybuild = "1.0"
 
 [features]
-default = ["rustls"]
-rustls = ["reqwest/rustls-tls"]
-native-tls = ["reqwest/native-tls"]
+default = ["tls-rustls"]
+# TLS features - exactly one must be chosen
+# Use --features "tls-rustls" for rustls-tls (default)
+# Use --features "tls-native-tls" for native-tls
+tls-rustls = ["reqwest/rustls-tls"]
+tls-native-tls = ["reqwest/native-tls"]
+# Legacy aliases for compatibility (deprecated)
+rustls = ["tls-rustls"]
+native-tls = ["tls-native-tls"]
 tracing = ["dep:tracing"]
 
 [package.metadata.docs.rs]
