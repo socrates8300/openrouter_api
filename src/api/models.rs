@@ -13,6 +13,7 @@ pub struct ModelsApi {
 
 impl ModelsApi {
     /// Creates a new ModelsApi with the given reqwest client and configuration.
+    #[must_use = "returns an API client that should be used for API calls"]
     pub fn new(client: Client, config: &crate::client::ClientConfig) -> Result<Self> {
         Ok(Self {
             client,
@@ -33,12 +34,9 @@ impl ModelsApi {
                 metadata: None,
             })?;
 
-        // Use pre-built headers from config
-        let headers = self.config.headers.clone();
-
         // Execute request with retry logic
         let response = execute_with_retry_builder(&self.config.retry_config, LIST_MODELS, || {
-            let mut req_builder = self.client.get(url.clone()).headers(headers.clone());
+            let mut req_builder = self.client.get(url.clone()).headers((*self.config.headers).clone());
 
             if let Some(ref req) = request {
                 req_builder = req_builder.query(req);

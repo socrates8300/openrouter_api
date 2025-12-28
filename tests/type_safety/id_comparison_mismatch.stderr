@@ -1,0 +1,7 @@
+error[E0308]: mismatched types
+  --> tests/type_safety/id_comparison_mismatch.rs:13:20
+   |
+13 |     if model_id == gen_id {
+   |        --------    ^^^^^^ expected `ModelId`, found `GenerationId`
+   |        |
+   |        expected because this is `ModelId`

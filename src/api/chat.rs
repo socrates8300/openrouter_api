@@ -1,6 +1,7 @@
 use crate::error::{Error, Result};
+use crate::models::tool::ToolType;
 use crate::types::chat::{
-    ChatCompletionChunk, ChatCompletionRequest, ChatCompletionResponse, Message, MessageContent,
+    ChatCompletionChunk, ChatCompletionRequest, ChatCompletionResponse, ChatRole, Message, MessageContent,
 };
 use crate::utils::{
     retry::execute_with_retry_builder, retry::handle_response_json,
@@ -34,6 +35,7 @@ pub struct ChatApi {
 
 impl ChatApi {
     /// Creates a new ChatApi with the given reqwest client and configuration.
+    #[must_use = "returns an API client that should be used for chat operations"]
     pub fn new(client: Client, config: &crate::client::ClientConfig) -> Result<Self> {
         Ok(Self {
             client,
@@ -42,6 +44,7 @@ impl ChatApi {
     }
 
     /// Sends a chat completion request and returns a complete ChatCompletionResponse.
+    #[must_use = "returns the chat completion response that should be processed"]
     pub async fn chat_completion(
         &self,
         request: ChatCompletionRequest,
@@ -61,15 +64,12 @@ impl ChatApi {
                 metadata: None,
             })?;
 
-        // Use pre-built headers from config
-        let headers = self.config.headers.clone();
-
         // Execute request with retry logic
         let response =
             execute_with_retry_builder(&self.config.retry_config, CHAT_COMPLETION, || {
                 self.client
                     .post(url.clone())
-                    .headers(headers.clone())
+                    .headers((*self.config.headers).clone())
                     .json(&request)
             })
             .await?;
@@ -82,7 +82,7 @@ impl ChatApi {
         for choice in &chat_response.choices {
             if let Some(tool_calls) = &choice.message.tool_calls {
                 for tc in tool_calls {
-                    if tc.kind != "function" {
+                    if tc.kind != ToolType::Function {
                         return Err(Error::SchemaValidationError(format!(
                             "Invalid tool call kind: {}. Expected 'function'",
                             tc.kind
@@ -97,13 +97,13 @@ impl ChatApi {
 
     /// Returns a stream for a chat completion request.
     /// Each yielded item is a ChatCompletionChunk.
+    #[must_use = "returns a stream that should be consumed to receive completion chunks"]
     pub fn chat_completion_stream(
         &self,
         request: ChatCompletionRequest,
     ) -> Pin<Box<dyn Stream<Item = Result<ChatCompletionChunk>> + Send + '_>> {
         let client = self.client.clone();
-        let headers = self.config.headers.clone();
-        let _retry_config = self.config.retry_config.clone();
+        let headers = Arc::clone(&self.config.headers);
 
         // Validate the request before streaming
         if let Err(e) = validation::validate_chat_request(&request) {
@@ -153,7 +153,7 @@ impl ChatApi {
             // Issue the POST request
             let response = client
                 .post(url)
-                .headers(headers)
+                .headers((*headers).clone())
                 .json(&req_body)
                 .send()
                 .await
@@ -259,7 +259,7 @@ impl ChatApi {
     pub async fn simple_completion(&self, model: &str, user_message: &str) -> Result<String> {
         let request = ChatCompletionRequest {
             model: model.to_string(),
-            messages: vec![Message::text("user", user_message)],
+            messages: vec![Message::text(ChatRole::User, user_message)],
             stream: None,
             response_format: None,
             tools: None,

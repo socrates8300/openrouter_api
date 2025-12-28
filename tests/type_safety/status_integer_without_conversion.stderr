@@ -1,0 +1,15 @@
+error[E0308]: mismatched types
+  --> tests/type_safety/status_integer_without_conversion.rs:12:35
+   |
+12 |     let status: StreamingStatus = 1;
+   |                 ---------------   ^ expected `StreamingStatus`, found integer
+   |                 |
+   |                 expected due to this
+
+error[E0308]: mismatched types
+  --> tests/type_safety/status_integer_without_conversion.rs:37:45
+   |
+37 |     let cancel_status: CancellationStatus = 2;
+   |                        ------------------   ^ expected `CancellationStatus`, found integer
+   |                        |
+   |                        expected due to this

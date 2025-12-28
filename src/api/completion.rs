@@ -15,6 +15,7 @@ pub struct CompletionApi {
 
 impl CompletionApi {
     /// Creates a new CompletionApi with the given reqwest client and configuration.
+    #[must_use = "returns an API client that should be used for completion operations"]
     pub fn new(client: Client, config: &crate::client::ClientConfig) -> Result<Self> {
         Ok(Self {
             client,
@@ -24,6 +25,7 @@ impl CompletionApi {
 
     /// Calls the completions endpoint. The request payload includes at minimum the `model` and `prompt` fields,
     /// along with any additional generation parameters (temperature, top_p, and so on).
+    #[must_use = "returns a completion response that should be processed"]
     pub async fn text_completion(&self, request: CompletionRequest) -> Result<CompletionResponse> {
         // Validate the request using the new validation module
         validate_completion_request(&request)?;
@@ -39,15 +41,12 @@ impl CompletionApi {
                 metadata: None,
             })?;
 
-        // Use pre-built headers from config
-        let headers = self.config.headers.clone();
-
         // Execute request with retry logic
         let response =
             execute_with_retry_builder(&self.config.retry_config, TEXT_COMPLETION, || {
                 self.client
                     .post(url.clone())
-                    .headers(headers.clone())
+                    .headers((*self.config.headers).clone())
                     .json(&request)
             })
             .await?;

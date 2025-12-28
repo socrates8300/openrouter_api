@@ -1,0 +1,7 @@
+error[E0308]: mismatched types
+  --> tests/type_safety/enum_integer_construction.rs:11:26
+   |
+11 |     let role: ChatRole = 0;
+   |               --------   ^ expected `ChatRole`, found integer
+   |               |
+   |               expected due to this

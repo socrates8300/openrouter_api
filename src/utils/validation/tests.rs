@@ -49,7 +49,7 @@ mod validation_tests {
     fn test_chat_validation_integration() {
         let request = ChatCompletionRequest {
             model: "openai/gpt-4".to_string(),
-            messages: vec![Message::text("user", "Hello, world!")],
+            messages: vec![Message::text(crate::types::chat::ChatRole::User, "Hello, world!")],
             stream: None,
             response_format: None,
             tools: None,
@@ -128,7 +128,7 @@ mod validation_tests {
         for _ in 0..1000 {
             let request = ChatCompletionRequest {
                 model: "openai/gpt-4".to_string(),
-                messages: vec![Message::text("user", "Hello, world!")],
+                messages: vec![Message::text(crate::types::chat::ChatRole::User, "Hello, world!")],
                 stream: None,
                 response_format: None,
                 tools: None,
@@ -233,15 +233,4 @@ mod validation_tests {
         // 0 is allowed
     }
 
-    // TODO: Fix this test after implementing Default for ChatCompletionRequest
-    // #[test]
-    // fn test_validation_backwards_compatibility() {
-    //     // Ensure that existing valid requests continue to work
-    // }
-
-    // TODO: Fix this test after improving error message handling
-    // #[test]
-    // fn test_validation_error_recovery() {
-    //     // Test that validation provides useful information for error recovery
-    // }
 }

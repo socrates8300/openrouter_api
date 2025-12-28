@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// Any extra parameters (e.g., `temperature`, `top_p`, etc.) can also be provided and will be flattened
 /// into the resulting JSON.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, PartialEq, Eq)]
 pub struct CompletionRequest {
     pub model: String,
     pub prompt: String,
@@ -15,7 +15,7 @@ pub struct CompletionRequest {
 }
 
 /// Represents a choice returned by the completions endpoint.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq)]
 pub struct CompletionChoice {
     pub text: String,
     pub index: Option<u32>,
@@ -26,7 +26,7 @@ pub struct CompletionChoice {
 /// Represents the text completion response. It includes:
 /// - an optional `id` for the request
 /// - a list of choices with the completed text
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq)]
 pub struct CompletionResponse {
     pub id: Option<String>,
     pub choices: Vec<CompletionChoice>,

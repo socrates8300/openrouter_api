@@ -1,0 +1,13 @@
+warning: unused import: `CancellationStatus`
+ --> tests/type_safety/status_invalid_variant.rs:7:37
+  |
+7 | use openrouter_api::types::status::{CancellationStatus, StreamingStatus};
+  |                                     ^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error[E0599]: no variant or associated item named `Undefined` found for enum `StreamingStatus` in the current scope
+  --> tests/type_safety/status_invalid_variant.rs:11:43
+   |
+11 |     let invalid_status = StreamingStatus::Undefined;
+   |                                           ^^^^^^^^^ variant or associated item not found in `StreamingStatus`

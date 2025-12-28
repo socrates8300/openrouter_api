@@ -15,6 +15,7 @@ pub struct GenerationApi {
 
 impl GenerationApi {
     /// Creates a new GenerationApi with the given reqwest client and configuration.
+    #[must_use = "returns an API client that should be used for API calls"]
     pub fn new(client: Client, config: &crate::client::ClientConfig) -> Result<Self> {
         Ok(Self {
             client,
@@ -105,16 +106,13 @@ impl GenerationApi {
                 metadata: None,
             })?;
 
-        // Use pre-built headers from config
-        let headers = self.config.headers.clone();
-
         // Execute request with retry logic
         let response =
             execute_with_retry_builder(&self.config.retry_config, GET_GENERATION, || {
                 self.client
                     .get(url.clone())
                     .query(&[("id", id)])
-                    .headers(headers.clone())
+                    .headers((*self.config.headers).clone())
             })
             .await?;
 
@@ -149,6 +147,7 @@ mod tests {
 
         // Verify that the API config was created successfully
         // The API key should NOT be stored in the API config for security reasons
+        // headers is now Arc<HeaderMap>, but Arc implements Deref so methods work the same
         assert!(!generation_api.config.headers.is_empty());
         assert!(generation_api.config.headers.contains_key("authorization"));
     }

@@ -2,6 +2,7 @@
 
 use crate::error::{Error, Result};
 use crate::models::tool::Tool;
+
 use crate::types::chat::{ChatCompletionRequest, ContentPart, Message, MessageContent};
 use std::collections::HashSet;
 
@@ -133,15 +134,12 @@ fn validate_sampling_parameters(request: &ChatCompletionRequest) -> Result<()> {
 
 /// Validates a single message for errors.
 fn validate_message(message: &Message, index: usize) -> Result<()> {
-    // Role validation
-    match message.role.as_str() {
-        "user" | "assistant" | "system" | "tool" => {}
-        _ => {
-            return Err(Error::ConfigError(format!(
-            "Invalid role at message[{}]: '{}'. Must be 'user', 'assistant', 'system', or 'tool'",
-            index, message.role
-        )))
-        }
+    // Role validation - ChatRole enum ensures only valid values
+    match message.role {
+        crate::types::chat::ChatRole::User |
+        crate::types::chat::ChatRole::Assistant |
+        crate::types::chat::ChatRole::System |
+        crate::types::chat::ChatRole::Tool => {}
     }
 
     // Content validation based on role
@@ -149,7 +147,7 @@ fn validate_message(message: &Message, index: usize) -> Result<()> {
 
     // Tool calls validation for assistant messages
     if let Some(tool_calls) = &message.tool_calls {
-        if message.role != "assistant" {
+        if message.role != crate::types::chat::ChatRole::Assistant {
             return Err(Error::ConfigError(format!(
                 "Message at index {} has tool_calls but role is '{}', not 'assistant'",
                 index, message.role
@@ -158,13 +156,13 @@ fn validate_message(message: &Message, index: usize) -> Result<()> {
 
         // Validate each tool call
         for (tc_idx, tc) in tool_calls.iter().enumerate() {
-            if tc.id.trim().is_empty() {
+            if tc.id.is_empty() {
                 return Err(Error::ConfigError(format!(
                     "Tool call {tc_idx} at message {index} has empty id"
                 )));
             }
 
-            if tc.kind != "function" {
+            if tc.kind != crate::models::tool::ToolType::Function {
                 return Err(Error::ConfigError(format!(
                     "Tool call {} at message {} has invalid type: '{}'. Must be 'function'",
                     tc_idx, index, tc.kind
@@ -180,9 +178,9 @@ fn validate_message(message: &Message, index: usize) -> Result<()> {
     }
 
     // Tool call ID validation for tool messages
-    if message.role == "tool"
+    if message.role == crate::types::chat::ChatRole::Tool
         && (message.tool_call_id.is_none()
-            || message.tool_call_id.as_ref().unwrap().trim().is_empty())
+            || message.tool_call_id.as_ref().unwrap().is_empty())
     {
         return Err(Error::ConfigError(format!(
             "Tool message at index {} must have a non-empty tool_call_id",
@@ -198,7 +196,7 @@ fn validate_message_content(message: &Message, index: usize) -> Result<()> {
     match &message.content {
         MessageContent::Text(text) => {
             // For tool messages, content can be empty (some providers allow empty results)
-            if message.role != "tool" && text.trim().is_empty() && message.tool_calls.is_none() {
+            if message.role != crate::types::chat::ChatRole::Tool && text.trim().is_empty() && message.tool_calls.is_none() {
                 return Err(Error::ConfigError(format!(
                     "Message at index {} must have either non-empty content or tool_calls",
                     index
@@ -207,7 +205,7 @@ fn validate_message_content(message: &Message, index: usize) -> Result<()> {
         }
         MessageContent::Parts(parts) => {
             // Multimodal content is only allowed for user messages
-            if message.role != "user" {
+            if message.role != crate::types::chat::ChatRole::User {
                 return Err(Error::ConfigError(format!(
                     "Multimodal content (ContentParts) is only allowed for user messages, got role '{}' at index {}",
                     message.role, index
@@ -369,7 +367,7 @@ pub fn estimate_message_tokens(message: &Message) -> u32 {
 
     // Add tokens for tool call ID if present
     let tool_call_id_tokens = if let Some(tool_call_id) = &message.tool_call_id {
-        tool_call_id.len() as u32 / 4
+        tool_call_id.as_str().len() as u32 / 4
     } else {
         0
     };
@@ -437,7 +435,7 @@ mod tests {
     fn create_valid_chat_request() -> ChatCompletionRequest {
         ChatCompletionRequest {
             model: "openai/gpt-4o".to_string(),
-            messages: vec![Message::text("user", "Hello, world!")],
+            messages: vec![Message::text(crate::types::chat::ChatRole::User, "Hello, world!")],
             stream: None,
             response_format: None,
             tools: None,

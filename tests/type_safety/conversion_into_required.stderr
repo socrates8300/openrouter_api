@@ -1,0 +1,17 @@
+error[E0308]: mismatched types
+  --> tests/type_safety/conversion_into_required.rs:17:31
+   |
+17 |     let result = takes_string(id);
+   |                  ------------ ^^ expected `String`, found `ModelId`
+   |                  |
+   |                  arguments to this function are incorrect
+   |
+note: function defined here
+  --> tests/type_safety/conversion_into_required.rs:9:4
+   |
+ 9 | fn takes_string(s: String) -> String {
+   |    ^^^^^^^^^^^^ ---------
+help: try using a conversion method
+   |
+17 |     let result = takes_string(id.to_string());
+   |                                 ++++++++++++

@@ -1,0 +1,7 @@
+error[E0308]: mismatched types
+  --> tests/type_safety/id_type_mismatch.rs:12:39
+   |
+12 |     let generation_id: GenerationId = model_id;
+   |                        ------------   ^^^^^^^^ expected `GenerationId`, found `ModelId`
+   |                        |
+   |                        expected due to this

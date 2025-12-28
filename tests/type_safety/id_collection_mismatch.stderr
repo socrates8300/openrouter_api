@@ -1,0 +1,13 @@
+warning: unused imports: `ActivityId` and `ToolCallId`
+ --> tests/type_safety/id_collection_mismatch.rs:6:29
+  |
+6 | use openrouter_api::types::{ActivityId, GenerationId, ModelId, ToolCallId};
+  |                             ^^^^^^^^^^                         ^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error[E0308]: mismatched types
+  --> tests/type_safety/id_collection_mismatch.rs:12:9
+   |
+12 |         GenerationId::new("gen-1"), // ERROR: type mismatch with previous element
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `ModelId`, found `GenerationId`

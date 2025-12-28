@@ -1,0 +1,5 @@
+error[E0599]: no variant or associated item named `Maybe` found for enum `CancellationStatus` in the current scope
+  --> tests/type_safety/cancellation_invalid_variant.rs:11:46
+   |
+11 |     let invalid_cancel = CancellationStatus::Maybe;
+   |                                              ^^^^^ variant or associated item not found in `CancellationStatus`

@@ -18,6 +18,7 @@ pub struct ProvidersApi {
 
 impl ProvidersApi {
     /// Creates a new ProvidersApi with the given reqwest client and configuration.
+    #[must_use = "returns an API client that should be used for API calls"]
     pub fn new(client: Client, config: &crate::client::ClientConfig) -> Result<Self> {
         Ok(Self {
             client,
@@ -83,12 +84,9 @@ impl ProvidersApi {
             format!("{}/providers", self.config.base_url)
         };
 
-        // Use pre-built headers from config
-        let headers = self.config.headers.clone();
-
         // Execute request with retry logic
         let response = execute_with_retry_builder(&self.config.retry_config, GET_PROVIDERS, || {
-            self.client.get(&url).headers(headers.clone())
+            self.client.get(&url).headers((*self.config.headers).clone())
         })
         .await?;
 

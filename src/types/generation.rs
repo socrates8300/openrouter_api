@@ -2,11 +2,14 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::types::ids::GenerationId;
+use crate::types::status::{CancellationStatus, StreamingStatus};
+
 /// Generation data returned by the OpenRouter API.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct GenerationData {
     /// Unique identifier for the generation
-    pub id: String,
+    pub id: GenerationId,
     /// Upstream API identifier (if available)
     pub upstream_id: Option<String>,
     /// Total cost of the generation in credits
@@ -22,9 +25,9 @@ pub struct GenerationData {
     /// Application ID (if applicable)
     pub app_id: Option<i64>,
     /// Whether the generation was streamed
-    pub streamed: Option<bool>,
+    pub streamed: StreamingStatus,
     /// Whether the generation was cancelled
-    pub cancelled: Option<bool>,
+    pub cancelled: CancellationStatus,
     /// Name of the provider that handled the generation
     pub provider_name: Option<String>,
     /// Latency in milliseconds (if available)
@@ -87,17 +90,17 @@ impl GenerationData {
 
     /// Check if the generation was successful.
     pub fn is_successful(&self) -> bool {
-        self.cancelled != Some(true)
+        !self.cancelled.is_cancelled()
     }
 
     /// Check if the generation was streamed.
     pub fn was_streamed(&self) -> bool {
-        self.streamed.unwrap_or(false)
+        self.streamed.is_active()
     }
 
     /// Check if the generation was cancelled.
     pub fn was_cancelled(&self) -> bool {
-        self.cancelled.unwrap_or(false)
+        self.cancelled.is_cancelled()
     }
 
     /// Get the effective cost (total cost minus cache discount).
@@ -152,7 +155,7 @@ impl GenerationResponse {
 
     /// Get generation ID.
     pub fn id(&self) -> &str {
-        &self.data.id
+        self.data.id.as_str()
     }
 
     /// Get model used.
@@ -217,7 +220,7 @@ mod tests {
 
     fn create_test_generation_data() -> GenerationData {
         GenerationData {
-            id: "gen-123456".to_string(),
+            id: GenerationId::new("gen-123456"),
             upstream_id: Some("upstream-789".to_string()),
             total_cost: 0.025,
             cache_discount: Some(0.005),
@@ -225,8 +228,8 @@ mod tests {
             created_at: "2024-01-15T10:30:00Z".to_string(),
             model: "openai/gpt-4".to_string(),
             app_id: Some(12345),
-            streamed: Some(true),
-            cancelled: Some(false),
+            streamed: StreamingStatus::Complete,
+            cancelled: CancellationStatus::NotCancelled,
             provider_name: Some("OpenAI".to_string()),
             latency: Some(1500),
             moderation_latency: Some(100),
@@ -310,7 +313,7 @@ mod tests {
     fn test_generation_data_edge_cases() {
         // Test with minimal data
         let minimal_data = GenerationData {
-            id: "gen-minimal".to_string(),
+            id: GenerationId::new("gen-minimal"),
             upstream_id: None,
             total_cost: 0.01,
             cache_discount: None,
@@ -318,8 +321,8 @@ mod tests {
             created_at: "2024-01-15T10:30:00Z".to_string(),
             model: "openai/gpt-3.5-turbo".to_string(),
             app_id: None,
-            streamed: None,
-            cancelled: None,
+            streamed: StreamingStatus::default(),
+            cancelled: CancellationStatus::default(),
             provider_name: None,
             latency: None,
             moderation_latency: None,
@@ -366,5 +369,73 @@ mod tests {
         let json = serde_json::to_string(&response).unwrap();
         let parsed: GenerationResponse = serde_json::from_str(&json).unwrap();
         assert_eq!(response, parsed);
+    }
+
+    #[test]
+    fn test_generation_id_serialization() {
+        let generation = GenerationData {
+            id: GenerationId::new("gen-12345"),
+            upstream_id: Some("upstream-789".to_string()),
+            total_cost: 0.025,
+            cache_discount: Some(0.005),
+            upstream_inference_cost: Some(0.020),
+            created_at: "2024-01-15T10:30:00Z".to_string(),
+            model: "openai/gpt-4".to_string(),
+            app_id: Some(12345),
+            streamed: StreamingStatus::Complete,
+            cancelled: CancellationStatus::NotCancelled,
+            provider_name: Some("OpenAI".to_string()),
+            latency: Some(1500),
+            moderation_latency: Some(100),
+            generation_time: Some(1200),
+            finish_reason: Some("stop".to_string()),
+            native_finish_reason: Some("stop".to_string()),
+            tokens_prompt: Some(50),
+            tokens_completion: Some(100),
+            native_tokens_prompt: Some(50),
+            native_tokens_completion: Some(100),
+            native_tokens_reasoning: Some(25),
+            num_media_prompt: Some(2),
+            num_media_completion: Some(0),
+            num_search_results: Some(5),
+            origin: "api".to_string(),
+            usage: 0.025,
+            is_byok: false,
+        };
+
+        // Test that GenerationId serializes as a plain string
+        let json = serde_json::to_string(&generation).unwrap();
+        assert!(json.contains("\"gen-12345\""));
+
+        // Test deserialization roundtrip
+        let deserialized: GenerationData = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.id.as_str(), "gen-12345");
+    }
+
+    #[test]
+    fn test_generation_id_from_string() {
+        let id: GenerationId = "string-id".into();
+        assert_eq!(id.as_str(), "string-id");
+
+        let id2: GenerationId = String::from("string-id-2").into();
+        assert_eq!(id2.as_str(), "string-id-2");
+    }
+
+    #[test]
+    fn test_generation_id_display() {
+        let id = GenerationId::new("test-display");
+        assert_eq!(format!("{}", id), "test-display");
+    }
+
+    #[test]
+    fn test_generation_id_hash() {
+        use std::collections::HashSet;
+
+        let mut set = HashSet::new();
+        set.insert(GenerationId::new("id-1"));
+        set.insert(GenerationId::new("id-2"));
+        set.insert(GenerationId::new("id-1")); // Duplicate
+
+        assert_eq!(set.len(), 2); // Should only have 2 unique IDs
     }
 }

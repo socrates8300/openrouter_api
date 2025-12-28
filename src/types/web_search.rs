@@ -2,7 +2,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Request type for performing a web search.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, PartialEq, Eq)]
 pub struct WebSearchRequest {
     /// The search query string.
     pub query: String,
@@ -13,7 +13,7 @@ pub struct WebSearchRequest {
 }
 
 /// A single search result.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq)]
 pub struct WebSearchResult {
     /// The title of the search result.
     pub title: String,
@@ -25,7 +25,7 @@ pub struct WebSearchResult {
 }
 
 /// Response type returned by the web search API.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq)]
 pub struct WebSearchResponse {
     /// The original search query.
     pub query: String,

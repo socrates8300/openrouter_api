@@ -33,8 +33,10 @@ output.txt
 
 # docs
 **/tasks/
+docs/agent_context.db
 
 # Rust and toolchain
 /.rustup
 tarpaulin-report.html
 .DS_Store
+docs/agent_context.db

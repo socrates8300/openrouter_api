@@ -1,9 +1,40 @@
 use crate::models::tool::{ToolCall, ToolCallChunk};
+use crate::types::ids::ToolCallId;
+use crate::types::status::StreamingStatus;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+/// Content type for multimodal message parts.
+///
+/// This enum represents the different types of content that can be included in a message,
+/// such as text, images, audio, or files. Using an enum with serde tagging makes
+/// invalid content types unrepresentable at compile time.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum ContentType {
+    /// Plain text content.
+    Text,
+    /// Image content with URL or base64 data.
+    ImageUrl,
+    /// Audio content with URL.
+    AudioUrl,
+    /// File content (e.g., PDF) with URL.
+    FileUrl,
+}
+
+impl std::fmt::Display for ContentType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ContentType::Text => write!(f, "text"),
+            ContentType::ImageUrl => write!(f, "image_url"),
+            ContentType::AudioUrl => write!(f, "audio_url"),
+            ContentType::FileUrl => write!(f, "file_url"),
+        }
+    }
+}
+
 /// Defines the role of a chat message (user, assistant, or system).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum ChatRole {
     User,
@@ -12,8 +43,19 @@ pub enum ChatRole {
     Tool,
 }
 
+impl std::fmt::Display for ChatRole {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ChatRole::User => write!(f, "user"),
+            ChatRole::Assistant => write!(f, "assistant"),
+            ChatRole::System => write!(f, "system"),
+            ChatRole::Tool => write!(f, "tool"),
+        }
+    }
+}
+
 /// Stop sequence for chat completion - can be a string or array of strings.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum StopSequence {
     Single(String),
@@ -21,7 +63,7 @@ pub enum StopSequence {
 }
 
 /// Prediction configuration for latency optimization.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PredictionConfig {
     #[serde(rename = "type")]
     pub prediction_type: String, // "content"
@@ -29,7 +71,7 @@ pub struct PredictionConfig {
 }
 
 /// Verbosity level for model responses.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum VerbosityLevel {
     Low,
@@ -38,14 +80,14 @@ pub enum VerbosityLevel {
 }
 
 /// Route strategy for model routing.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum RouteStrategy {
     Fallback,
 }
 
 /// Image detail level for vision models.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum ImageDetail {
     Auto,
@@ -54,15 +96,15 @@ pub enum ImageDetail {
 }
 
 /// Text content part for multimodal messages.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TextContent {
     #[serde(rename = "type")]
-    pub content_type: String, // "text"
+    pub content_type: ContentType,
     pub text: String,
 }
 
 /// Image URL content for multimodal messages.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ImageUrl {
     pub url: String, // URL or base64 encoded image data
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -70,10 +112,10 @@ pub struct ImageUrl {
 }
 
 /// Image content part for multimodal messages.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ImageContent {
     #[serde(rename = "type")]
-    pub content_type: String, // "image_url"
+    pub content_type: ContentType,
     pub image_url: ImageUrl,
 }
 
@@ -87,7 +129,7 @@ pub struct AudioUrl {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AudioContent {
     #[serde(rename = "type")]
-    pub content_type: String, // "audio_url"
+    pub content_type: ContentType,
     pub audio_url: AudioUrl,
 }
 
@@ -101,7 +143,7 @@ pub struct FileUrl {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct FileContent {
     #[serde(rename = "type")]
-    pub content_type: String, // "file_url"
+    pub content_type: ContentType,
     pub file_url: FileUrl,
 }
 
@@ -124,14 +166,14 @@ pub enum MessageContent {
 }
 
 /// Represents a chat message with a role and content.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Message {
-    pub role: String,
+    pub role: ChatRole,
     pub content: MessageContent,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tool_call_id: Option<String>,
+    pub tool_call_id: Option<ToolCallId>,
     // Optionally include tool_calls when the assistant message contains a tool call.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_calls: Option<Vec<ToolCall>>,
@@ -140,7 +182,7 @@ pub struct Message {
 impl Default for Message {
     fn default() -> Self {
         Self {
-            role: "user".to_string(),
+            role: ChatRole::User,
             content: MessageContent::Text("".to_string()),
             name: None,
             tool_call_id: None,
@@ -151,9 +193,9 @@ impl Default for Message {
 
 impl Message {
     /// Create a simple text message (backward compatible).
-    pub fn text(role: impl Into<String>, content: impl Into<String>) -> Self {
+    pub fn text(role: ChatRole, content: impl Into<String>) -> Self {
         Self {
-            role: role.into(),
+            role,
             content: MessageContent::Text(content.into()),
             name: None,
             tool_calls: None,
@@ -163,12 +205,12 @@ impl Message {
 
     /// Create a message with a name.
     pub fn text_with_name(
-        role: impl Into<String>,
+        role: ChatRole,
         content: impl Into<String>,
         name: impl Into<String>,
     ) -> Self {
         Self {
-            role: role.into(),
+            role,
             content: MessageContent::Text(content.into()),
             name: Some(name.into()),
             tool_calls: None,
@@ -177,9 +219,9 @@ impl Message {
     }
 
     /// Create a multimodal message with content parts.
-    pub fn multimodal(role: impl Into<String>, parts: Vec<ContentPart>) -> Self {
+    pub fn multimodal(role: ChatRole, parts: Vec<ContentPart>) -> Self {
         Self {
-            role: role.into(),
+            role,
             content: MessageContent::Parts(parts),
             name: None,
             tool_calls: None,
@@ -188,9 +230,9 @@ impl Message {
     }
 
     /// Create a tool message.
-    pub fn tool(content: impl Into<String>, tool_call_id: impl Into<String>) -> Self {
+    pub fn tool(content: impl Into<String>, tool_call_id: impl Into<ToolCallId>) -> Self {
         Self {
-            role: "tool".to_string(),
+            role: ChatRole::Tool,
             content: MessageContent::Text(content.into()),
             name: None,
             tool_calls: None,
@@ -204,7 +246,7 @@ impl Message {
         tool_calls: Vec<ToolCall>,
     ) -> Self {
         Self {
-            role: "assistant".to_string(),
+            role: ChatRole::Assistant,
             content: content
                 .map(|c| MessageContent::Text(c.into()))
                 .unwrap_or(MessageContent::Text("".to_string())),
@@ -224,7 +266,7 @@ pub struct ChatCompletionRequest {
     pub messages: Vec<Message>,
     /// Whether the response should be streamed.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub stream: Option<bool>,
+    pub stream: Option<StreamingStatus>,
     /// (Optional) Response format for structured outputs.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub response_format: Option<crate::api::request::ResponseFormatConfig>,

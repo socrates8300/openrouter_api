@@ -1,0 +1,13 @@
+error[E0308]: mismatched types
+  --> tests/type_safety/id_function_arg_mismatch.rs:16:32
+   |
+16 |     let result = process_model(generation_id);
+   |                  ------------- ^^^^^^^^^^^^^ expected `ModelId`, found `GenerationId`
+   |                  |
+   |                  arguments to this function are incorrect
+   |
+note: function defined here
+  --> tests/type_safety/id_function_arg_mismatch.rs:8:4
+   |
+ 8 | fn process_model(model_id: ModelId) -> String {
+   |    ^^^^^^^^^^^^^ -----------------

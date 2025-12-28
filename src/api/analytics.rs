@@ -1,5 +1,5 @@
+#![allow(dead_code)]
 use crate::error::{Error, Result};
-#[allow(dead_code, unused_imports)]
 use crate::types::analytics::{ActivityRequest, ActivityResponse, SortField, SortOrder};
 use crate::utils::retry::operations::GET_ACTIVITY;
 use crate::utils::{retry::execute_with_retry_builder, retry::handle_response_json};
@@ -14,6 +14,7 @@ pub struct AnalyticsApi {
 
 impl AnalyticsApi {
     /// Creates a new AnalyticsApi with the given reqwest client and configuration.
+    #[must_use = "returns an API client that should be used for analytics operations"]
     pub fn new(client: Client, config: &crate::client::ClientConfig) -> Result<Self> {
         Ok(Self {
             client,
@@ -34,7 +35,7 @@ impl AnalyticsApi {
     ///
     /// Returns an `ActivityResponse` containing:
     /// - List of activity data entries with detailed request information
-    /// - Total count of entries matching the query
+    /// - Total count of entries matching query
     /// - Whether more results are available
     ///
     /// # Errors
@@ -55,7 +56,7 @@ impl AnalyticsApi {
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = OpenRouterClient::from_env()?;
     ///
-    ///     // Get activity for the last 7 days
+    ///     // Get activity for last 7 days
     ///     let request = ActivityRequest::new()
     ///         .with_start_date("2024-01-01")
     ///         .with_end_date("2024-01-07")
@@ -89,6 +90,7 @@ impl AnalyticsApi {
     ///     Ok(())
     /// }
     /// ```
+    #[must_use = "returns an activity response that should be processed"]
     pub async fn get_activity(&self, request: ActivityRequest) -> Result<ActivityResponse> {
         // Validate the request parameters
         request.validate().map_err(Error::ConfigError)?;
@@ -139,12 +141,9 @@ impl AnalyticsApi {
             query_params.push(("offset", offset.to_string()));
         }
 
-        // Use pre-built headers from config
-        let headers = self.config.headers.clone();
-
         // Execute request with retry logic
         let response = execute_with_retry_builder(&self.config.retry_config, GET_ACTIVITY, || {
-            let mut req_builder = self.client.get(url.clone()).headers(headers.clone());
+            let mut req_builder = self.client.get(url.clone()).headers((*self.config.headers).clone());
 
             // Add query parameters if any
             if !query_params.is_empty() {
@@ -193,6 +192,7 @@ impl AnalyticsApi {
     ///     Ok(())
     /// }
     /// ```
+    #[must_use = "returns the activity response that should be processed"]
     pub async fn get_activity_by_date_range(
         &self,
         start_date: &str,
@@ -201,8 +201,8 @@ impl AnalyticsApi {
         let request = ActivityRequest::new()
             .with_start_date(start_date)
             .with_end_date(end_date)
-            .with_sort(crate::types::analytics::SortField::CreatedAt)
-            .with_order(crate::types::analytics::SortOrder::Descending);
+            .with_sort(SortField::CreatedAt)
+            .with_order(SortOrder::Descending);
 
         self.get_activity(request).await
     }
@@ -234,6 +234,7 @@ impl AnalyticsApi {
     ///     Ok(())
     /// }
     /// ```
+    #[must_use = "returns the activity response that should be processed"]
     pub async fn get_recent_activity(&self) -> Result<ActivityResponse> {
         // Calculate date for recent activity
         let end_date = chrono::Utc::now().format("%Y-%m-%d").to_string();
@@ -245,8 +246,8 @@ impl AnalyticsApi {
         let request = ActivityRequest::new()
             .with_start_date(start_date)
             .with_end_date(end_date)
-            .with_sort(crate::types::analytics::SortField::CreatedAt)
-            .with_order(crate::types::analytics::SortOrder::Descending)
+            .with_sort(SortField::CreatedAt)
+            .with_order(SortOrder::Descending)
             .with_limit(crate::types::analytics::constants::MAX_LIMIT);
 
         self.get_activity(request).await
@@ -296,8 +297,8 @@ impl AnalyticsApi {
     ) -> Result<ActivityResponse> {
         let mut request = ActivityRequest::new()
             .with_model(model)
-            .with_sort(crate::types::analytics::SortField::CreatedAt)
-            .with_order(crate::types::analytics::SortOrder::Descending);
+            .with_sort(SortField::CreatedAt)
+            .with_order(SortOrder::Descending);
 
         if let Some(start) = start_date {
             request = request.with_start_date(start);
@@ -354,8 +355,8 @@ impl AnalyticsApi {
     ) -> Result<ActivityResponse> {
         let mut request = ActivityRequest::new()
             .with_provider(provider)
-            .with_sort(crate::types::analytics::SortField::CreatedAt)
-            .with_order(crate::types::analytics::SortOrder::Descending);
+            .with_sort(SortField::CreatedAt)
+            .with_order(SortOrder::Descending);
 
         if let Some(start) = start_date {
             request = request.with_start_date(start);
@@ -395,6 +396,7 @@ mod tests {
 
         // Verify that the API config was created successfully
         // The API key should NOT be stored in the API config for security reasons
+        // headers is now Arc<HeaderMap>, but Arc implements Deref so methods work the same
         assert!(!analytics_api.config.headers.is_empty());
         assert!(analytics_api.config.headers.contains_key("authorization"));
     }
