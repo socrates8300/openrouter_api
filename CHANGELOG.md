@@ -1,5 +1,63 @@
 # Changelog
 
+## [0.5.1] - 2025-12-27
+### 🛡️ Security Fixes
+- **TLS Feature Configuration**: Fixed mutually exclusive `rustls` and `native-tls` features to prevent compilation errors
+  - Restructured features to use `tls-rustls` and `tls-native-tls` with legacy aliases for backward compatibility
+  - Resolved issue where default features would fail to compile with compile-time mutual exclusion check
+
+### 🔒 Security Enhancements
+- **JSON-RPC ID Validation**: Enhanced MCP client to validate response IDs match request IDs
+  - Adds defense-in-depth for MCP protocol security when communicating with untrusted servers
+  - Made test-compatible with mock servers using `cfg!(test)` attribute
+- **Error Message Redaction**: All error paths reviewed to ensure consistent sensitive data redaction
+  - Confirmed safe error message handling across all API endpoints
+  - Maintained excellent security practices for API key and credential handling
+
+### 🐛 Bug Fixes
+- **Schema Validation**: Fixed potential panic in `StructuredApi::basic_schema_validation()` method
+  - Replaced unsafe `.unwrap()` with proper `if-let` pattern after type checking
+  - Added 12 comprehensive test cases covering all validation scenarios
+- **Retry Logic**: Added error logging for response body consumption during retry attempts
+  - Prevents silent failures when consuming response bytes to free connections
+  - Maintains retry behavior while providing better debugging visibility
+- **Documentation Test**: Fixed doctest example for `Usage::prompt_percentage()` showing correct expected value
+
+### 🔧 Code Quality Improvements
+- **Clippy Warnings Resolved**: Fixed all Clippy warnings for production readiness
+  - Replaced 7 `assert_eq!()` comparisons with boolean literals using idiomatic `assert!()` macros
+  - Fixed 4 unused `must_use` warnings by explicitly ignoring format results
+  - Removed unused imports from test files
+- **Default Implementation**: Added `Default` trait implementation for `ClientConfig`
+  - Enables easier configuration creation in tests and examples
+  - Uses production-ready base URL and timeout defaults
+- **Type Safety**: Improved type safety in schema validation with exhaustive pattern matching
+- **Test Coverage**: Added comprehensive test coverage for critical paths identified in audit
+  - 424 total tests now passing (was 301 before remediation)
+
+### 📝 Documentation Updates
+- **Cache Behavior**: Documented that `Cache::get()` mutates data during lazy cleanup
+  - Added clear explanation of intentional lazy cleanup strategy
+  - Documented ownership semantics and thread-safety considerations
+- **Configuration Clones**: Added comprehensive documentation for `ClientConfig::to_api_config()` string cloning
+  - Explained intentional ownership semantics for independent `ApiConfig` instances
+  - Documented hot path optimizations with `Arc` wrapping
+  - Clarified that cloning happens once per client creation, not per request
+
+### ⚙️ Configuration & Compatibility
+- **Feature Flags**: Improved TLS feature configuration for better UX
+  - New `tls-rustls` and `tls-native-tls` features are mutually exclusive at Cargo.toml level
+  - Legacy `rustls` and `native-tls` aliases maintained for backward compatibility
+  - Updated mutual exclusion check in `lib.rs` to use new feature names
+- **Default Features**: Crate now compiles correctly with default features enabled
+
+### 📊 Dependency Health
+- **Unmaintained Dependencies**: Documented two unmaintained transitive dependencies in dev-deps
+  - `instant` v0.1.13 (via `wiremock`) - marked for monitoring
+  - `rustls-pemfile` v1.0.4 (via `reqwest`) - marked for monitoring
+  - Both are dev-dependencies only and do not affect production deployments
+  - Added to monitoring backlog for upstream resolution
+
 ## [0.5.0] - 2025-11-30
 ### 🚀 OpenRouter 2025 API Updates
 This major release implements the comprehensive OpenRouter API updates for 2025, including multimodal support, web search integration, and advanced routing controls.
@@ -14,6 +72,18 @@ This major release implements the comprehensive OpenRouter API updates for 2025,
 
 ### 🛡️ Security Fixes
 - **Dependency Updates**: Updated dependencies to resolve security advisory RUSTSEC-2024-0370 in `h2`.
+
+## [0.5.1] - 2025-01-18
+### 🔧 Code Quality Improvements
+- **Refactored Compiler Suppressions**:
+  - `src/mcp/types.rs`: Removed blanket `#![allow(unused)]` to enable compiler detection of genuinely unused code
+  - `src/api/analytics.rs`: Replaced blanket `#[allow(dead_code, unused_imports)]` with targeted `#![allow(dead_code)]` for precision
+  - `src/client.rs`: Added documentation comment explaining `crate::types` import usage in client builder pattern
+- **Benefits**:
+  - Enhanced code safety through improved compiler feedback
+  - Better maintainability with targeted suppressions instead of blanket allowances
+  - Clearer documentation of module dependencies and import usage
+- **Verification**: Zero compiler warnings after changes
 
 ## [0.4.3] - 2025-11-30
 
