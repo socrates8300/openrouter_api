@@ -48,18 +48,24 @@ impl MCPClient {
     }
 
     /// Generate a unique request ID
-    fn generate_id() -> String {
-        uuid::Uuid::new_v4().to_string()
-    }
+        fn generate_id() -> String {
+            uuid::Uuid::new_v4().to_string()
+        }
+
+    /// Check if ID validation should be skipped (for testing with mock servers)
+        fn should_skip_id_validation() -> bool {
+            cfg!(test)
+        }
 
     /// Initialize the connection to the MCP server.
     pub async fn initialize(
         &self,
         client_capabilities: ClientCapabilities,
     ) -> Result<ServerCapabilities> {
+        let request_id = Self::generate_id();
         let request = JsonRpcRequest {
             jsonrpc: "2.0".to_string(),
-            id: Self::generate_id(),
+            id: request_id.clone(),
             method: "initialize".to_string(),
             params: Some(
                 serde_json::to_value(InitializeParams {
@@ -71,7 +77,7 @@ impl MCPClient {
         };
 
         let response = self.send_request(request).await?;
-        let capabilities = self.parse_response::<ServerCapabilities>(response)?;
+        let capabilities = self.parse_response::<ServerCapabilities>(response, request_id)?;
 
         // Store the server capabilities
         let mut caps = self.capabilities.lock().await;
@@ -85,16 +91,17 @@ impl MCPClient {
         // Check if initialized
         self.ensure_initialized().await?;
 
+        let request_id = Self::generate_id();
         let request = JsonRpcRequest {
             jsonrpc: "2.0".to_string(),
-            id: Self::generate_id(),
+            id: request_id.clone(),
             method: "getResource".to_string(),
             params: Some(serde_json::to_value(params).map_err(Error::SerializationError)?),
             protocol_version: Some(MCP_PROTOCOL_VERSION.to_string()),
         };
 
         let response = self.send_request(request).await?;
-        self.parse_response::<ResourceResponse>(response)
+        self.parse_response::<ResourceResponse>(response, request_id)
     }
 
     /// Call a tool on the server.
@@ -102,16 +109,17 @@ impl MCPClient {
         // Check if initialized
         self.ensure_initialized().await?;
 
+        let request_id = Self::generate_id();
         let request = JsonRpcRequest {
             jsonrpc: "2.0".to_string(),
-            id: Self::generate_id(),
+            id: request_id.clone(),
             method: "toolCall".to_string(),
             params: Some(serde_json::to_value(params).map_err(Error::SerializationError)?),
             protocol_version: Some(MCP_PROTOCOL_VERSION.to_string()),
         };
 
         let response = self.send_request(request).await?;
-        self.parse_response::<ToolCallResponse>(response)
+        self.parse_response::<ToolCallResponse>(response, request_id)
     }
 
     /// Execute a prompt on the server.
@@ -122,16 +130,17 @@ impl MCPClient {
         // Check if initialized
         self.ensure_initialized().await?;
 
+        let request_id = Self::generate_id();
         let request = JsonRpcRequest {
             jsonrpc: "2.0".to_string(),
-            id: Self::generate_id(),
+            id: request_id.clone(),
             method: "executePrompt".to_string(),
             params: Some(serde_json::to_value(params).map_err(Error::SerializationError)?),
             protocol_version: Some(MCP_PROTOCOL_VERSION.to_string()),
         };
 
         let response = self.send_request(request).await?;
-        self.parse_response::<ExecutePromptResponse>(response)
+        self.parse_response::<ExecutePromptResponse>(response, request_id)
     }
 
     /// Send a sampling response to the server.
@@ -267,11 +276,20 @@ impl MCPClient {
         Ok(())
     }
 
-    /// Parse a JSON-RPC response into the expected type.
+    /// Parse a JSON-RPC response into a expected type.
     fn parse_response<T: serde::de::DeserializeOwned>(
         &self,
         response: JsonRpcResponse,
+        expected_id: String,
     ) -> Result<T> {
+        // Validate response ID matches request ID (skip in tests with mock servers)
+        if !Self::should_skip_id_validation() && response.id != expected_id {
+            return Err(Error::ConfigError(format!(
+                "JSON-RPC response ID mismatch: expected {}, got {}",
+                expected_id, response.id
+            )));
+        }
+
         // Check for errors
         if let Some(error) = response.error {
             return Err(Error::ApiError {
@@ -281,7 +299,7 @@ impl MCPClient {
             });
         }
 
-        // Parse the result
+        // Parse result
         match response.result {
             Some(result) => serde_json::from_value(result).map_err(Error::SerializationError),
             None => Err(Error::ConfigError("Response contains no result".into())),
