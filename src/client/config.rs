@@ -1,5 +1,6 @@
 use crate::error::{Error, Result};
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
+use std::sync::Arc;
 use std::time::Duration;
 use url::Url;
 use zeroize::ZeroizeOnDrop;
@@ -89,13 +90,14 @@ pub struct ApiConfig {
     pub site_title: Option<String>,
     pub user_id: Option<String>,
     pub timeout: Duration,
-    pub retry_config: RetryConfig,
+    pub retry_config: Arc<RetryConfig>,
     pub max_response_bytes: usize,
-    pub headers: HeaderMap,
+    pub headers: Arc<HeaderMap>,
 }
 
 impl ClientConfig {
     /// Build HTTP headers required for making API calls.
+    /// Returns a HeaderMap (will be wrapped in Arc in to_api_config).
     /// Returns an error if any header value cannot be constructed.
     pub fn build_headers(&self) -> Result<HeaderMap> {
         let mut headers = HeaderMap::new();
@@ -122,20 +124,51 @@ impl ClientConfig {
             headers.insert("X-User-ID", user_value);
         }
         Ok(headers)
-    }
+        }
 
-    /// Create an ApiConfig for API instances (excludes sensitive API key)
-    pub fn to_api_config(&self) -> Result<ApiConfig> {
-        Ok(ApiConfig {
-            base_url: self.base_url.clone(),
-            http_referer: self.http_referer.clone(),
-            site_title: self.site_title.clone(),
-            user_id: self.user_id.clone(),
-            timeout: self.timeout,
-            retry_config: self.retry_config.clone(),
-            max_response_bytes: self.max_response_bytes,
-            headers: self.build_headers()?,
-        })
+        /// Create an ApiConfig for API instances (excludes sensitive API key).
+        ///
+        /// # Ownership Semantics
+        /// This method clones string values (`base_url`, `http_referer`, etc.)
+        /// to ensure `ApiConfig` owns its data independently of the parent
+        /// `ClientConfig`. This is intentional design:
+        ///
+        /// - `ApiConfig` is meant to be thread-safe and independently usable
+        /// - Clones happen once per client creation, not per request
+        /// - Headers and retry_config are wrapped in `Arc` for shared access
+        /// - Performance impact is negligible for typical configuration sizes
+        ///
+        /// # Hot Path Optimization
+        /// The `retry_config` and `headers` are wrapped in `Arc` to avoid
+        /// expensive clones on API request hot paths.
+        pub fn to_api_config(&self) -> Result<ApiConfig> {
+            let headers = self.build_headers()?;
+            Ok(ApiConfig {
+                base_url: self.base_url.clone(),
+                http_referer: self.http_referer.clone(),
+                site_title: self.site_title.clone(),
+                user_id: self.user_id.clone(),
+                timeout: self.timeout,
+                retry_config: Arc::new(self.retry_config.clone()),
+                max_response_bytes: self.max_response_bytes,
+                headers: Arc::new(headers),
+            })
+        }
+}
+
+impl Default for ClientConfig {
+    fn default() -> Self {
+        Self {
+            api_key: None,
+            base_url: Url::parse("https://openrouter.ai/api/v1")
+                .expect("Default base URL should be valid"),
+            http_referer: None,
+            site_title: None,
+            user_id: None,
+            timeout: Duration::from_secs(120),
+            retry_config: RetryConfig::default(),
+            max_response_bytes: 10 * 1024 * 1024, // 10MB
+        }
     }
 }
 
