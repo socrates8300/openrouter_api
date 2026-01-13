@@ -352,7 +352,7 @@ pub struct ChatCompletionRequest {
 }
 
 /// A choice returned by the chat API.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Choice {
     pub message: Message,
     pub finish_reason: Option<String>,
@@ -363,13 +363,13 @@ pub struct Choice {
 }
 
 /// Log probabilities information.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct LogProbs {
     pub content: Option<Vec<TokenLogProb>>,
 }
 
 /// Token log probability information.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TokenLogProb {
     pub token: String,
     pub logprob: f32,
@@ -378,7 +378,7 @@ pub struct TokenLogProb {
 }
 
 /// Top log probability information.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TopLogProb {
     pub token: String,
     pub logprob: f32,
@@ -386,7 +386,7 @@ pub struct TopLogProb {
 }
 
 /// Usage data returned from the API.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Usage {
     pub prompt_tokens: u32,
     pub completion_tokens: u32,
@@ -402,7 +402,7 @@ pub struct Usage {
 
 /// Additional cost details available when the request contains `"usage": { "include": true }`.
 /// See <https://openrouter.ai/docs/guides/guides/usage-accounting>
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CostDetails {
     pub upstream_inference_cost: f64,
     pub upstream_inference_prompt_cost: f64,
@@ -410,7 +410,7 @@ pub struct CostDetails {
 }
 
 /// Details about prompt token usage.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct PromptTokensDetails {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cached_tokens: Option<u32>,
@@ -423,7 +423,7 @@ pub struct PromptTokensDetails {
 }
 
 /// Details about completion token usage.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CompletionTokensDetails {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning_tokens: Option<u32>,
@@ -436,7 +436,7 @@ pub struct CompletionTokensDetails {
 }
 
 /// Chat completion response.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ChatCompletionResponse {
     pub id: String,
     pub choices: Vec<Choice>,
