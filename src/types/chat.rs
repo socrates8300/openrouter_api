@@ -391,10 +391,22 @@ pub struct Usage {
     pub prompt_tokens: u32,
     pub completion_tokens: u32,
     pub total_tokens: u32,
+    pub cost: Option<f64>,
+    pub is_byok: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prompt_tokens_details: Option<PromptTokensDetails>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub completion_tokens_details: Option<CompletionTokensDetails>,
+    pub cost_details: Option<CostDetails>,
+}
+
+/// Additional cost details available when the request contains `"usage": { "include": true }`.
+/// See <https://openrouter.ai/docs/guides/guides/usage-accounting>
+#[derive(Debug, Deserialize)]
+pub struct CostDetails {
+    pub upstream_inference_cost: f64,
+    pub upstream_inference_prompt_cost: f64,
+    pub upstream_inference_completion_cost: f64,
 }
 
 /// Details about prompt token usage.
