@@ -404,9 +404,9 @@ pub struct Usage {
 /// See <https://openrouter.ai/docs/guides/guides/usage-accounting>
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CostDetails {
-    pub upstream_inference_cost: f64,
-    pub upstream_inference_prompt_cost: f64,
-    pub upstream_inference_completion_cost: f64,
+    pub upstream_inference_cost: Option<f64>,
+    pub upstream_inference_prompt_cost: Option<f64>,
+    pub upstream_inference_completion_cost: Option<f64>,
 }
 
 /// Details about prompt token usage.
