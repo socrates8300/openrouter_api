@@ -1,6 +1,5 @@
 use crate::models::tool::{ToolCall, ToolCallChunk};
 use crate::types::ids::ToolCallId;
-use crate::types::status::StreamingStatus;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -258,7 +257,7 @@ impl Message {
 }
 
 /// Chat completion request matching the OpenRouter API schema.
-#[derive(Debug, Serialize, Clone, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct ChatCompletionRequest {
     /// The model ID to use.
     pub model: String,
@@ -266,7 +265,7 @@ pub struct ChatCompletionRequest {
     pub messages: Vec<Message>,
     /// Whether the response should be streamed.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub stream: Option<StreamingStatus>,
+    pub stream: Option<bool>,
     /// (Optional) Response format for structured outputs.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub response_format: Option<crate::api::request::ResponseFormatConfig>,

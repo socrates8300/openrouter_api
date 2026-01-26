@@ -16,11 +16,11 @@
 use crate::models::structured::JsonSchemaConfig;
 use crate::models::tool::Tool;
 use crate::types::chat::Message;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 /// Representation for enabling structured outputs in the request payload.
-#[derive(Debug, Clone, Serialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ResponseFormatConfig {
     /// Fixed string indicating the type of response format.

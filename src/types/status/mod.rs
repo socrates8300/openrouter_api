@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// Replaces `Option<bool>` to make invalid states unrepresentable.
 /// Supports multiple serialization formats for API compatibility.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum StreamingStatus {
     /// Streaming has not started
