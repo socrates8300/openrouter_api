@@ -68,7 +68,10 @@ fn test_web_search_plugin() {
     let request = ChatCompletionRequest {
         model: "openai/gpt-4o".to_string(),
         messages: vec![Message::text(ChatRole::User, "Search for Rust news")],
-        plugins: Some(vec![Plugin { id: "web".to_string(), config: None }]),
+        plugins: Some(vec![Plugin {
+            id: "web".to_string(),
+            config: None,
+        }]),
         ..Default::default()
     };
 

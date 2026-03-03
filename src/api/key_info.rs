@@ -53,7 +53,9 @@ impl KeyInfoApi {
             })?;
 
         let response = execute_with_retry_builder(&self.config.retry_config, GET_KEY_INFO, || {
-            self.client.get(url.clone()).headers((*self.config.headers).clone())
+            self.client
+                .get(url.clone())
+                .headers((*self.config.headers).clone())
         })
         .await?;
 

@@ -15,8 +15,8 @@ use futures::TryStreamExt;
 use reqwest::Client;
 use serde_json;
 use std::pin::Pin;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use tokio_util::codec::{FramedRead, LinesCodec};
 use tokio_util::io::StreamReader;
 

@@ -167,11 +167,9 @@ impl MCPClient {
     /// Send a JSON-RPC request to the server.
     async fn send_request(&self, request: JsonRpcRequest) -> Result<JsonRpcResponse> {
         // Acquire semaphore permit to limit concurrent requests
-        let _permit = self
-            .semaphore
-            .acquire()
-            .await
-            .map_err(|_| Error::ResourceExhausted("Too many concurrent MCP requests".to_string()))?;
+        let _permit = self.semaphore.acquire().await.map_err(|_| {
+            Error::ResourceExhausted("Too many concurrent MCP requests".to_string())
+        })?;
 
         // Check request size limit before sending
         let request_json = serde_json::to_string(&request).map_err(Error::SerializationError)?;
