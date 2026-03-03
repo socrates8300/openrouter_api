@@ -143,8 +143,7 @@ let config = RetryConfig::default();
 
 // Or with custom time caps:
 let config = RetryConfig::default()
-    .with_total_timeout(Duration::from_secs(60))
-    .with_max_retry_interval(Duration::from_secs(10));
+    .with_total_timeout(Duration::from_secs(60));
 ```
 
 ## Testing

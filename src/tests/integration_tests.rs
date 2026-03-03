@@ -71,6 +71,7 @@ mod tests {
             prediction: None,
             parallel_tool_calls: None,
             verbosity: None,
+            debug: None,
             plugins: None,
         };
 
@@ -150,7 +151,9 @@ mod tests {
             },
             http_client: None,
             _state: std::marker::PhantomData,
-            router_config: None, // Add this field
+            router_config: None,
+            cached_api_config: None,
+            providers_cache: None,
         };
 
         // Validate the tool calls – should return Ok.
@@ -254,7 +257,6 @@ mod tests {
         // Serialize the complete payload.
         let payload = builder.build();
         let payload_json = serde_json::to_string_pretty(&payload)?;
-        println!("Payload with provider preferences:\n{payload_json}");
 
         // Check that the serialized JSON contains the "provider" key with the expected configuration.
         let payload_value: Value = serde_json::from_str(&payload_json)?;
@@ -346,12 +348,12 @@ mod tests {
             prediction: None,
             parallel_tool_calls: None,
             verbosity: None,
+            debug: None,
             plugins: None,
         };
 
         // Serialize to JSON to verify the structure
         let json = serde_json::to_string_pretty(&request)?;
-        println!("Chat request with provider preferences: {json}");
 
         // Verify that the provider field is serialized as an object, not a string
         let parsed: serde_json::Value = serde_json::from_str(&json)?;

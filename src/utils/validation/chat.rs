@@ -467,6 +467,7 @@ mod tests {
             prediction: None,
             parallel_tool_calls: None,
             verbosity: None,
+            debug: None,
             plugins: None,
         }
     }

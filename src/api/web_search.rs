@@ -12,8 +12,8 @@ use reqwest::Client;
 
 /// API endpoint for web search integration.
 pub struct WebSearchApi {
-    pub client: Client,
-    pub config: crate::client::ApiConfig,
+    pub(crate) client: Client,
+    pub(crate) config: crate::client::ApiConfig,
 }
 
 impl WebSearchApi {

@@ -6,6 +6,7 @@ use url::Url;
 
 use crate::error::{Error, Result};
 use crate::mcp::types::*;
+use crate::utils::security::create_safe_error_message;
 
 /// MCP client for connecting to and interacting with MCP servers.
 #[derive(Clone)]
@@ -170,12 +171,12 @@ impl MCPClient {
             .semaphore
             .acquire()
             .await
-            .map_err(|_| Error::ConfigError("Too many concurrent MCP requests".to_string()))?;
+            .map_err(|_| Error::ResourceExhausted("Too many concurrent MCP requests".to_string()))?;
 
         // Check request size limit before sending
         let request_json = serde_json::to_string(&request).map_err(Error::SerializationError)?;
         if request_json.len() > self.config.max_request_size {
-            return Err(Error::ConfigError(format!(
+            return Err(Error::ResourceExhausted(format!(
                 "Request too large: {} bytes (max: {})",
                 request_json.len(),
                 self.config.max_request_size
@@ -186,7 +187,8 @@ impl MCPClient {
             self.config.request_timeout,
             self.client
                 .post(self.server_url.clone())
-                .json(&request)
+                .header("Content-Type", "application/json")
+                .body(request_json)
                 .send(),
         )
         .await
@@ -199,9 +201,11 @@ impl MCPClient {
         .map_err(Error::HttpError)?;
 
         if !response.status().is_success() {
+            let status_code = response.status().as_u16();
+            let raw_body = response.text().await.unwrap_or_default();
             return Err(Error::ApiError {
-                code: response.status().as_u16(),
-                message: response.text().await.unwrap_or_default(),
+                code: status_code,
+                message: create_safe_error_message(&raw_body, "MCP server error"),
                 metadata: None,
             });
         }
@@ -209,7 +213,7 @@ impl MCPClient {
         // Check response size limit from Content-Length header
         let content_length = response.content_length().unwrap_or(0);
         if content_length > self.config.max_response_size as u64 {
-            return Err(Error::ConfigError(format!(
+            return Err(Error::ResourceExhausted(format!(
                 "Response too large: {} bytes (max: {})",
                 content_length, self.config.max_response_size
             )));
@@ -223,7 +227,7 @@ impl MCPClient {
         while let Some(chunk) = stream.next().await {
             let chunk = chunk.map_err(Error::HttpError)?;
             if body_bytes.len() + chunk.len() > self.config.max_response_size {
-                return Err(Error::ConfigError(format!(
+                return Err(Error::ResourceExhausted(format!(
                     "Response body exceeded maximum size of {} bytes",
                     self.config.max_response_size
                 )));
@@ -243,18 +247,16 @@ impl MCPClient {
     /// Send a JSON-RPC response to the server with security controls.
     async fn send_response(&self, response: JsonRpcResponse) -> Result<()> {
         // Acquire semaphore permit to limit concurrent requests
-        let _permit = self
-            .semaphore
-            .acquire()
-            .await
-            .map_err(|_| Error::ConfigError("Too many concurrent MCP requests".to_string()))?;
+        let _permit = self.semaphore.acquire().await.map_err(|_| {
+            Error::ResourceExhausted("Too many concurrent MCP requests".to_string())
+        })?;
 
         // Validate response size before sending
         // Note: We use max_request_size for all outgoing messages (requests and responses)
         let response_json = serde_json::to_string(&response).map_err(Error::SerializationError)?;
 
         if response_json.len() > self.config.max_request_size {
-            return Err(Error::ConfigError(format!(
+            return Err(Error::ResourceExhausted(format!(
                 "Response too large: {} bytes (max: {})",
                 response_json.len(),
                 self.config.max_request_size
@@ -266,11 +268,12 @@ impl MCPClient {
             self.config.request_timeout,
             self.client
                 .post(self.server_url.clone())
+                .header("Content-Type", "application/json")
                 .body(response_json)
                 .send(),
         )
         .await
-        .map_err(|_| Error::ConfigError("MCP response timed out".to_string()))?
+        .map_err(|_| Error::TimeoutError("MCP response timed out".to_string()))?
         .map_err(Error::HttpError)?;
 
         Ok(())
@@ -293,7 +296,7 @@ impl MCPClient {
         // Check for errors
         if let Some(error) = response.error {
             return Err(Error::ApiError {
-                code: error.code as u16,
+                code: error.code.try_into().unwrap_or(500),
                 message: error.message,
                 metadata: error.data,
             });
@@ -383,6 +386,7 @@ mod tests {
         assert!(result.is_err());
         let error = result.unwrap_err();
         match &error {
+            Error::TimeoutError(msg) => assert!(msg.contains("timeout")),
             Error::ConfigError(msg) => assert!(msg.contains("timed out")),
             Error::HttpError(_) => {} // HTTP timeout errors are also acceptable
             _ => panic!("Expected timeout error, got: {:?}", error),
@@ -416,8 +420,8 @@ mod tests {
 
         assert!(result.is_err());
         match result.unwrap_err() {
-            Error::ConfigError(msg) => assert!(msg.contains("too large")),
-            _ => panic!("Expected size limit error"),
+            Error::ResourceExhausted(msg) => assert!(msg.contains("too large")),
+            _ => panic!("Expected ResourceExhausted error"),
         }
     }
 
@@ -465,8 +469,8 @@ mod tests {
         assert!(result.is_err());
         let error = result.unwrap_err();
         match &error {
-            Error::ConfigError(msg) => assert!(msg.contains("Request too large")),
-            _ => panic!("Expected request size error, got: {:?}", error),
+            Error::ResourceExhausted(msg) => assert!(msg.contains("Request too large")),
+            _ => panic!("Expected ResourceExhausted error, got: {:?}", error),
         }
     }
 
@@ -474,15 +478,17 @@ mod tests {
     async fn test_concurrent_request_limiting() {
         let mock_server = MockServer::start().await;
 
-        // Create a slow response to test concurrent limiting
+        // Each request takes 300ms. With concurrency limit 2 and 4 requests,
+        // minimum wall time is 2 batches * 300ms = 600ms.
+        // Without limiting, all 4 would complete in ~300ms.
         Mock::given(matchers::method("POST"))
             .respond_with(
                 ResponseTemplate::new(StatusCode::OK)
-                    .set_delay(Duration::from_millis(200))
+                    .set_delay(Duration::from_millis(300))
                     .set_body_json(serde_json::json!({
                         "jsonrpc": "2.0",
                         "id": "test",
-                        "result": {"protocolVersion": "2025-03-26"}
+                        "result": {"protocol_version": "2025-03-26"}
                     })),
             )
             .mount(&mock_server)
@@ -490,12 +496,15 @@ mod tests {
 
         let client = MCPClient::new_with_config(mock_server.uri(), create_test_config()).unwrap();
 
-        // Launch 3 concurrent requests (limit is 2)
         let capabilities = ClientCapabilities {
             protocol_version: "2025-03-26".to_string(),
             supports_sampling: None,
         };
-        let handles: Vec<_> = (0..3)
+
+        let start = std::time::Instant::now();
+
+        // Launch 4 concurrent requests (semaphore limit is 2)
+        let handles: Vec<_> = (0..4)
             .map(|_| {
                 let client = client.clone();
                 let caps = capabilities.clone();
@@ -504,15 +513,31 @@ mod tests {
             .collect();
 
         let results: Vec<_> = futures::future::join_all(handles).await;
+        let elapsed = start.elapsed();
 
-        // Count successful requests
-        let successes = results.iter().filter(|r| matches!(r, Ok(Ok(_)))).count();
+        // All 4 requests must succeed (semaphore queues, doesn't reject)
+        let mut successes = 0;
+        let mut errors: Vec<String> = Vec::new();
+        for r in &results {
+            match r {
+                Ok(Ok(_)) => successes += 1,
+                Ok(Err(e)) => errors.push(format!("Request error: {:?}", e)),
+                Err(e) => errors.push(format!("Join error: {:?}", e)),
+            }
+        }
 
-        // At most 2 should succeed (the limit)
+        assert_eq!(
+            successes, 4,
+            "All 4 requests should succeed (semaphore queues, doesn't reject). Got {}, errors: {:?}",
+            successes, errors
+        );
+
+        // Verify concurrency was bounded: 4 requests * 300ms each with concurrency 2
+        // requires at least 2 batches = 600ms. Without limiting, it would be ~300ms.
         assert!(
-            successes <= 2,
-            "Expected at most 2 successful requests, got {}",
-            successes
+            elapsed >= Duration::from_millis(500),
+            "Expected >= 500ms (2 batches of 300ms), got {:?}. Semaphore may not be limiting.",
+            elapsed
         );
     }
 
@@ -574,8 +599,8 @@ mod tests {
         assert!(result.is_err());
         let error = result.unwrap_err();
         match &error {
-            Error::ConfigError(msg) => assert!(msg.contains("too large")),
-            _ => panic!("Expected size validation error, got: {:?}", error),
+            Error::ResourceExhausted(msg) => assert!(msg.contains("too large")),
+            _ => panic!("Expected ResourceExhausted error, got: {:?}", error),
         }
     }
 
@@ -610,8 +635,8 @@ mod tests {
         assert!(result.is_err());
         let error = result.unwrap_err();
         match &error {
-            Error::ConfigError(msg) => assert!(msg.contains("exceeded maximum size")),
-            _ => panic!("Expected size validation error, got: {:?}", error),
+            Error::ResourceExhausted(msg) => assert!(msg.contains("exceeded maximum size")),
+            _ => panic!("Expected ResourceExhausted error, got: {:?}", error),
         }
     }
 }

@@ -48,10 +48,15 @@ pub fn redact_sensitive_content(content: &str) -> String {
 
     // Truncate if too long to prevent log overflow
     if redacted.len() > 1000 {
+        // Walk back from 1000 to find a valid char boundary (avoids panicking on multi-byte UTF-8)
+        let mut end = 1000;
+        while end > 0 && !redacted.is_char_boundary(end) {
+            end -= 1;
+        }
         format!(
             "{}...[truncated {} chars]",
-            &redacted[..500],
-            redacted.len() - 500
+            &redacted[..end],
+            redacted.len() - end
         )
     } else {
         redacted
@@ -59,7 +64,8 @@ pub fn redact_sensitive_content(content: &str) -> String {
 }
 
 /// Redacts sensitive fields from JSON-like content
-pub fn redact_json_fields(content: &str) -> String {
+#[cfg(test)]
+pub(crate) fn redact_json_fields(content: &str) -> String {
     let mut redacted = content.to_string();
 
     // Common sensitive field names
@@ -113,14 +119,6 @@ pub fn create_safe_error_message(error_content: &str, fallback_message: &str) ->
             redacted
         }
     }
-}
-
-/// Creates a safe error message for logging while preserving debugging info
-pub fn create_safe_error_message_for_logging(
-    error_content: &str,
-    fallback_message: &str,
-) -> String {
-    create_safe_error_message(error_content, fallback_message)
 }
 
 #[cfg(test)]
@@ -201,7 +199,10 @@ pub mod security_tests {
         let long_content = "A".repeat(2000);
         let redacted = redact_sensitive_content(&long_content);
 
-        assert!(redacted.len() <= 1000);
+        // Keeps 1000 chars of content + truncation suffix, so shorter than original 2000
+        assert!(redacted.len() < 2000);
         assert!(redacted.contains("...[truncated"));
+        // Verify it starts with 1000 'A's (the threshold matches the cut point)
+        assert!(redacted.starts_with(&"A".repeat(1000)));
     }
 }

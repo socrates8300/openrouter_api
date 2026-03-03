@@ -52,6 +52,7 @@ tls-native-tls = ["reqwest/native-tls"]
 rustls = ["tls-rustls"]
 native-tls = ["tls-native-tls"]
 tracing = ["dep:tracing"]
+allow-http = []
 
 [package.metadata.docs.rs]
 all-features = true

@@ -1,6 +1,6 @@
-use openrouter_api::{OpenRouterClient, utils, ModelGroups, PredefinedModelCoverageProfile};
-use openrouter_api::types::chat::Message;
 use openrouter_api::models::structured::JsonSchemaConfig;
+use openrouter_api::types::chat::{ChatRole, Message};
+use openrouter_api::{utils, ModelGroups, OpenRouterClient, PredefinedModelCoverageProfile};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
@@ -24,17 +24,15 @@ async fn main() -> Result<(), openrouter_api::Error> {
         .with_http_referer("https://github.com/your-org/your-repo")
         .with_timeout(Duration::from_secs(60))
         .with_model_coverage_profile(PredefinedModelCoverageProfile::Custom(
-            ModelGroups::general()
+            ModelGroups::general(),
         ))
         .with_api_key(api_key)?;
 
     // Create a simple chat message
-    let messages = vec![Message {
-        role: "user".to_string(),
-        content: "Recommend a sci-fi movie from the 1980s".to_string(),
-        name: None,
-        tool_calls: None,
-    }];
+    let messages = vec![Message::text(
+        ChatRole::User,
+        "Recommend a sci-fi movie from the 1980s",
+    )];
 
     // Define JSON schema for structured output
     let schema = JsonSchemaConfig {
@@ -50,16 +48,15 @@ async fn main() -> Result<(), openrouter_api::Error> {
                 "description": {"type": "string"}
             },
             "required": ["title", "year", "director", "genre", "description"]
-        })).unwrap(),
+        }))
+        .unwrap(),
     };
 
     // Get a structured response
     let structured_api = client.structured()?;
-    let movie: MovieRecommendation = structured_api.generate(
-        "openai/gpt-4o",
-        messages,
-        schema
-    ).await?;
+    let movie: MovieRecommendation = structured_api
+        .generate("openai/gpt-4o", messages, schema)
+        .await?;
 
     println!("Recommended movie: {} ({})", movie.title, movie.year);
     println!("Director: {}", movie.director);
@@ -68,4 +65,3 @@ async fn main() -> Result<(), openrouter_api::Error> {
 
     Ok(())
 }
-

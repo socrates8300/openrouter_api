@@ -1,0 +1,66 @@
+{
+  "metadata": {
+    "task_short": "api-gap-phase1",
+    "agent_abbr": "ar",
+    "datetime_utc": "2026-03-02T20:00:00Z",
+    "filename": "2026-03-02T20-00-00Z__api-gap-phase1__ar.json",
+    "supersedes": null,
+    "version": "1.0"
+  },
+  "state": {
+    "objectives": [
+      "Architectural review of OpenRouter API Rust client library",
+      "Evaluate type-state builder, module organization, retry strategy, streaming, error handling, MCP integration, separation of concerns"
+    ],
+    "constraints": [
+      "Review only - no code changes in this iteration"
+    ],
+    "important_facts": [
+      "Codebase compiles clean with no warnings",
+      "Branch feat/api-gap-phase1 adds embeddings and key_info endpoints",
+      "types/ and models/ have overlapping domain concepts (Message, Usage, Choice duplicated in types/common.rs vs types/chat.rs)",
+      "models/common.rs is empty (1 line), models/chat.rs duplicates ChatRole from types/chat.rs",
+      "lib.rs uses pub use types::* which could cause namespace collisions as types grow",
+      "MCP client is architecturally isolated but does not share retry logic with main client",
+      "Streaming uses Semaphore for backpressure but semaphore is never contended (acquired and released within same sequential loop iteration)",
+      "API endpoint accessor methods on OpenRouterClient<Ready> all clone http_client per call",
+      "11 API endpoint modules, all follow same pattern: struct with client + config, new() takes ClientConfig ref"
+    ],
+    "decisions_made": [],
+    "artifacts": [
+      "/Volumes/BugsBunny/Development/openrouter_api/src/client.rs",
+      "/Volumes/BugsBunny/Development/openrouter_api/src/api/chat.rs",
+      "/Volumes/BugsBunny/Development/openrouter_api/src/utils/retry.rs",
+      "/Volumes/BugsBunny/Development/openrouter_api/src/mcp/client.rs",
+      "/Volumes/BugsBunny/Development/openrouter_api/src/error.rs"
+    ],
+    "dependencies": [],
+    "risks_issues": [
+      "Semaphore backpressure in streaming is architecturally inert: HIGH",
+      "types/ vs models/ boundary is unclear and has duplication: MEDIUM",
+      "Glob re-export of types::* from lib.rs risks namespace pollution: MEDIUM",
+      "MCP client duplicates HTTP/retry concerns instead of sharing: LOW",
+      "API accessor methods clone reqwest::Client on every call: LOW (reqwest::Client is Arc-based)"
+    ]
+  },
+  "iteration": {
+    "summary": "Completed full architectural review of the OpenRouter API Rust client. Read all core modules including client.rs, all api/ endpoints, types/, models/, utils/ (retry, security, validation), mcp/, and error.rs. Identified 5 key architectural findings ranging from a non-functional semaphore backpressure mechanism to module boundary confusion between types/ and models/. The type-state builder pattern is well-implemented. Retry logic is solid. Error hierarchy is reasonable but has some semantic misuse.",
+    "inputs_consulted": [
+      "src/lib.rs", "src/client.rs", "src/error.rs",
+      "src/api/mod.rs", "src/api/chat.rs", "src/api/completion.rs", "src/api/embeddings.rs", "src/api/request.rs",
+      "src/types/mod.rs", "src/types/chat.rs", "src/types/common.rs", "src/types/embeddings.rs", "src/types/key_info.rs",
+      "src/models/mod.rs", "src/models/chat.rs", "src/models/common.rs",
+      "src/utils/mod.rs", "src/utils/retry.rs", "src/utils/security.rs", "src/utils/validation/mod.rs",
+      "src/mcp/mod.rs", "src/mcp/client.rs", "src/mcp/types.rs"
+    ],
+    "outputs_produced": ["Architectural review document (in conversation)"],
+    "next_actions": [
+      "Consider consolidating types/ and models/ modules",
+      "Fix or remove semaphore backpressure in streaming",
+      "Consider an ApiEndpoint trait to reduce boilerplate across 11 endpoint modules"
+    ]
+  },
+  "cross_agent_notes": {
+    "mentions": []
+  }
+}

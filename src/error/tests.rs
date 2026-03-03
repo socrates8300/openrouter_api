@@ -219,7 +219,6 @@ mod tests {
         let _model_error = Error::ModelNotAvailable("Model unavailable".to_string());
         let _credential_error = Error::MissingCredential("API key missing".to_string());
         let _timeout_error = Error::TimeoutError("Request timed out".to_string());
-        let _unknown_error = Error::Unknown;
 
         // If this compiles, the error types are correctly defined
     }

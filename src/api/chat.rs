@@ -15,23 +15,19 @@ use futures::TryStreamExt;
 use reqwest::Client;
 use serde_json;
 use std::pin::Pin;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
-use tokio::sync::Semaphore;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio_util::codec::{FramedRead, LinesCodec};
 use tokio_util::io::StreamReader;
 
 // Streaming safety limits to prevent memory exhaustion
 const MAX_LINE_LENGTH: usize = 64 * 1024; // 64KB per line
 const MAX_TOTAL_CHUNKS: usize = 10_000; // Maximum chunks per stream
-const MAX_CONCURRENT_CHUNKS: usize = 10; // Maximum chunks processing concurrently
-const CHUNK_PROCESSING_DELAY_MS: u64 = 10; // Delay between chunks for backpressure
 
 /// API endpoint for chat completions.
 pub struct ChatApi {
-    pub client: Client,
-    pub config: crate::client::ApiConfig,
+    pub(crate) client: Client,
+    pub(crate) config: crate::client::ApiConfig,
 }
 
 impl ChatApi {
@@ -115,9 +111,7 @@ impl ChatApi {
             return Box::pin(futures::stream::once(async { Err(e) }));
         }
 
-        // Set up backpressure control
-        let semaphore = Arc::new(Semaphore::new(MAX_CONCURRENT_CHUNKS));
-        let chunk_count = Arc::new(AtomicUsize::new(0));
+        let chunk_count = AtomicUsize::new(0);
 
         // Build the URL for the chat completions endpoint.
         let url = match self.config.base_url.join("chat/completions") {
@@ -148,8 +142,6 @@ impl ChatApi {
         };
         req_body["stream"] = serde_json::Value::Bool(true);
 
-        // ApiConfig already contains headers
-
         let stream = try_stream! {
             // Issue the POST request
             let response = client
@@ -177,18 +169,14 @@ impl ChatApi {
             // Process the bytes stream as an asynchronous line stream.
             let byte_stream = response.bytes_stream().map_err(std::io::Error::other);
             let stream_reader = StreamReader::new(byte_stream);
-            let mut lines = FramedRead::new(stream_reader, LinesCodec::new());
+            let mut lines = FramedRead::new(stream_reader, LinesCodec::new_with_max_length(MAX_LINE_LENGTH));
 
             while let Some(line_result) = lines.next().await {
                 let line = line_result.map_err(|e| Error::StreamingError(format!("Failed to read stream line: {e}")))?;
 
-                // Safety check: Line length limit
-                if line.len() > MAX_LINE_LENGTH {
-                    Err(Error::StreamingError(format!(
-                        "Line too long: {} bytes (max: {})",
-                        line.len(),
-                        MAX_LINE_LENGTH
-                    )))?;
+                // Skip empty lines before incurring chunk budget or backpressure cost
+                if line.trim().is_empty() {
+                    continue;
                 }
 
                 // Safety check: Chunk count limit
@@ -199,17 +187,6 @@ impl ChatApi {
                     )))?;
                 }
 
-                // Apply backpressure - acquire semaphore permit
-                let _permit = semaphore.acquire().await
-                    .map_err(|_| Error::StreamingError("Failed to acquire backpressure permit".to_string()))?;
-
-                // Add small delay for backpressure control
-                tokio::time::sleep(Duration::from_millis(CHUNK_PROCESSING_DELAY_MS)).await;
-
-                if line.trim().is_empty() {
-                    continue;
-                }
-
                 if line.starts_with("data:") {
                     let data_part = line.trim_start_matches("data:").trim();
                     if data_part == "[DONE]" {
@@ -218,7 +195,6 @@ impl ChatApi {
 
                     match serde_json::from_str::<ChatCompletionChunk>(data_part) {
                         Ok(chunk) => {
-                            // Permit is automatically released when _permit goes out of scope
                             yield chunk;
                         },
                         Err(e) => {
@@ -227,13 +203,12 @@ impl ChatApi {
                                 "Streaming chunk parse error"
                             );
 
-                            // Use tracing if available, otherwise fall back to eprintln
+                            // Log via tracing if available; otherwise silently skip
+                            // malformed chunks (library crates must not write to stderr).
                             #[cfg(feature = "tracing")]
                             tracing::error!("Streaming parse error: {}", error_msg);
 
-                            #[cfg(not(feature = "tracing"))]
-                            eprintln!("Streaming parse error: {}", error_msg);
-
+                            let _ = error_msg; // suppress unused warning when tracing is off
                             continue;
                         }
                     }
@@ -244,7 +219,6 @@ impl ChatApi {
                     // Try to parse as a regular JSON message (non-SSE format)
                     match serde_json::from_str::<ChatCompletionChunk>(&line) {
                         Ok(chunk) => {
-                            // Permit is automatically released when _permit goes out of scope
                             yield chunk;
                         },
                         Err(_) => continue,
@@ -261,38 +235,18 @@ impl ChatApi {
         let request = ChatCompletionRequest {
             model: model.to_string(),
             messages: vec![Message::text(ChatRole::User, user_message)],
-            stream: None,
-            response_format: None,
-            tools: None,
-            tool_choice: None,
-            provider: None,
-            models: None,
-            transforms: None,
-            route: None,
-            user: None,
-            max_tokens: None,
-            temperature: None,
-            top_p: None,
-            top_k: None,
-            frequency_penalty: None,
-            presence_penalty: None,
-            repetition_penalty: None,
-            min_p: None,
-            top_a: None,
-            seed: None,
-            stop: None,
-            logit_bias: None,
-            logprobs: None,
-            top_logprobs: None,
-            prediction: None,
-            parallel_tool_calls: None,
-            verbosity: None,
-            plugins: None,
+            ..Default::default()
         };
 
         let response = self.chat_completion(request).await?;
 
-        match &response.choices[0].message.content {
+        let choice = response.choices.first().ok_or_else(|| Error::ApiError {
+            code: 500,
+            message: "API returned no choices".into(),
+            metadata: None,
+        })?;
+
+        match &choice.message.content {
             MessageContent::Text(content) => Ok(content.clone()),
             MessageContent::Parts(_) => Err(Error::ConfigError(
                 "Unexpected multimodal content in simple completion response".into(),

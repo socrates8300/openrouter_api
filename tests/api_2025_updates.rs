@@ -3,7 +3,7 @@ use openrouter_api::client::{
 };
 use openrouter_api::types::chat::{
     AudioContent, AudioUrl, ChatCompletionRequest, ChatRole, ContentPart, ContentType, FileContent,
-    FileUrl, Message,
+    FileUrl, Message, Plugin,
 };
 use openrouter_api::types::provider::ProviderPreferences;
 
@@ -68,12 +68,12 @@ fn test_web_search_plugin() {
     let request = ChatCompletionRequest {
         model: "openai/gpt-4o".to_string(),
         messages: vec![Message::text(ChatRole::User, "Search for Rust news")],
-        plugins: Some(vec!["web".to_string()]),
+        plugins: Some(vec![Plugin { id: "web".to_string(), config: None }]),
         ..Default::default()
     };
 
     let json_req = serde_json::to_value(&request).unwrap();
-    assert_eq!(json_req["plugins"][0], "web");
+    assert_eq!(json_req["plugins"][0]["id"], "web");
 }
 
 #[test]

@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod cache;
+pub mod https;
 pub mod retry;
 pub mod security;
 pub mod url_builder;
