@@ -1,5 +1,39 @@
 # Changelog
 
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.5.2] - 2026-03-03
+
+### Added
+- **Embeddings API**: New `client.embeddings()?.create_embedding(request)` endpoint with `EmbeddingRequest`, `EmbeddingInput` (single/batch), `EmbeddingResponse` types, and convenience methods (`first_embedding()`, `embeddings()`)
+- **Key Info API**: New `client.key_info()?.get_key_info()` endpoint with `KeyInfoResponse`, `KeyInfoData`, `RateLimitInfo` types, and convenience methods (`limit()`, `usage()`, `is_free_tier()`)
+- **Test Helpers**: Shared `test_helpers.rs` module with `test_client_config()` to reduce copy-pasted test setup across API modules
+- **Retry & Streaming Tests**: Consolidated retry-after header and streaming backpressure tests into `retry_and_streaming_tests.rs`
+
+### Changed
+- **Test module visibility**: Changed `pub mod tests` to `#[cfg(test)] mod tests` in `lib.rs` so test infrastructure no longer ships in release builds
+- **Security function visibility**: Made `redact_json_fields` `pub(crate)` + `#[cfg(test)]` (zero production callers)
+
+### Removed
+- **Dead code**: Removed unused `create_safe_error_message_for_logging` function (trivial wrapper, zero callers)
+- **Dead code**: Removed unused `handle_response` method from client (superseded by `utils/retry/handle_response_json`)
+- **Dead code**: Removed unused MCP modules (`context.rs`, `strategy.rs`)
+- **Stale files**: Removed `docs/Overview.md`, `docs/final-ci-resolution.md`, separate validation test files (merged into main test modules)
+- **Debug output**: Removed `println!` calls from integration tests
+
+### Fixed
+- **Test setup duplication**: API module tests (`analytics`, `credits`, `generation`, `providers`) now use shared `test_client_config()` helper instead of duplicating `ClientConfig` construction
+
+### Testing
+- 471 tests passing (365 unit + 106 doc/integration), 0 failures
+- Clippy clean with `-D warnings` on both `tls-rustls` and `tls-native-tls`
+- Documentation builds clean on both TLS backends
+
+---
+
 ## [0.5.1] - 2025-12-27
 ### 🛡️ Security Fixes
 - **TLS Feature Configuration**: Fixed mutually exclusive `rustls` and `native-tls` features to prevent compilation errors
@@ -197,17 +231,11 @@ This release delivers comprehensive quality improvements and security enhancemen
 - Validation integrated into CompletionApi and WebSearchApi before sending requests.
 - Documentation improvements and consistent error messages.
 
-All notable changes to this project will be documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
 ## [0.3.0] - 2025-01-18
 
 ### 🚀 Major Release: Enterprise-Grade Error Handling Standardization
 
-This release represents a significant milestone with comprehensive error handling standardization across all API endpoints, delivering enterprise-grade reliability and production-ready resilience.
-This release represents a significant milestone with comprehensive error handling standardization across all API endpoints, delivering enterprise-grade reliability and production-ready resilience.
+This release delivers comprehensive error handling standardization across all API endpoints with enterprise-grade reliability.
 
 ### 🔧 **BREAKING CHANGES**
 
@@ -699,104 +727,13 @@ While this release maintains backward compatibility, users should be aware of:
 
 ---
 
-## Future Roadmap
-
-### v0.4.0 (Planned)
-
-- **Retry-After Header Support**: Respect server-provided retry guidance
-- **Circuit Breaker Pattern**: Prevent cascading failures
-- **Retry Budget Management**: Prevent excessive retries in high-throughput scenarios
-- **Metrics Integration**: Comprehensive retry metrics collection
-
-### v0.5.0 (Planned)
-
-- **Advanced Retry Strategies**: Custom retry decision logic
-- **Performance Optimizations**: Connection pooling and caching improvements
-- **Enhanced Monitoring**: Built-in metrics and observability features
-
----
-
 ## Contributors
 
-- **Development Team** - Core implementation, error handling standardization, and reliability enhancements
-- **Quality Assurance** - Comprehensive testing and validation
-- **Documentation Team** - Enhanced documentation and migration guides
-- **Community Contributors** - Bug reports, feature suggestions, and feedback
-
----
-
-## Acknowledgments
-
-- **OpenRouter** for providing the robust API platform
-- **Model Context Protocol** team for the MCP specification
-- **Rust Community** for excellent crates: `reqwest`, `tokio`, `serde`, `zeroize`, `thiserror`, `fastrand`
-- **Production Users** for valuable feedback on reliability requirements
-
----
-
-## Breaking Changes
-
-### v0.1.4
-
-1. **SecureApiKey Introduction**
-   ```rust
-   // OLD (v0.1.3 and earlier)
-   let client = OpenRouterClient::new()
-       .with_api_key("sk-key")?;
-   
-   // NEW (v0.1.4+) - Still supported, automatically wrapped
-   let client = OpenRouterClient::new()
-       .with_api_key("sk-key")?;
-   
-   // NEW - Explicit SecureApiKey usage
-   let secure_key = SecureApiKey::new("sk-key")?;
-   let client = OpenRouterClient::new()
-       .with_secure_api_key(secure_key)?;
-   ```
-
-2. **Enhanced Error Types**
-   - Error messages are now automatically redacted for security
-   - More detailed error context and metadata available
-   - Some error message formats may have changed
-
-3. **Validation Changes**
-   - Stricter API key validation (minimum length, format checks)
-   - Enhanced input validation for all request parameters
-   - Some previously accepted invalid inputs may now return errors
-
----
-
-## Migration Guide
-
-### From v0.1.3 to v0.1.4
-
-1. **No code changes required** for most users - the API remains backward compatible
-2. **Recommended changes** for enhanced security:
-   ```rust
-   // Use new convenience constructors
-   let client = OpenRouterClient::from_env()?;
-   
-   // Or for production
-   let client = OpenRouterClient::production(
-       "sk-key",
-       "My App",
-       "https://myapp.com"
-   )?;
-   ```
-3. **Test updates** may be needed if you're testing error messages
-4. **Environment variables**: Set `OPENROUTER_API_KEY` or `OR_API_KEY`
-
----
-
-## Contributors
-
-- Development Team - Core implementation and security enhancements
+- [James Ray](https://github.com/socrates8300) - Core implementation and maintenance
 - Community Contributors - Bug reports and feature suggestions
-
----
 
 ## Acknowledgments
 
 - [OpenRouter](https://openrouter.ai/) for providing the API platform
 - [Model Context Protocol](https://modelcontextprotocol.io/) team for the MCP specification
-- Rust community for excellent crates: `reqwest`, `tokio`, `serde`, `zeroize`, `thiserror`
+- Rust community for excellent crates: `reqwest`, `tokio`, `serde`, `zeroize`, `thiserror`, `fastrand`, `uuid`

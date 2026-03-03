@@ -1,55 +1,52 @@
 # OpenRouter API Client Library
 
-A production-ready Rust client for the OpenRouter API with comprehensive security, ergonomic design, and extensive testing. The library uses a type‑state builder pattern for compile-time configuration validation, ensuring robust and secure API interactions.
+A production-ready Rust client for the [OpenRouter API](https://openrouter.ai/docs) with comprehensive security, ergonomic design, and extensive testing. The library uses a type-state builder pattern for compile-time configuration validation, ensuring robust and secure API interactions.
 
 ## Features
 
-### 🏗️ **Architecture & Safety**
-- **Type‑State Builder Pattern:** Compile-time configuration validation ensures all required settings are provided before making requests
-- **Secure Memory Management:** API keys are automatically zeroed on drop using the `zeroize` crate for enhanced security
+### Architecture & Safety
+- **Type-State Builder Pattern:** Compile-time configuration validation ensures all required settings are provided before making requests
+- **Secure Memory Management:** API keys are automatically zeroed on drop using the `zeroize` crate
 - **Comprehensive Error Handling:** Centralized error management with safe error message redaction to prevent sensitive data leakage
 - **Modular Organization:** Clean separation of concerns across modules for models, API endpoints, types, and utilities
 
-### 🚀 **Ergonomic API Design**
-- **Convenient Constructors:** Quick setup with `from_api_key()`, `from_env()`, `quick()`, and `production()` methods
+### Ergonomic API Design
+- **Convenient Constructors:** Quick setup with `from_api_key()`, `from_env()`, and `production()` methods
 - **Flexible Configuration:** Fluent builder pattern with timeout, retry, and header configuration
 - **Environment Integration:** Automatic API key loading from `OPENROUTER_API_KEY` or `OR_API_KEY` environment variables
 
-### 🔒 **Security & Reliability**
-- **Standardized Error Handling:** Enterprise-grade retry logic with exponential backoff and jitter across all endpoints
-- **Memory Safety:** Secure API key handling with automatic memory zeroing
-- **Response Redaction:** Automatic sanitization of error messages to prevent sensitive data exposure
-- **Bounded Response Reading:** Strict, configurable size limits on response body reading to prevent OOM attacks (default 10MB)
+### Security & Reliability
+- **Bounded Response Reading:** Configurable size limits on response body reading to prevent OOM attacks (default 10 MB)
 - **Streaming Safety:** Buffer limits and backpressure handling for streaming responses
 - **Input Validation:** Comprehensive validation of requests and parameters
-- **Automatic Retries:** Configurable retry behavior for network failures and rate limiting
-- **Production Reliability:** Enterprise-grade error handling with exponential backoff and jitter
+- **Automatic Retries:** Configurable retry behavior with exponential backoff, jitter, and Retry-After header support
+- **Error Redaction:** Automatic sanitization of error messages to prevent sensitive data exposure
 
-### 🌐 **OpenRouter API Support**
-- **Chat Completions:** Full support for OpenRouter's chat completion API with streaming
-- **Text Completions:** Traditional text completion endpoint with customizable parameters
-- **Tool Calling:** Define and invoke function tools with proper validation
-- **Structured Outputs:** JSON Schema validation for structured response formats
+### OpenRouter API Support
+- **Chat Completions:** Full support with streaming, tool calling, and structured outputs
+- **Text Completions:** Traditional text completion endpoint
+- **Embeddings:** Vector embedding generation for text inputs
 - **Web Search:** Type-safe web search API integration
-- **Provider Preferences:** Configure model routing, fallbacks, and provider selection
-- **Analytics API:** Comprehensive activity data retrieval with filtering and pagination
-- **Providers API:** Provider information management with search and filtering
-- **Enhanced Models API:** Advanced model discovery with filtering, sorting, and search
-- **Multimodal Support:** Audio and File (PDF) input support
-- **Policy Controls:** Granular routing control with allow/deny lists and Zero Data Retention (ZDR)
+- **Analytics:** Activity data retrieval with filtering, sorting, and pagination
+- **Providers:** Provider information and discovery
+- **Models:** Model listing and discovery
+- **Credits:** Account credit and usage tracking
+- **Key Info:** API key metadata, rate limits, and usage
+- **Generation:** Generation metadata and cost tracking
+- **Provider Preferences:** Model routing, fallbacks, and provider selection
+- **Multimodal Support:** Audio and file (PDF) input support
+- **Policy Controls:** Allow/deny lists and Zero Data Retention (ZDR)
 
-### 📡 **Model Context Protocol (MCP)**
+### Model Context Protocol (MCP)
 - **MCP Client:** Full JSON-RPC client implementation for the [Model Context Protocol](https://modelcontextprotocol.io/)
 - **Resource Access:** Retrieve resources from MCP servers
 - **Tool Invocation:** Execute tools provided by MCP servers
-- **Context Integration:** Seamless context sharing between applications and LLMs
-- **Concurrency Control:** Semaphore-based limiting for concurrent requests
 - **Secure ID Generation:** UUID v4 usage for request tracking
 
-### 🧪 **Quality & Testing**
-- **100% Test Coverage:** 162 comprehensive unit and integration tests
-- **CI/CD Pipeline:** Automated quality gates with formatting, linting, security audits, and documentation checks
-- **Production Ready:** Extensive error handling, standardized retry logic, and timeout management
+### Quality & Testing
+- **471 Tests:** Comprehensive unit and integration test suite
+- **CI/CD Pipeline:** GitHub Actions with quality gates (formatting, linting, security audits, documentation)
+- **Production Ready:** Enterprise-grade error handling, retry logic, and timeout management
 
 ## Getting Started
 
@@ -60,51 +57,40 @@ Add the following to your project's `Cargo.toml`:
 ```bash
 cargo add openrouter_api
 
-# With optional tracing support for better error logging
+# With optional tracing support
 cargo add openrouter_api --features tracing
 ```
 
-**Available Features:**
-- `rustls` (default): Use rustls for TLS
-- `native-tls`: Use system TLS
-- `tracing`: Enhanced error logging with tracing support
+**Feature Flags:**
 
-Ensure that you have Rust installed (tested with Rust v1.83.0) and that you're using Cargo for building and testing.
+| Feature | Description | Default |
+|---|---|---|
+| `tls-rustls` | Use rustls for TLS | Yes |
+| `tls-native-tls` | Use system native TLS | No |
+| `tracing` | Enhanced logging via the `tracing` crate | No |
+| `allow-http` | Allow non-HTTPS base URLs (testing only) | No |
 
-### Quick Start Examples
+Requires Rust 1.83.0 or later.
 
-#### Simple Chat Completion
+### Quick Start
 
 ```rust
-use openrouter_api::{OpenRouterClient, Result};
-use openrouter_api::types::chat::{ChatCompletionRequest, Message};
+use openrouter_api::OpenRouterClient;
+use openrouter_api::types::chat::{ChatCompletionRequest, ChatRole, Message};
 
 #[tokio::main]
-async fn main() -> Result<()> {
-    // Quick setup from environment variable (OPENROUTER_API_KEY)
+async fn main() -> openrouter_api::Result<()> {
+    // From environment variable (OPENROUTER_API_KEY or OR_API_KEY)
     let client = OpenRouterClient::from_env()?;
-    
-    // Or directly from API key
-    // let client = OpenRouterClient::from_api_key("sk-or-v1-...")?;
 
     let request = ChatCompletionRequest {
         model: "openai/gpt-4o".to_string(),
-        messages: vec![Message {
-            role: "user".to_string(),
-            content: "Hello, world!".to_string(),
-            name: None,
-            tool_calls: None,
-        }],
-        stream: None,
-        response_format: None,
-        tools: None,
-        provider: None,
-        models: None,
-        transforms: None,
+        messages: vec![Message::text(ChatRole::User, "Hello, world!")],
+        ..Default::default()
     };
 
     let response = client.chat()?.chat_completion(request).await?;
-    
+
     if let Some(choice) = response.choices.first() {
         println!("Response: {}", choice.message.content);
     }
@@ -112,599 +98,418 @@ async fn main() -> Result<()> {
 }
 ```
 
-#### Multimodal Chat (Audio & PDF)
+### Client Constructors
 
 ```rust
-use openrouter_api::{OpenRouterClient, Result};
-use openrouter_api::types::chat::{ChatCompletionRequest, Message, ContentPart, AudioContent, AudioUrl, FileContent, FileUrl};
+use openrouter_api::OpenRouterClient;
 
-#[tokio::main]
-async fn main() -> Result<()> {
-    let client = OpenRouterClient::from_env()?;
+// From environment variable
+let client = OpenRouterClient::from_env()?;
 
-    let request = ChatCompletionRequest {
-        model: "openai/gpt-4o".to_string(),
-        messages: vec![Message {
-            role: "user".to_string(),
-            content: openrouter_api::types::chat::MessageContent::Parts(vec![
-                ContentPart::Text(openrouter_api::types::chat::TextContent {
-                    text: "Analyze this audio and document".to_string(),
-                }),
-                ContentPart::Audio(AudioContent {
-                    content_type: "audio_url".to_string(),
-                    audio_url: AudioUrl {
-                        url: "https://example.com/audio.mp3".to_string(),
-                    },
-                }),
-                ContentPart::File(FileContent {
-                    content_type: "file_url".to_string(),
-                    file_url: FileUrl {
-                        url: "https://example.com/document.pdf".to_string(),
-                    },
-                }),
-            ]),
-            ..Default::default()
-        }],
-        ..Default::default()
-    };
+// From API key directly
+let client = OpenRouterClient::from_api_key("sk-or-v1-...")?;
 
-    let response = client.chat()?.chat_completion(request).await?;
-    Ok(())
-}
+// Production-ready with optimized settings (60s timeout, 5 retries, app headers)
+let client = OpenRouterClient::production(
+    "sk-or-v1-...",
+    "My Production App",
+    "https://myapp.com",
+)?;
+
+// Full builder control
+let client = OpenRouterClient::new()
+    .skip_url_configuration()
+    .with_timeout_secs(120)
+    .with_retries(3, 500)
+    .with_http_referer("https://myapp.com")
+    .with_site_title("My Application")
+    .with_max_response_bytes(10 * 1024 * 1024)
+    .with_api_key("sk-or-v1-...")?;
 ```
 
-#### Routing Shortcuts & Web Search
+## Examples
+
+### Streaming Chat
 
 ```rust
-use openrouter_api::{OpenRouterClient, Result, client::{ROUTING_NITRO, ROUTING_ONLINE}};
-use openrouter_api::types::chat::{ChatCompletionRequest, Message};
-
-#[tokio::main]
-async fn main() -> Result<()> {
-    let client = OpenRouterClient::from_env()?;
-
-    // Use routing shortcuts
-    let model = OpenRouterClient::model_with_shortcut("openai/gpt-4o", ROUTING_NITRO);
-
-    let request = ChatCompletionRequest {
-        model,
-        messages: vec![Message::text("user", "Search for latest Rust news")],
-        // Enable web search plugin
-        plugins: Some(vec!["web".to_string()]),
-        ..Default::default()
-    };
-
-    let response = client.chat()?.chat_completion(request).await?;
-    Ok(())
-}
-```
-
-#### Production Configuration
-
-```rust
-use openrouter_api::{OpenRouterClient, Result};
-
-#[tokio::main]
-async fn main() -> Result<()> {
-    // Production-ready client with optimized settings
-    let client = OpenRouterClient::production(
-        "sk-or-v1-...",           // API key
-        "My Production App",       // App name
-        "https://myapp.com"       // App URL
-    )?;
-    
-    // Client is now configured with:
-    // - 60 second timeout
-    // - 5 retries with exponential backoff
-    // - Proper headers for app identification
-    
-    // Use the client...
-    Ok(())
-}
-```
-
-#### Custom Configuration
-
-```rust
-use openrouter_api::{OpenRouterClient, Result};
-use std::time::Duration;
-
-#[tokio::main]
-async fn main() -> Result<()> {
-    // Full control over client configuration
-    let client = OpenRouterClient::new()
-        .skip_url_configuration()  // Use default OpenRouter URL
-        .with_timeout_secs(120)    // 2-minute timeout
-        .with_retries(3, 500)      // 3 retries, 500ms initial backoff
-        .with_http_referer("https://myapp.com")
-        .with_site_title("My Application")
-        .with_max_response_bytes(10 * 1024 * 1024) // 10MB limit (default)
-        .with_api_key("sk-or-v1-...")?;
-    
-    // Ready to use
-    Ok(())
-}
-```
-
-#### Provider Preferences Example
-
-```rust
-use openrouter_api::{OpenRouterClient, utils, Result};
-use openrouter_api::models::provider_preferences::{DataCollection, ProviderPreferences, ProviderSort};
-use openrouter_api::types::chat::{ChatCompletionRequest, Message};
-use serde_json::json;
-
-#[tokio::main]
-async fn main() -> Result<()> {
-    // Load API key from environment variables
-    let api_key = utils::load_api_key_from_env()?;
-
-    // Build the client
-    let client = OpenRouterClient::new()
-        .with_base_url("https://openrouter.ai/api/v1/")?
-        .with_api_key(api_key)?;
-    
-    // Create provider preferences
-    let preferences = ProviderPreferences::new()
-        .with_order(vec!["OpenAI".to_string(), "Anthropic".to_string()])
-        .with_allow_fallbacks(true)
-        .with_allow_fallbacks(true)
-        .with_data_collection(DataCollection::Deny) // Enable Zero Data Retention (ZDR)
-        .with_allow(vec!["OpenAI".to_string(), "Anthropic".to_string()]) // Explicit allowlist
-        .with_sort(ProviderSort::Throughput);
-    
-    // Create a request builder with provider preferences
-    let request_builder = client.chat_request_builder(vec![
-        Message {
-            role: "user".to_string(),
-            content: "Hello with provider preferences!".to_string(),
-            name: None,
-            tool_calls: None,
-        },
-    ]);
-    
-    // Add provider preferences and build the payload
-    let payload = request_builder
-        .with_provider_preferences(preferences)?
-        .build();
-    
-    // The payload now includes provider preferences!
-    println!("Request payload: {}", serde_json::to_string_pretty(&payload)?);
-    
-    Ok(())
-}
-```
-
-#### Model Context Protocol (MCP) Client Example
-
-```rust
-use openrouter_api::{MCPClient, Result};
-use openrouter_api::mcp_types::{
-    ClientCapabilities, GetResourceParams, ToolCallParams,
-    MCP_PROTOCOL_VERSION
-};
-
-#[tokio::main]
-async fn main() -> Result<()> {
-    // Create a new MCP client
-    let client = MCPClient::new("https://mcp-server.example.com/mcp")?;
-    
-    // Initialize the client with client capabilities
-    let server_capabilities = client.initialize(ClientCapabilities {
-        protocolVersion: MCP_PROTOCOL_VERSION.to_string(),
-        supportsSampling: Some(true),
-    }).await?;
-    
-    println!("Connected to MCP server with capabilities: {:?}", server_capabilities);
-    
-    // Get a resource from the MCP server
-    let resource = client.get_resource(GetResourceParams {
-        id: "document-123".to_string(),
-        parameters: None,
-    }).await?;
-    
-    println!("Retrieved resource: {}", resource.content);
-    
-    // Call a tool on the MCP server
-    let result = client.tool_call(ToolCallParams {
-        id: "search-tool".to_string(),
-        parameters: serde_json::json!({
-            "query": "Rust programming"
-        }),
-    }).await?;
-    
-    println!("Tool call result: {:?}", result.result);
-    
-    Ok(())
-}
-```
-
-#### Text Completion Example
-
-```rust
-use openrouter_api::{OpenRouterClient, utils, Result};
-use openrouter_api::types::completion::CompletionRequest;
-use serde_json::json;
-
-#[tokio::main]
-async fn main() -> Result<()> {
-    // Load API key from environment
-    let api_key = utils::load_api_key_from_env()?;
-
-    // Build the client
-    let client = OpenRouterClient::new()
-        .with_base_url("https://openrouter.ai/api/v1/")?
-        .with_api_key(api_key)?;
-
-    // Create a text completion request
-    let request = CompletionRequest {
-        model: "openai/gpt-3.5-turbo-instruct".to_string(),
-        prompt: "Once upon a time".to_string(),
-        // Additional generation parameters
-        extra_params: json!({
-            "temperature": 0.8,
-            "max_tokens": 50
-        }),
-    };
-
-    // Invoke the text completion endpoint
-    let completions_api = client.completions()?;
-    let response = completions_api.text_completion(request).await?;
-
-    // Print out the generated text
-    if let Some(choice) = response.choices.first() {
-        println!("Text Completion: {}", choice.text);
-    }
-    Ok(())
-}
-```
-
-#### Streaming Chat Example
-
-```rust
-use openrouter_api::{OpenRouterClient, utils, Result};
-use openrouter_api::types::chat::{ChatCompletionRequest, Message};
+use openrouter_api::OpenRouterClient;
+use openrouter_api::types::chat::{ChatCompletionRequest, ChatRole, Message};
 use futures::StreamExt;
 use std::io::Write;
 
 #[tokio::main]
-async fn main() -> Result<()> {
-    // Load API key from environment
-    let api_key = utils::load_api_key_from_env()?;
+async fn main() -> openrouter_api::Result<()> {
+    let client = OpenRouterClient::from_env()?;
 
-    // Build the client
-    let client = OpenRouterClient::new()
-        .with_base_url("https://openrouter.ai/api/v1/")?
-        .with_api_key(api_key)?;
-
-    // Create a chat completion request with streaming enabled
     let request = ChatCompletionRequest {
         model: "openai/gpt-4o".to_string(),
-        messages: vec![Message {
-            role: "user".to_string(),
-            content: "Tell me a story.".to_string(),
-            name: None,
-            tool_calls: None,
-        }],
-        stream: Some(true),
-        response_format: None,
-        tools: None,
-        provider: None,
-        models: None,
-        transforms: None,
+        messages: vec![Message::text(ChatRole::User, "Tell me a story.")],
+        stream: Some(true.into()),
+        ..Default::default()
     };
 
-    // Invoke the streaming chat completion endpoint
-    let chat_api = client.chat()?;
-    let mut stream = chat_api.chat_completion_stream(request);
+    let mut stream = client.chat()?.chat_completion_stream(request);
 
-    // Process the stream - accumulating content and tracking usage
-    let mut total_content = String::new();
     while let Some(chunk) = stream.next().await {
         match chunk {
             Ok(c) => {
                 if let Some(choice) = c.choices.first() {
                     if let Some(content) = &choice.delta.content {
                         print!("{}", content);
-                        total_content.push_str(content);
                         std::io::stdout().flush().unwrap();
                     }
                 }
-                
-                // Check for usage information in final chunk
                 if let Some(usage) = c.usage {
-                    println!("\nUsage: {} prompt + {} completion = {} total tokens", 
+                    println!("\nUsage: {} prompt + {} completion = {} total tokens",
                         usage.prompt_tokens, usage.completion_tokens, usage.total_tokens);
                 }
-            },
-            Err(e) => eprintln!("Error during streaming: {}", e),
-        }
-    }
-    println!();
-    Ok(())
-}
-```
-
-#### Analytics API Example
-
-```rust
-use openrouter_api::{OpenRouterClient, utils, Result};
-use openrouter_api::types::analytics::{AnalyticsQuery, ActivityType, DateRange};
-
-#[tokio::main]
-async fn main() -> Result<()> {
-    // Load API key from environment
-    let api_key = utils::load_api_key_from_env()?;
-    
-    // Build the client
-    let client = OpenRouterClient::new()
-        .with_base_url("https://openrouter.ai/api/v1/")?
-        .with_api_key(api_key)?;
-
-    // Get the analytics API
-    let analytics_api = client.analytics()?;
-
-    // Example 1: Get all activity data with pagination
-    let mut all_activities = Vec::new();
-    let mut page = 1;
-    
-    loop {
-        let query = AnalyticsQuery::new()
-            .with_page(page)
-            .with_per_page(100);
-            
-        let response = analytics_api.query(query).await?;
-        all_activities.extend(response.data);
-        
-        if response.data.len() < 100 {
-            break; // Last page
-        }
-        page += 1;
-    }
-    
-    println!("Retrieved {} total activities", all_activities.len());
-
-    // Example 2: Filter by specific activity types
-    let chat_query = AnalyticsQuery::new()
-        .with_activity_type(vec![ActivityType::ChatCompletion])
-        .with_per_page(50);
-        
-    let chat_response = analytics_api.query(chat_query).await?;
-    println!("Found {} chat completion activities", chat_response.data.len());
-
-    // Example 3: Get activity within a date range
-    let date_range_query = AnalyticsQuery::new()
-        .with_date_range(DateRange::Custom {
-            start: "2024-01-01".to_string(),
-            end: "2024-01-31".to_string(),
-        });
-        
-    let january_response = analytics_api.query(date_range_query).await?;
-    println!("January activities: {}", january_response.data.len());
-
-    // Example 4: Get usage statistics
-    let usage_stats = analytics_api.usage().await?;
-    println!("Total requests: {}", usage_stats.total_requests);
-    println!("Total tokens: {}", usage_stats.total_tokens);
-
-    // Example 5: Get daily activity for the last 7 days
-    let daily_activity = analytics_api.daily_activity().await?;
-    for day in daily_activity {
-        println!("{}: {} requests, {} tokens", 
-            day.date, day.request_count, day.token_count);
-    }
-
-    Ok(())
-}
-```
-
-#### Providers API Example
-
-```rust
-use openrouter_api::{OpenRouterClient, utils, Result};
-use openrouter_api::types::providers::{ProvidersQuery, ProviderSort};
-
-#[tokio::main]
-async fn main() -> Result<()> {
-    // Load API key from environment
-    let api_key = utils::load_api_key_from_env()?;
-    
-    // Build the client
-    let client = OpenRouterClient::new()
-        .with_base_url("https://openrouter.ai/api/v1/")?
-        .with_api_key(api_key)?;
-
-    // Get the providers API
-    let providers_api = client.providers()?;
-
-    // Example 1: List all available providers
-    let all_providers = providers_api.list().await?;
-    println!("Found {} providers", all_providers.len());
-    
-    for provider in &all_providers {
-        println!("{}: {} models", provider.name, provider.model_count);
-    }
-
-    // Example 2: Search for specific providers
-    let search_query = ProvidersQuery::new()
-        .with_search("openai")
-        .with_sort(ProviderSort::Name);
-        
-    let search_results = providers_api.search(search_query).await?;
-    println!("Found {} providers matching 'openai'", search_results.len());
-
-    // Example 3: Get provider by name
-    if let Some(openai) = providers_api.get_by_name("OpenAI").await? {
-        println!("OpenAI provider details:");
-        println!("  Models: {}", openai.model_count);
-        println!("  Status: {:?}", openai.status);
-        
-        // Extract domain from provider's first model URL
-        if let Some(first_model) = openai.models.first() {
-            if let Some(domain) = first_model.extract_domain() {
-                println!("  Domain: {}", domain);
             }
+            Err(e) => eprintln!("Error: {}", e),
         }
     }
-
-    // Example 4: Get providers with specific capabilities
-    let capability_query = ProvidersQuery::new()
-        .with_capability("chat");
-        
-    let chat_providers = providers_api.query(capability_query).await?;
-    println!("{} providers support chat", chat_providers.len());
-
     Ok(())
 }
 ```
 
-#### Enhanced Models API Example
+### Routing Shortcuts & Web Search Plugin
 
 ```rust
-use openrouter_api::{OpenRouterClient, utils, Result};
-use openrouter_api::types::models::{ModelsQuery, ModelSort, ModelArchitecture};
+use openrouter_api::OpenRouterClient;
+use openrouter_api::client::{ROUTING_NITRO, ROUTING_ONLINE};
+use openrouter_api::types::chat::{ChatCompletionRequest, ChatRole, Message, Plugin};
 
 #[tokio::main]
-async fn main() -> Result<()> {
-    // Load API key from environment
-    let api_key = utils::load_api_key_from_env()?;
-    
-    // Build the client
-    let client = OpenRouterClient::new()
-        .with_base_url("https://openrouter.ai/api/v1/")?
-        .with_api_key(api_key)?;
+async fn main() -> openrouter_api::Result<()> {
+    let client = OpenRouterClient::from_env()?;
 
-    // Get the models API
-    let models_api = client.models()?;
+    let model = OpenRouterClient::model_with_shortcut("openai/gpt-4o", ROUTING_NITRO);
 
-    // Example 1: List all available models
-    let all_models = models_api.list().await?;
-    println!("Found {} models", all_models.len());
+    let request = ChatCompletionRequest {
+        model,
+        messages: vec![Message::text(ChatRole::User, "Search for latest Rust news")],
+        plugins: Some(vec![Plugin { id: "web".to_string(), config: None }]),
+        ..Default::default()
+    };
 
-    // Example 2: Search for models with specific capabilities
-    let search_query = ModelsQuery::new()
-        .with_search("gpt-4")
-        .with_capability("chat")
-        .with_sort(ModelSort::Name);
-        
-    let search_results = models_api.search(search_query).await?;
-    println!("Found {} GPT-4 models with chat capability", search_results.len());
+    let response = client.chat()?.chat_completion(request).await?;
+    Ok(())
+}
+```
 
-    // Example 3: Filter by architecture
-    let architecture_query = ModelsQuery::new()
-        .with_architecture(ModelArchitecture::Transformer);
-        
-    let transformer_models = models_api.query(architecture_query).await?;
-    println!("Found {} transformer models", transformer_models.len());
+### Tool Calling
 
-    // Example 4: Get models by provider
-    let openai_models = models_api.get_by_provider("OpenAI").await?;
-    println!("OpenAI has {} models", openai_models.len());
+```rust
+use openrouter_api::OpenRouterClient;
+use openrouter_api::models::tool::{Tool, FunctionDescription};
+use openrouter_api::types::chat::{ChatCompletionRequest, ChatRole, Message};
+use serde_json::json;
 
-    // Example 5: Filter by context length
-    let context_query = ModelsQuery::new()
-        .with_min_context_length(32000)
-        .with_max_context_length(128000);
-        
-    let high_context_models = models_api.query(context_query).await?;
-    println!("Found {} models with 32k-128k context", high_context_models.len());
+#[tokio::main]
+async fn main() -> openrouter_api::Result<()> {
+    let client = OpenRouterClient::from_env()?;
 
-    // Example 6: Get free models
-    let free_models = models_api.get_free_models().await?;
-    println!("Found {} free models", free_models.len());
+    let weather_tool = Tool::Function {
+        function: FunctionDescription {
+            name: "get_weather".to_string(),
+            description: Some("Get weather for a location".to_string()),
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "location": { "type": "string", "description": "City and state" }
+                },
+                "required": ["location"]
+            }),
+        },
+    };
 
-    // Example 7: Get model details
-    if let Some(gpt4) = models_api.get_by_id("openai/gpt-4").await? {
-        println!("GPT-4 Details:");
-        println!("  Name: {}", gpt4.name);
-        println!("  Context Length: {}", gpt4.context_length);
-        println!("  Pricing: ${}/1M tokens", gpt4.pricing.prompt);
-        
-        if let Some(description) = gpt4.description {
-            println!("  Description: {}", description);
-        }
+    let request = ChatCompletionRequest {
+        model: "openai/gpt-4o".to_string(),
+        messages: vec![Message::text(ChatRole::User, "What's the weather in Boston?")],
+        tools: Some(vec![weather_tool]),
+        ..Default::default()
+    };
+
+    let response = client.chat()?.chat_completion(request).await?;
+    Ok(())
+}
+```
+
+### Multimodal Chat (Audio & PDF)
+
+```rust
+use openrouter_api::OpenRouterClient;
+use openrouter_api::types::chat::*;
+
+#[tokio::main]
+async fn main() -> openrouter_api::Result<()> {
+    let client = OpenRouterClient::from_env()?;
+
+    let request = ChatCompletionRequest {
+        model: "openai/gpt-4o".to_string(),
+        messages: vec![Message::multimodal(ChatRole::User, vec![
+            ContentPart::Text(TextContent {
+                content_type: ContentType::Text,
+                text: "Analyze this audio and document".to_string(),
+            }),
+            ContentPart::Audio(AudioContent {
+                content_type: ContentType::AudioUrl,
+                audio_url: AudioUrl {
+                    url: "https://example.com/audio.mp3".to_string(),
+                },
+            }),
+            ContentPart::File(FileContent {
+                content_type: ContentType::FileUrl,
+                file_url: FileUrl {
+                    url: "https://example.com/document.pdf".to_string(),
+                },
+            }),
+        ])],
+        ..Default::default()
+    };
+
+    let response = client.chat()?.chat_completion(request).await?;
+    Ok(())
+}
+```
+
+### Provider Preferences
+
+```rust
+use openrouter_api::OpenRouterClient;
+use openrouter_api::models::provider_preferences::{DataCollection, ProviderPreferences, ProviderSort};
+use openrouter_api::types::chat::{ChatCompletionRequest, ChatRole, Message};
+
+#[tokio::main]
+async fn main() -> openrouter_api::Result<()> {
+    let client = OpenRouterClient::from_env()?;
+
+    let preferences = ProviderPreferences::new()
+        .with_order(vec!["OpenAI".to_string(), "Anthropic".to_string()])
+        .with_allow_fallbacks(true)
+        .with_data_collection(DataCollection::Deny)
+        .with_allow(vec!["OpenAI".to_string(), "Anthropic".to_string()])
+        .with_sort(ProviderSort::Throughput);
+
+    let request = ChatCompletionRequest {
+        model: "openai/gpt-4o".to_string(),
+        messages: vec![Message::text(ChatRole::User, "Hello with provider preferences!")],
+        provider: Some(preferences),
+        ..Default::default()
+    };
+
+    let response = client.chat()?.chat_completion(request).await?;
+    Ok(())
+}
+```
+
+### Text Completion
+
+```rust
+use openrouter_api::OpenRouterClient;
+use openrouter_api::types::completion::CompletionRequest;
+use serde_json::json;
+
+#[tokio::main]
+async fn main() -> openrouter_api::Result<()> {
+    let client = OpenRouterClient::from_env()?;
+
+    let request = CompletionRequest {
+        model: "openai/gpt-3.5-turbo-instruct".to_string(),
+        prompt: "Once upon a time".to_string(),
+        extra_params: json!({
+            "temperature": 0.8,
+            "max_tokens": 50
+        }),
+    };
+
+    let response = client.completions()?.text_completion(request).await?;
+
+    if let Some(choice) = response.choices.first() {
+        println!("Completion: {}", choice.text);
     }
+    Ok(())
+}
+```
+
+### Embeddings API
+
+```rust
+use openrouter_api::OpenRouterClient;
+use openrouter_api::types::embeddings::{EmbeddingRequest, EmbeddingInput};
+
+#[tokio::main]
+async fn main() -> openrouter_api::Result<()> {
+    let client = OpenRouterClient::from_env()?;
+
+    let request = EmbeddingRequest {
+        model: "openai/text-embedding-3-small".to_string(),
+        input: EmbeddingInput::Single("Hello world".to_string()),
+        encoding_format: None,
+        provider: None,
+    };
+
+    let response = client.embeddings()?.create_embedding(request).await?;
+
+    if let Some(embedding) = response.first_embedding() {
+        println!("Embedding dimensions: {}", embedding.len());
+    }
+    Ok(())
+}
+```
+
+### Key Info API
+
+```rust
+use openrouter_api::OpenRouterClient;
+
+#[tokio::main]
+async fn main() -> openrouter_api::Result<()> {
+    let client = OpenRouterClient::from_env()?;
+
+    let key_info = client.key_info()?.get_key_info().await?;
+    println!("Usage: {:?}", key_info.usage());
+    println!("Remaining: {:?}", key_info.limit_remaining());
+    println!("Free tier: {}", key_info.is_free_tier());
+    Ok(())
+}
+```
+
+### Analytics API
+
+```rust
+use openrouter_api::OpenRouterClient;
+use openrouter_api::types::analytics::{ActivityRequest, SortField, SortOrder};
+
+#[tokio::main]
+async fn main() -> openrouter_api::Result<()> {
+    let client = OpenRouterClient::from_env()?;
+
+    let request = ActivityRequest::new()
+        .with_start_date("2024-01-01")
+        .with_end_date("2024-01-31")
+        .with_sort(SortField::CreatedAt)
+        .with_order(SortOrder::Descending)
+        .with_limit(100);
+
+    let response = client.analytics()?.get_activity(request).await?;
+    println!("Retrieved {} activities", response.data.len());
+
+    // Convenience methods
+    let recent = client.analytics()?.get_recent_activity(7).await?;
+    println!("Last 7 days: {} activities", recent.data.len());
 
     Ok(())
 }
 ```
 
-## Model Context Protocol (MCP) Client
-
-The library includes a client implementation for the [Model Context Protocol](https://modelcontextprotocol.io/), which is an open protocol that standardizes how applications provide context to LLMs.
-
-Key features of the MCP client include:
-
-- **JSON-RPC Communication:** Implements the JSON-RPC 2.0 protocol for MCP
-- **Resource Access:** Retrieve resources from MCP servers
-- **Tool Invocation:** Call tools provided by MCP servers
-- **Prompt Execution:** Execute prompts on MCP servers
-- **Server Capabilities:** Discover and leverage server capabilities
-- **Proper Authentication:** Handle initialization and authentication flows
+### Model Context Protocol (MCP)
 
 ```rust
-// Create an MCP client connected to a server
-let client = MCPClient::new("https://mcp-server.example.com/mcp")?;
+use openrouter_api::{MCPClient, mcp_types};
 
-// Initialize with client capabilities
-let server_capabilities = client.initialize(ClientCapabilities {
-    protocolVersion: "2025-03-26".to_string(),
-    supportsSampling: Some(true),
-}).await?;
+#[tokio::main]
+async fn main() -> openrouter_api::Result<()> {
+    let client = MCPClient::new("https://mcp-server.example.com/mcp")?;
 
-// Access resources from the server
-let resource = client.get_resource(GetResourceParams {
-    id: "some-resource-id".to_string(),
-    parameters: None,
-}).await?;
+    // Initialize with client capabilities
+    let server_capabilities = client.initialize(mcp_types::ClientCapabilities {
+        protocolVersion: mcp_types::MCP_PROTOCOL_VERSION.to_string(),
+        supportsSampling: Some(true),
+    }).await?;
+
+    println!("Connected: {:?}", server_capabilities);
+    Ok(())
+}
 ```
 
-See the [Model Context Protocol specification](https://spec.modelcontextprotocol.io/specification/2025-03-26/) for more details.
+## Error Handling
 
-## Implementation Status
+The library provides structured error types with automatic retries for transient failures.
 
-This is a production-ready library with comprehensive functionality:
+### Error Types
 
-### ✅ **Core Features (Completed)**
-- **Client Framework:** Type‑state builder pattern with compile‑time validation
-- **Security:** Secure API key handling with memory zeroing and error redaction
-- **Chat Completions:** Full OpenRouter chat API support with streaming
-- **Text Completions:** Traditional text completion endpoint
-- **Web Search:** Integrated web search capabilities
-- **Tool Calling:** Function calling with validation
-- **Structured Outputs:** JSON Schema validation
-- **Provider Preferences:** Model routing and fallback configuration
-- **Analytics API:** Comprehensive activity data retrieval with filtering and pagination
-- **Providers API:** Provider information management with search and filtering
-- **Enhanced Models API:** Advanced model discovery with filtering, sorting, and search
-- **Credits API:** Account credit and usage tracking
-- **Generation API:** Generation metadata and cost tracking
-- **Model Context Protocol:** Complete MCP client implementation
+```rust
+use openrouter_api::error::Error;
 
-### ✅ **Quality Infrastructure (Completed)**
-- **100% Test Coverage:** 162 comprehensive unit and integration tests
-- **Security Auditing:** Automated security vulnerability scanning
-- **CI/CD Pipeline:** GitHub Actions with quality gates
-- **Documentation:** Complete API documentation with examples
-- **Developer Experience:** Contributing guidelines, issue templates, PR templates
-- **Error Handling Standardization:** Enterprise-grade retry logic across all endpoints
+match client.chat()?.chat_completion(request).await {
+    Ok(response) => {
+        println!("Success: {}", response.choices[0].message.content);
+    }
+    Err(e) => match e {
+        Error::ApiError { code, message, .. } => {
+            eprintln!("API Error ({}): {}", code, message);
+        }
+        Error::RateLimitExceeded(msg) => {
+            eprintln!("Rate limited: {}", msg);
+        }
+        Error::ContextLengthExceeded { model, message } => {
+            eprintln!("Context limit for {}: {}", model, message);
+        }
+        Error::ValidationError(msg) => {
+            eprintln!("Validation: {}", msg);
+        }
+        Error::TimeoutError(msg) => {
+            eprintln!("Timeout: {}", msg);
+        }
+        Error::ResponseTooLarge(size, limit) => {
+            eprintln!("Response too large: {} bytes (limit: {})", size, limit);
+        }
+        _ => eprintln!("Error: {:?}", e),
+    },
+}
+```
 
-### ✅ **Ergonomic Improvements (Completed)**
-- **Convenience Constructors:** `from_env()`, `from_api_key()`, `production()`, `quick()`
-- **Flexible Configuration:** Timeout, retry, and header management
-- **Error Handling:** Comprehensive error types with context and automatic retries
-- **Memory Safety:** Automatic sensitive data cleanup
-- **Advanced Filtering:** Sophisticated query builders for analytics, providers, and models
-- **Convenience Methods:** Helper methods for common operations like domain extraction
-- **Production Reliability:** Exponential backoff with jitter, rate limit handling, and consistent retry behavior
-- **Retry-After Support:** Respects server-provided retry guidance (headers) for rate limiting
+### Retry Configuration
 
-### 🔄 **Future Enhancements**
-- **Circuit Breaker Pattern:** Prevent cascading failures
-- **Retry Budget Management:** Prevent excessive retries in high-throughput scenarios
-- **Performance Optimizations:** Connection pooling and caching
-- **Extended MCP Features:** Additional MCP protocol capabilities
-- **Generation API Enhancements:** Additional generation endpoints and features
+All API endpoints automatically retry with exponential backoff and jitter. Default behavior retries on 429 (rate limit) and 5xx (server errors).
+
+```rust
+use openrouter_api::client::RetryConfig;
+use std::time::Duration;
+
+let config = RetryConfig {
+    max_retries: 5,
+    initial_backoff_ms: 1000,
+    max_backoff_ms: 30000,
+    retry_on_status_codes: vec![429, 500, 502, 503, 504],
+    total_timeout: Duration::from_secs(120),
+    max_retry_interval: Duration::from_secs(30),
+};
+```
+
+Retry attempts are logged with context:
+
+```
+Retrying chat_completion request (1/3) after 625 ms (base: 500 ms, jitter: 25.00%) due to status code 429
+```
+
+## API Reference
+
+| Endpoint | Access | Key Methods |
+|---|---|---|
+| Chat Completions | `client.chat()?` | `chat_completion`, `chat_completion_stream` |
+| Text Completions | `client.completions()?` | `text_completion` |
+| Embeddings | `client.embeddings()?` | `create_embedding` |
+| Models | `client.models()?` | `list_models` |
+| Providers | `client.providers()?` | `get_providers`, `get_provider_by_slug` |
+| Analytics | `client.analytics()?` | `get_activity`, `get_activity_by_date_range`, `get_recent_activity`, `get_activity_by_model`, `get_activity_by_provider` |
+| Credits | `client.credits()?` | `get_credits` |
+| Key Info | `client.key_info()?` | `get_key_info` |
+| Generation | `client.generation()?` | `get_generation` |
+| Structured | `client.structured()?` | Structured output generation |
+| Web Search | `client.web_search()?` | Type-safe web search |
+
+## Architecture
+
+The crate is organized into several modules:
+
+- **`client`** -- Type-state client with builder pattern (`Unconfigured` -> `NoAuth` -> `Ready`)
+- **`api`** -- API endpoint implementations
+- **`models`** -- Domain models (tools, provider preferences, structured output schemas)
+- **`types`** -- Request/response type definitions
+- **`mcp`** -- Model Context Protocol client
+- **`error`** -- Centralized error types
+- **`utils`** -- Retry, validation, security, and authentication helpers
 
 ## Contributing
 
@@ -713,280 +518,3 @@ Contributions are welcome! Please open an issue or submit a pull request with yo
 ## License
 
 Distributed under either the MIT license or the Apache License, Version 2.0. See [LICENSE](LICENSE) for details.
-
----
-
-# OpenRouter API Rust Crate Documentation
-
-_**Version:** 0.1.6 • **License:** MIT / Apache‑2.0_
-
-The `openrouter_api` crate is a comprehensive client for interacting with the [OpenRouter API](https://openrouter.ai/docs) and [Model Context Protocol](https://modelcontextprotocol.io/) servers. It provides strongly‑typed endpoints for chat completions, text completions, web search, and MCP connections. The crate is built using asynchronous Rust and leverages advanced patterns for safe and flexible API usage.
-
----
-
-## Table of Contents
-
-- [Core Concepts](#core-concepts)
-- [Installation](#installation)
-- [Architecture & Module Overview](#architecture--module-overview)
-- [Client Setup & Type‑State Pattern](#client-setup--type-state-pattern)
-- [API Endpoints](#api-endpoints)
-  - [Chat Completions](#chat-completions)
-  - [Text Completions](#text-completions)
-  - [Web Search](#web-search)
-  - [Tool Calling & Structured Output](#tool-calling--structured-output)
-  - [Model Context Protocol](#model-context-protocol)
-- [Error Handling](#error-handling)
-- [Best Practices](#best-practices)
-- [Examples](#examples)
-- [Additional Resources](#additional-resources)
-
----
-
-## Core Concepts
-
-- **Type‑State Client Configuration:**
-  The client is built using a type‑state pattern to ensure that required parameters are set before making any API calls.
-
-- **Provider Preferences:**
-  Strongly-typed configuration for model routing, fallbacks, and provider selection.
-
-- **Asynchronous Streaming:**
-  Support for streaming responses via asynchronous streams.
-
-- **Model Context Protocol:**
-  Client implementation for connecting to MCP servers to access resources, tools, and prompts.
-
-- **Error Handling & Validation:**
-  Comprehensive error handling with detailed context and validation utilities.
-
----
-
-## Architecture & Module Overview
-
-The crate is organized into several modules:
-
-- **`client`:** Type-state client implementation with builder pattern
-- **`api`:** API endpoint implementations (chat, completions, web search, etc.)
-- **`models`:** Domain models for structured outputs, provider preferences, tools
-- **`types`:** Type definitions for requests and responses
-- **`mcp`:** Model Context Protocol client implementation
-- **`error`:** Centralized error handling
-- **`utils`:** Utility functions and helpers
-
----
-
-## Client Setup & Type‑State Pattern
-
-```rust
-// Quick setup (recommended for most use cases)
-let client = OpenRouterClient::from_env()?;
-
-// Production setup with optimized settings
-let client = OpenRouterClient::production(
-    "sk-or-v1-...",
-    "My App", 
-    "https://myapp.com"
-)?;
-
-// Full control with type-state pattern
-let client = OpenRouterClient::new()
-    .with_base_url("https://openrouter.ai/api/v1/")?
-    .with_timeout(Duration::from_secs(30))
-    .with_http_referer("https://your-app.com/")
-    .with_api_key(std::env::var("OPENROUTER_API_KEY")?)?;
-```
-
-## API Endpoints
-
-### Chat Completions
-
-```rust
-// Basic chat completion
-let response = client.chat()?.chat_completion(
-    ChatCompletionRequest {
-        model: "openai/gpt-4o".to_string(),
-        messages: vec![Message {
-            role: "user".to_string(),
-            content: "Explain quantum computing".to_string(),
-            name: None,
-            tool_calls: None,
-        }],
-        stream: None,
-        response_format: None,
-        tools: None,
-        provider: None,
-        models: None,
-        transforms: None,
-    }
-).await?;
-```
-
-### Tool Calling
-
-```rust
-// Define a function tool
-let weather_tool = Tool::Function { 
-    function: FunctionDescription {
-        name: "get_weather".to_string(),
-        description: Some("Get weather information for a location".to_string()),
-        parameters: serde_json::json!({
-            "type": "object",
-            "properties": {
-                "location": {
-                    "type": "string",
-                    "description": "City and state"
-                }
-            },
-            "required": ["location"]
-        }),
-    }
-};
-
-// Make a request with tool calling enabled
-let response = client.chat()?.chat_completion(
-    ChatCompletionRequest {
-        model: "openai/gpt-4o".to_string(),
-        messages: vec![Message {
-            role: "user".to_string(),
-            content: "What's the weather in Boston?".to_string(),
-            name: None,
-            tool_calls: None,
-        }],
-        tools: Some(vec![weather_tool]),
-        // other fields...
-        stream: None,
-        response_format: None,
-        provider: None,
-        models: None,
-        transforms: None,
-    }
-).await?;
-```
-
-### Model Context Protocol
-
-```rust
-// Create an MCP client
-let mcp_client = MCPClient::new("https://mcp-server.example.com/mcp")?;
-
-// Initialize with client capabilities
-let server_capabilities = mcp_client.initialize(ClientCapabilities {
-    protocolVersion: MCP_PROTOCOL_VERSION.to_string(),
-    supportsSampling: Some(true),
-}).await?;
-
-// Access a resource from the MCP server
-let resource = mcp_client.get_resource(GetResourceParams {
-    id: "document-123".to_string(),
-    parameters: None,
-}).await?;
-```
-
-## Error Handling
-
-The library provides enterprise-grade error handling with automatic retries and consistent behavior across all endpoints.
-
-### Standardized Retry Logic
-
-All API endpoints automatically retry failed requests with:
-- **Exponential Backoff:** Starting at 500ms, doubling up to 10 seconds maximum
-- **Jitter:** ±25% random variation to prevent thundering herd effects
-- **Smart Status Codes:** Retries on rate limiting (429) and server errors (500, 502, 503, 504)
-- **Configurable Limits:** Customizable maximum retries and backoff settings
-
-```rust
-use openrouter_api::{OpenRouterClient, Result};
-
-// Custom retry configuration
-let client = OpenRouterClient::from_env()?
-    .with_retry_config(RetryConfig {
-        max_retries: 5,
-        initial_backoff_ms: 1000,
-        max_backoff_ms: 30000,
-        retry_on_status_codes: vec![429, 500, 502, 503, 504],
-    })?;
-
-// Automatic retries happen transparently
-let response = client.chat()?.chat_completion(request).await?;
-```
-
-### Error Types
-
-```rust
-match client.chat()?.chat_completion(request).await {
-    Ok(response) => {
-        println!("Success: {}", response.choices[0].message.content);
-    },
-    Err(e) => match e {
-        Error::ApiError { code, message, .. } => {
-            eprintln!("API Error ({}): {}", code, message);
-        },
-        Error::RateLimitExceeded(msg) => {
-            eprintln!("Rate limit exceeded: {}", msg);
-            // Automatic retry with exponential backoff
-        },
-        Error::HttpError(ref err) if err.is_timeout() => {
-            eprintln!("Request timed out!");
-            // Automatic retry with exponential backoff
-        },
-        Error::ConfigError(msg) => {
-            eprintln!("Configuration error: {}", msg);
-        },
-        Error::ContextLengthExceeded { model, message } => {
-            eprintln!("Context limit exceeded for {}: {}", model, message);
-        },
-        _ => eprintln!("Other error: {:?}", e),
-    }
-}
-```
-
-### Retry Behavior
-
-The library automatically handles:
-- **Network Timeouts:** Retries with increasing delays
-- **Rate Limiting:** Respects HTTP 429 with exponential backoff
-- **Server Errors:** Retries 5xx errors to handle temporary failures
-- **Connection Issues:** Retries connection failures and DNS errors
-
-All retry attempts are logged with operation context for debugging:
-
-```
-Retrying chat_completion request (1/3) after 625 ms (base: 500 ms, jitter: 25.00%) due to status code 429
-Retrying chat_completion request (2/3) after 1250 ms (base: 1000 ms, jitter: 25.00%) due to status code 429
-```
-
-## Best Practices
-
-1. **Use the Type‑State Pattern:**
-   Let the compiler ensure your client is properly configured.
-
-2. **Configure Retry Behavior:**
-   Adjust retry settings based on your application's needs:
-   ```rust
-   let client = OpenRouterClient::from_env()?
-       .with_retries(5)?  // More retries for resilience
-       .without_retries()?; // Disable for testing
-   ```
-
-3. **Set Appropriate Timeouts & Headers:**
-   Configure reasonable timeouts and identify your application.
-
-4. **Handle Errors Appropriately:**
-   Implement proper error handling for each error type. The automatic retry logic handles most transient failures.
-
-5. **Use Provider Preferences:**
-   Configure provider routing for optimal model selection.
-
-6. **Monitor Retry Behavior:**
-   Watch retry logs in production to identify patterns and adjust configuration.
-
-7. **Secure Your API Keys:**
-   Store keys in environment variables or secure storage.
-
-## Additional Resources
-
-- [OpenRouter API Documentation](https://openrouter.ai/docs)
-- [Model Context Protocol Specification](https://modelcontextprotocol.io/specification/2025-03-26/)
-
----
