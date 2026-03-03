@@ -15,6 +15,7 @@ fn main() {
             name: None,
             tool_calls: None,
             tool_call_id: None,
+            reasoning: None,
         }],
         stream: None,
         response_format: None,
@@ -42,6 +43,7 @@ fn main() {
         prediction: None,
         parallel_tool_calls: None,
         verbosity: None,
+        debug: None,
         plugins: None,
     };
 

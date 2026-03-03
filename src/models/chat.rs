@@ -23,6 +23,7 @@ impl From<ChatMessage> for crate::types::chat::Message {
             name: None,
             tool_calls: None,
             tool_call_id: None,
+            reasoning: None,
         }
     }
 }

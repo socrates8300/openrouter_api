@@ -1,19 +1,12 @@
 // openrouter_api/src/client.rs
 
-#![allow(unused)]
-// Fix for unused imports in src/client.rs
 use crate::error::{Error, Result};
 
 /// Note: These imports are used to implement the client builder pattern.
-/// The crate::types import provides type aliases and utility functions used throughout OpenRouterClient.
-use crate::types;
 use crate::types::routing::{PredefinedModelCoverageProfile, RouterConfig};
-use crate::utils::security::create_safe_error_message;
-use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 use std::marker::PhantomData;
 use std::time::Duration;
 use url::Url;
-use zeroize::{Zeroize, ZeroizeOnDrop};
 
 pub mod config;
 pub use config::*;
@@ -36,10 +29,19 @@ pub struct Ready;
 /// Main OpenRouter client using a type‑state builder pattern.
 #[derive(Debug)]
 pub struct OpenRouterClient<State = Unconfigured> {
-    pub config: ClientConfig,
-    pub http_client: Option<reqwest::Client>,
-    pub _state: PhantomData<State>,
-    pub router_config: Option<RouterConfig>,
+    pub(crate) config: ClientConfig,
+    pub(crate) http_client: Option<reqwest::Client>,
+    pub(crate) _state: PhantomData<State>,
+    pub(crate) router_config: Option<RouterConfig>,
+    pub(crate) cached_api_config: Option<ApiConfig>,
+    /// Shared providers cache persisted across `.providers()` calls
+    pub(crate) providers_cache: Option<
+        std::sync::Arc<
+            std::sync::Mutex<
+                crate::utils::cache::Cache<String, crate::types::providers::ProvidersResponse>,
+            >,
+        >,
+    >,
 }
 
 impl Default for OpenRouterClient<Unconfigured> {
@@ -136,6 +138,8 @@ impl OpenRouterClient<Unconfigured> {
             http_client: None,
             _state: PhantomData,
             router_config: None,
+            cached_api_config: None,
+            providers_cache: None,
         }
     }
 
@@ -185,6 +189,7 @@ impl OpenRouterClient<Unconfigured> {
                 "Invalid base URL '{url_str}': {e}. Expected format: 'https://api.example.com/v1/'"
             ))
         })?;
+        crate::utils::https::enforce_https(&self.config.base_url)?;
         Ok(self.transition_to_no_auth())
     }
 
@@ -194,6 +199,8 @@ impl OpenRouterClient<Unconfigured> {
             http_client: None,
             _state: PhantomData,
             router_config: self.router_config,
+            cached_api_config: None,
+            providers_cache: None,
         }
     }
 
@@ -365,102 +372,115 @@ impl OpenRouterClient<NoAuth> {
         // Build a client with retry capabilities
         let client_builder = reqwest::Client::builder()
             .timeout(self.config.timeout)
+            .tcp_keepalive(Duration::from_secs(60))
             .default_headers(headers);
 
         let http_client = client_builder
             .build()
             .map_err(|e| Error::ConfigError(format!("Failed to create HTTP client: {e}")))?;
 
+        // Cache the ApiConfig so accessor methods don't rebuild it each time
+        let api_config = self.config.to_api_config()?;
+
         Ok(OpenRouterClient {
             config: self.config,
             http_client: Some(http_client),
             _state: PhantomData,
             router_config: self.router_config,
+            cached_api_config: Some(api_config),
+            providers_cache: Some(std::sync::Arc::new(std::sync::Mutex::new(
+                crate::utils::cache::Cache::new(std::time::Duration::from_secs(300)),
+            ))),
         })
     }
 }
 
 impl OpenRouterClient<Ready> {
-    /// Provides access to the chat endpoint.
-    pub fn chat(&self) -> Result<crate::api::chat::ChatApi> {
+    /// Returns the cached HTTP client, or an error if missing.
+    fn get_client_and_config(&self) -> Result<(reqwest::Client, ApiConfig)> {
         let client = self
             .http_client
             .clone()
             .ok_or_else(|| Error::ConfigError("HTTP client is missing".into()))?;
-        crate::api::chat::ChatApi::new(client, &self.config)
+        let api_config = self
+            .cached_api_config
+            .clone()
+            .ok_or_else(|| Error::ConfigError("API config is missing".into()))?;
+        Ok((client, api_config))
+    }
+
+    /// Provides access to the chat endpoint.
+    pub fn chat(&self) -> Result<crate::api::chat::ChatApi> {
+        let (client, config) = self.get_client_and_config()?;
+        Ok(crate::api::chat::ChatApi { client, config })
     }
 
     /// Provides access to the completions endpoint.
     pub fn completions(&self) -> Result<crate::api::completion::CompletionApi> {
-        let client = self
-            .http_client
-            .clone()
-            .ok_or_else(|| Error::ConfigError("HTTP client is missing".into()))?;
-        crate::api::completion::CompletionApi::new(client, &self.config)
+        let (client, config) = self.get_client_and_config()?;
+        Ok(crate::api::completion::CompletionApi { client, config })
     }
 
     /// Provides access to the models endpoint.
     pub fn models(&self) -> Result<crate::api::models::ModelsApi> {
-        let client = self
-            .http_client
-            .clone()
-            .ok_or_else(|| Error::ConfigError("HTTP client is missing".into()))?;
-        crate::api::models::ModelsApi::new(client, &self.config)
+        let (client, config) = self.get_client_and_config()?;
+        Ok(crate::api::models::ModelsApi { client, config })
     }
 
     /// Provides access to the structured output endpoint.
     pub fn structured(&self) -> Result<crate::api::structured::StructuredApi> {
-        let client = self
-            .http_client
-            .clone()
-            .ok_or_else(|| Error::ConfigError("HTTP client is missing".into()))?;
-        crate::api::structured::StructuredApi::new(client, &self.config)
+        let (client, config) = self.get_client_and_config()?;
+        Ok(crate::api::structured::StructuredApi { client, config })
     }
 
     /// Provides access to the web search endpoint.
     pub fn web_search(&self) -> Result<crate::api::web_search::WebSearchApi> {
-        let client = self
-            .http_client
-            .clone()
-            .ok_or_else(|| Error::ConfigError("HTTP client is missing".into()))?;
-        crate::api::web_search::WebSearchApi::new(client, &self.config)
+        let (client, config) = self.get_client_and_config()?;
+        Ok(crate::api::web_search::WebSearchApi { client, config })
     }
 
     /// Provides access to the credits endpoint.
     pub fn credits(&self) -> Result<crate::api::credits::CreditsApi> {
-        let client = self
-            .http_client
-            .clone()
-            .ok_or_else(|| Error::ConfigError("HTTP client is missing".into()))?;
-        crate::api::credits::CreditsApi::new(client, &self.config)
+        let (client, config) = self.get_client_and_config()?;
+        Ok(crate::api::credits::CreditsApi { client, config })
     }
 
     /// Provides access to the analytics endpoint.
-    /// Get analytics API instance
     pub fn analytics(&self) -> Result<crate::api::analytics::AnalyticsApi> {
-        let client = self
-            .http_client
-            .clone()
-            .ok_or_else(|| Error::ConfigError("HTTP client is missing".into()))?;
-        crate::api::analytics::AnalyticsApi::new(client, &self.config)
+        let (client, config) = self.get_client_and_config()?;
+        Ok(crate::api::analytics::AnalyticsApi { client, config })
     }
 
     /// Provides access to the providers endpoint.
+    /// The cache is shared across calls so repeated `.providers()?.get_providers()` hits cache.
     pub fn providers(&self) -> Result<crate::api::providers::ProvidersApi> {
-        let client = self
-            .http_client
-            .clone()
-            .ok_or_else(|| Error::ConfigError("HTTP client is missing".into()))?;
-        crate::api::providers::ProvidersApi::new(client, &self.config)
+        let (client, config) = self.get_client_and_config()?;
+        let cache = self.providers_cache.clone().ok_or_else(|| {
+            crate::error::Error::ConfigError("Providers cache not initialized".into())
+        })?;
+        Ok(crate::api::providers::ProvidersApi {
+            client,
+            config,
+            cache,
+        })
+    }
+
+    /// Provides access to the key info endpoint.
+    pub fn key_info(&self) -> Result<crate::api::key_info::KeyInfoApi> {
+        let (client, config) = self.get_client_and_config()?;
+        Ok(crate::api::key_info::KeyInfoApi { client, config })
+    }
+
+    /// Provides access to the embeddings endpoint.
+    pub fn embeddings(&self) -> Result<crate::api::embeddings::EmbeddingsApi> {
+        let (client, config) = self.get_client_and_config()?;
+        Ok(crate::api::embeddings::EmbeddingsApi { client, config })
     }
 
     /// Provides access to the generation endpoint.
     pub fn generation(&self) -> Result<crate::api::generation::GenerationApi> {
-        let client = self
-            .http_client
-            .clone()
-            .ok_or_else(|| Error::ConfigError("HTTP client is missing".into()))?;
-        crate::api::generation::GenerationApi::new(client, &self.config)
+        let (client, config) = self.get_client_and_config()?;
+        Ok(crate::api::generation::GenerationApi { client, config })
     }
 
     /// Returns a new request builder for chat completions that supports MCP.
@@ -489,102 +509,22 @@ impl OpenRouterClient<Ready> {
         if let Some(router_config) = &self.router_config {
             if let Some(provider_prefs) = &router_config.provider_preferences {
                 // Convert to Value and handle errors
-                match serde_json::to_value(provider_prefs) {
-                    Ok(prefs_value) => {
-                        extra_params["provider"] = prefs_value;
-                    }
-                    Err(e) => {
-                        // Log error but continue without provider preferences
-                        eprintln!("Failed to serialize provider preferences: {e}");
-                    }
+                if let Ok(prefs_value) = serde_json::to_value(provider_prefs) {
+                    extra_params["provider"] = prefs_value;
                 }
             }
 
             // Add fallback models if present in custom profile
             if let PredefinedModelCoverageProfile::Custom(profile) = &router_config.profile {
                 if let Some(fallbacks) = &profile.fallbacks {
-                    match serde_json::to_value(fallbacks) {
-                        Ok(fallbacks_value) => {
-                            extra_params["models"] = fallbacks_value;
-                        }
-                        Err(e) => {
-                            // Log error but continue without fallbacks
-                            eprintln!("Failed to serialize fallback models: {e}");
-                        }
+                    if let Ok(fallbacks_value) = serde_json::to_value(fallbacks) {
+                        extra_params["models"] = fallbacks_value;
                     }
                 }
             }
         }
 
         crate::api::request::RequestBuilder::new(primary_model, messages, extra_params)
-    }
-
-    /// Helper method to handle standard HTTP responses.
-    pub(crate) async fn handle_response<T>(&self, response: reqwest::Response) -> Result<T>
-    where
-        T: serde::de::DeserializeOwned,
-    {
-        let status = response.status();
-
-        // Check Content-Length header first if available
-        if let Some(content_length) = response.content_length() {
-            if content_length > self.config.max_response_bytes as u64 {
-                return Err(Error::ResponseTooLarge(
-                    content_length as usize,
-                    self.config.max_response_bytes,
-                ));
-            }
-        }
-
-        // Read body with limit
-        let body_bytes = response.bytes().await?;
-        if body_bytes.len() > self.config.max_response_bytes {
-            return Err(Error::ResponseTooLarge(
-                body_bytes.len(),
-                self.config.max_response_bytes,
-            ));
-        }
-
-        // Convert to string (lossy is fine here as we expect JSON/text)
-        let body = String::from_utf8_lossy(&body_bytes).to_string();
-        if !status.is_success() {
-            return Err(Error::ApiError {
-                code: status.as_u16(),
-                message: create_safe_error_message(&body, "API error"),
-                metadata: Some(serde_json::json!({
-                    "response_text_length": body.len(),
-                    "timestamp": chrono::Utc::now().to_rfc3339(),
-                    "status_code": status.as_u16(),
-                    "has_structured_error": false
-                })),
-            });
-        }
-        if body.trim().is_empty() {
-            return Err(Error::ApiError {
-                code: status.as_u16(),
-                message: "Empty response body".into(),
-                metadata: Some(serde_json::json!({
-                    "response_text_length": 0,
-                    "timestamp": chrono::Utc::now().to_rfc3339(),
-                    "status_code": status.as_u16(),
-                    "error_type": "empty_response"
-                })),
-            });
-        }
-        serde_json::from_str::<T>(&body).map_err(|e| Error::ApiError {
-            code: status.as_u16(),
-            message: create_safe_error_message(
-                &format!("Failed to decode JSON: {e}"),
-                "JSON parsing error",
-            ),
-            metadata: Some(serde_json::json!({
-                "response_text_length": body.len(),
-                "timestamp": chrono::Utc::now().to_rfc3339(),
-                "status_code": status.as_u16(),
-                "error_type": "json_parsing",
-                "parsing_error": e.to_string()
-            })),
-        })
     }
 
     /// Validates tool calls in a chat completion response.

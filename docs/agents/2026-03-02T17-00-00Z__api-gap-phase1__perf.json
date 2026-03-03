@@ -1,0 +1,79 @@
+{
+  "metadata": {
+    "task_short": "api-gap-phase1",
+    "agent_abbr": "perf",
+    "datetime_utc": "2026-03-02T17:00:00Z",
+    "filename": "2026-03-02T17-00-00Z__api-gap-phase1__perf.json",
+    "supersedes": null,
+    "version": "1.0"
+  },
+  "state": {
+    "objectives": [
+      "Analyze performance characteristics of openrouter_api Rust client",
+      "Identify bottlenecks in streaming, retry, cache, serde, and connection pooling",
+      "Quantify semaphore backpressure ineffectiveness",
+      "Rank optimization opportunities by impact"
+    ],
+    "constraints": [
+      "No breaking API changes",
+      "Must maintain 301-test pass count",
+      "reqwest 0.11 pinned (not 0.12)"
+    ],
+    "important_facts": [
+      "10ms sleep removed from streaming - confirmed absent",
+      "Semaphore permits=10 acquired/released in same scope - no backpressure",
+      "reqwest::Client cloned per API method call (cheap Arc clone, acceptable)",
+      "HeaderMap cloned per retry iteration in closure",
+      "serde_json::to_value used in streaming path (intermediate allocation)",
+      "Cache uses std::sync::Mutex (blocks async runtime)",
+      "Cache has no max-size bound - unbounded growth risk",
+      "Token estimation uses len()/4 heuristic - inaccurate but fast",
+      "No connection pool tuning (reqwest defaults: ~100 idle, 90s timeout)",
+      "ChatCompletionRequest has 27 fields, many Option - large stack size",
+      "LinesCodec MAX_LINE_LENGTH=64KB reasonable but redundant check after codec",
+      "MCP client serializes request to String for size check then re-serializes via .json()"
+    ],
+    "decisions_made": [],
+    "artifacts": [
+      "src/api/chat.rs - streaming implementation",
+      "src/utils/retry.rs - retry with backoff",
+      "src/utils/cache.rs - TTL cache",
+      "src/utils/validation/chat.rs - token estimation",
+      "src/client.rs - connection setup",
+      "src/mcp/client.rs - MCP implementation"
+    ],
+    "dependencies": [],
+    "risks_issues": [
+      "Semaphore backpressure is a no-op: HIGH impact on memory under load",
+      "std::sync::Mutex on cache in async context: MEDIUM, potential deadlock",
+      "Double serialization in MCP client: LOW, minor CPU waste",
+      "No connection pool configuration: LOW, reqwest defaults are reasonable"
+    ]
+  },
+  "iteration": {
+    "summary": "Completed comprehensive performance analysis of the openrouter_api Rust client. Identified 8 optimization opportunities ranked by impact. The semaphore backpressure in streaming is the most critical finding - it provides zero actual backpressure because permits are acquired and released within the same loop iteration. The cache uses std::sync::Mutex in async context which can block the tokio runtime. The streaming path does an unnecessary serde_json::to_value intermediate allocation. Token counting is a fast heuristic with acceptable accuracy tradeoff.",
+    "inputs_consulted": [
+      "src/api/chat.rs",
+      "src/utils/retry.rs",
+      "src/utils/cache.rs",
+      "src/utils/validation/chat.rs",
+      "src/client.rs",
+      "src/mcp/client.rs",
+      "src/types/chat.rs",
+      "src/error.rs",
+      "Cargo.toml"
+    ],
+    "outputs_produced": [
+      "Performance analysis report (in conversation)",
+      "docs/agents/2026-03-02T17-00-00Z__api-gap-phase1__perf.json"
+    ],
+    "next_actions": [
+      "Implement fixes for top-priority issues if requested",
+      "Add benchmarks with criterion for hot paths",
+      "Replace std::sync::Mutex with tokio::sync::Mutex in ProvidersApi cache"
+    ]
+  },
+  "cross_agent_notes": {
+    "mentions": []
+  }
+}

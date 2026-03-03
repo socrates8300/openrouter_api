@@ -1,0 +1,92 @@
+{
+  "metadata": {
+    "task_short": "api-gap-phase1",
+    "agent_abbr": "ta",
+    "datetime_utc": "2026-03-02T18:00:00Z",
+    "filename": "2026-03-02T18-00-00Z__api-gap-phase1__ta.json",
+    "supersedes": null,
+    "version": "1.0"
+  },
+  "state": {
+    "objectives": [
+      "Evaluate test coverage and quality for the OpenRouter Rust client library",
+      "Identify and fill gaps: embed_batch index ordering, deleted integration tests, key info coverage, embeddings coverage, wiremock gaps, quality/maintainability issues"
+    ],
+    "constraints": [
+      "No breaking changes to existing tests",
+      "No emojis in code",
+      "All tests must pass before closing session",
+      "Rust toolchain 1.91, edition 2021"
+    ],
+    "important_facts": [
+      "Test count before: 280 unit + 23 doc = 303 total",
+      "Test count after: 341 unit + 23 doc = 364 total (+61 new unit tests)",
+      "EmbeddingResponse derives only Deserialize, not Serialize — affects roundtrip testing approach",
+      "MessageContent is an enum (Text | Parts), not a String — cannot use .as_deref() on Option<MessageContent>",
+      "StreamDelta.content is Option<MessageContent> — match on enum variant required in tests",
+      "embed_batch() sorts data by index before returning — critical correctness invariant, was untested",
+      "Retry-After header parsing was unit-tested in isolation but never exercised end-to-end with wiremock",
+      "streaming_backpressure.rs and retry_retry_after.rs were deleted and not replaced with equivalent wiremock tests",
+      "~30 tests duplicated between completion.rs/completion_tests.rs and web_search.rs/web_search_tests.rs",
+      "futures crate is in main [dependencies], not dev-dependencies — usable in #[cfg(test)] blocks"
+    ],
+    "decisions_made": [
+      "Added embeddings_tests.rs (17 tests): pure unit tests covering index ordering, edge cases, serde",
+      "Added key_info_tests.rs (21 tests): type convenience methods + 4 wiremock integration tests",
+      "Added retry_and_streaming_tests.rs (23 tests): retry-after e2e, non-retry passthrough, SSE streaming wiremock",
+      "Did not remove duplicated validation tests — risk of removing context from existing test files outweighs test count benefit",
+      "Did not add embed_text wiremock test — embed_text delegates to create(), which is already wiremock-tested"
+    ],
+    "artifacts": [
+      "src/tests/embeddings_tests.rs",
+      "src/tests/key_info_tests.rs",
+      "src/tests/retry_and_streaming_tests.rs",
+      "src/tests/mod.rs (updated to wire in 3 new modules)"
+    ],
+    "dependencies": [
+      "wiremock = 0.5 (already in dev-dependencies)",
+      "futures = 0.3 (in main dependencies, usable in tests)",
+      "iteration_id = 2 (api-gap-phase1), session_id = 3"
+    ],
+    "risks_issues": [
+      "Test duplication in validation suite (~30 tests): not a correctness issue but inflates count and causes confusion — recommend consolidating completion_tests.rs into completion.rs in a follow-up",
+      "Retry-After timing test uses 600ms lower bound — could be flaky on extremely slow CI; consider making it configurable or removing timing assertion if it causes CI noise",
+      "streaming wiremock test sends full SSE body as a string — wiremock's ResponseTemplate does not stream slowly, so backpressure semaphore is not exercised; true backpressure testing requires a slow mock server"
+    ]
+  },
+  "iteration": {
+    "summary": "Performed a full test coverage audit of the OpenRouter Rust client library. Identified 6 gap areas from the task brief and added 61 new unit/integration tests across 3 new files. All 341 tests pass with zero warnings. The critical embed_batch index-ordering invariant, Retry-After end-to-end behavior, key info wiremock coverage, and streaming wiremock coverage were all gaps — now addressed. Duplicate test coverage in the validation module (~30 redundant tests) was identified and documented as tech debt but not removed in this session.",
+    "inputs_consulted": [
+      "src/api/embeddings.rs",
+      "src/api/key_info.rs",
+      "src/types/embeddings.rs",
+      "src/types/key_info.rs",
+      "src/types/chat.rs",
+      "src/api/chat.rs",
+      "src/utils/retry.rs",
+      "src/tests/integration_tests.rs",
+      "src/utils/validation/tests.rs",
+      "src/utils/validation/completion_tests.rs",
+      "Cargo.toml",
+      "docs/agent_context.db"
+    ],
+    "outputs_produced": [
+      "src/tests/embeddings_tests.rs — 17 tests",
+      "src/tests/key_info_tests.rs — 21 tests",
+      "src/tests/retry_and_streaming_tests.rs — 23 tests",
+      "src/tests/mod.rs — updated",
+      "341 unit tests passing (was 280)"
+    ],
+    "next_actions": [
+      "Consolidate completion_tests.rs into completion.rs (deduplicate ~15 tests)",
+      "Consolidate web_search_tests.rs into web_search.rs (deduplicate ~15 tests)",
+      "Add wiremock test for true streaming backpressure using delayed mock responses",
+      "Add wiremock test for Retry-After HTTP-date format (not just delta-seconds)",
+      "Implement list_embedding_models endpoint (item 24) and add tests",
+      "Implement models listing and credits endpoints (item 9)"
+    ]
+  },
+  "cross_agent_notes": {
+    "mentions": []
+  }
+}

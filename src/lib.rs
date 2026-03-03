@@ -7,7 +7,8 @@ pub mod client;
 pub mod error;
 pub mod mcp; // Add the MCP module
 pub mod models;
-pub mod tests;
+#[cfg(test)]
+mod tests;
 pub mod types;
 pub mod utils;
 

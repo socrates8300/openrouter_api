@@ -46,6 +46,9 @@ pub enum Error {
     #[error("Schema validation error: {0}")]
     SchemaValidationError(String),
 
+    #[error("Validation error: {0}")]
+    ValidationError(String),
+
     #[error("Serialization error: {0}")]
     SerializationError(#[from] serde_json::Error),
 
@@ -67,6 +70,12 @@ pub enum Error {
     #[error("Response too large: {0} bytes (limit: {1} bytes)")]
     ResponseTooLarge(usize, usize),
 
+    #[error("Resource exhausted: {0}")]
+    ResourceExhausted(String),
+
+    #[error("Deserialization error (status {status_code}): {message}")]
+    DeserializationError { message: String, status_code: u16 },
+
     #[error("Unknown error")]
     Unknown,
 }
@@ -75,17 +84,17 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 impl Error {
     /// Creates an API error from a given HTTP response.
-    pub async fn from_response(response: Response) -> Result<Self> {
+    pub async fn from_response(response: Response) -> Self {
         let status = response.status().as_u16();
         let text = response.text().await.unwrap_or_default();
         Self::from_response_text(status, &text)
     }
 
     /// Creates an API error from status code and response text.
-    pub fn from_response_text(status: u16, text: &str) -> Result<Self> {
+    pub fn from_response_text(status: u16, text: &str) -> Self {
         // Try to parse structured API error response
         if let Ok(api_error) = serde_json::from_str::<ApiErrorDetails>(text) {
-            return Ok(Error::ApiError {
+            return Error::ApiError {
                 code: status,
                 message: create_safe_error_message(text, "API error occurred"),
                 metadata: Some(serde_json::json!({
@@ -93,18 +102,18 @@ impl Error {
                     "response_text_length": text.len(),
                     "timestamp": chrono::Utc::now().to_rfc3339()
                 })),
-            });
+            };
         }
 
         // Handle rate limiting specifically
         if status == 429 {
-            return Ok(Error::RateLimitExceeded(create_safe_error_message(
+            return Error::RateLimitExceeded(create_safe_error_message(
                 text,
                 "Rate limit exceeded",
-            )));
+            ));
         }
 
-        Ok(Error::ApiError {
+        Error::ApiError {
             code: status,
             message: create_safe_error_message(text, "API error occurred"),
             metadata: Some(serde_json::json!({
@@ -112,41 +121,7 @@ impl Error {
                 "timestamp": chrono::Utc::now().to_rfc3339(),
                 "has_structured_error": false
             })),
-        })
-    }
-
-    /// Creates an API error from a given HTTP response with additional context.
-    pub async fn from_response_with_context(
-        response: Response,
-        operation_name: &str,
-        request_id: Option<&str>,
-    ) -> Result<Self> {
-        let status = response.status().as_u16();
-        let text = response.text().await.unwrap_or_default();
-
-        let mut error = Self::from_response_text(status, &text)?;
-
-        // Add operation context to metadata
-        if let Error::ApiError {
-            metadata: Some(metadata),
-            ..
-        } = &mut error
-        {
-            // Add operation context to metadata
-            let metadata_obj = metadata.as_object_mut().unwrap();
-            metadata_obj.insert(
-                "operation".to_string(),
-                serde_json::Value::String(operation_name.to_string()),
-            );
-            if let Some(rid) = request_id {
-                metadata_obj.insert(
-                    "request_id".to_string(),
-                    serde_json::Value::String(rid.to_string()),
-                );
-            }
         }
-
-        Ok(error)
     }
 }
 

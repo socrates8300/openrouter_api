@@ -177,6 +177,9 @@ pub struct Message {
     // Optionally include tool_calls when the assistant message contains a tool call.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_calls: Option<Vec<ToolCall>>,
+    /// Reasoning content from thinking models (o1, o3, DeepSeek R1, Claude extended thinking).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning: Option<String>,
 }
 
 impl Default for Message {
@@ -187,6 +190,7 @@ impl Default for Message {
             name: None,
             tool_call_id: None,
             tool_calls: None,
+            reasoning: None,
         }
     }
 }
@@ -200,6 +204,7 @@ impl Message {
             name: None,
             tool_calls: None,
             tool_call_id: None,
+            reasoning: None,
         }
     }
 
@@ -215,6 +220,7 @@ impl Message {
             name: Some(name.into()),
             tool_calls: None,
             tool_call_id: None,
+            reasoning: None,
         }
     }
 
@@ -226,6 +232,7 @@ impl Message {
             name: None,
             tool_calls: None,
             tool_call_id: None,
+            reasoning: None,
         }
     }
 
@@ -237,6 +244,7 @@ impl Message {
             name: None,
             tool_calls: None,
             tool_call_id: Some(tool_call_id.into()),
+            reasoning: None,
         }
     }
 
@@ -253,8 +261,27 @@ impl Message {
             name: None,
             tool_calls: Some(tool_calls),
             tool_call_id: None,
+            reasoning: None,
         }
     }
+}
+
+/// Debug configuration for request inspection.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DebugConfig {
+    /// When true, the transformed upstream request body is echoed as the first streaming chunk.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub echo_upstream_body: Option<bool>,
+}
+
+/// Plugin configuration for enabling OpenRouter server-side features.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Plugin {
+    /// Plugin identifier (e.g., "web", "file-parser", "response-healing").
+    pub id: String,
+    /// Optional plugin-specific configuration.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub config: Option<serde_json::Value>,
 }
 
 /// Chat completion request matching the OpenRouter API schema.
@@ -282,9 +309,6 @@ pub struct ChatCompletionRequest {
     /// (Optional) Fallback models.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub models: Option<Vec<String>>,
-    /// (Optional) Plugins to enable (e.g. web search).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub plugins: Option<Vec<String>>,
     /// (Optional) Message transforms.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transforms: Option<Vec<String>>,
@@ -349,6 +373,12 @@ pub struct ChatCompletionRequest {
     /// (Optional) Response verbosity level.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub verbosity: Option<VerbosityLevel>,
+    /// (Optional) Debug configuration for request inspection.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub debug: Option<DebugConfig>,
+    /// (Optional) Plugins to enable (e.g., "web", "file-parser", "response-healing").
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub plugins: Option<Vec<Plugin>>,
 }
 
 /// A choice returned by the chat API.
@@ -385,12 +415,29 @@ pub struct TopLogProb {
     pub bytes: Option<Vec<u8>>,
 }
 
+/// Server-side tool usage counts (e.g., web search requests).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ServerToolUse {
+    /// Number of web search requests made by the server.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub web_search_requests: Option<u32>,
+}
+
 /// Usage data returned from the API.
 #[derive(Debug, Deserialize)]
 pub struct Usage {
     pub prompt_tokens: u32,
     pub completion_tokens: u32,
     pub total_tokens: u32,
+    /// Cost of the request in credits (USD float).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cost: Option<f64>,
+    /// Whether the request used a user-provided API key (Bring Your Own Key).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_byok: Option<bool>,
+    /// Server-side tool usage counts.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub server_tool_use: Option<ServerToolUse>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prompt_tokens_details: Option<PromptTokensDetails>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -457,6 +504,9 @@ pub struct StreamDelta {
     pub content: Option<MessageContent>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_calls: Option<Vec<ToolCallChunk>>,
+    /// Reasoning content delta from thinking models.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning: Option<String>,
 }
 
 /// A streaming chunk for chat completions.

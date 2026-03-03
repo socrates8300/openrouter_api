@@ -9,8 +9,8 @@ use reqwest::Client;
 
 /// API endpoint for text completions.
 pub struct CompletionApi {
-    pub client: Client,
-    pub config: crate::client::ApiConfig,
+    pub(crate) client: Client,
+    pub(crate) config: crate::client::ApiConfig,
 }
 
 impl CompletionApi {

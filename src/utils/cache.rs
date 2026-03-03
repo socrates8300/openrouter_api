@@ -7,6 +7,15 @@ pub struct Cache<K, V> {
     default_ttl: Duration,
 }
 
+impl<K, V> std::fmt::Debug for Cache<K, V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Cache")
+            .field("entries", &self.data.len())
+            .field("default_ttl", &self.default_ttl)
+            .finish()
+    }
+}
+
 struct CacheEntry<V> {
     value: V,
     expires_at: Instant,

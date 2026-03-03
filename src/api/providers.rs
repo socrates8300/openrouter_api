@@ -6,24 +6,31 @@ use crate::utils::{
     retry::operations::GET_PROVIDERS,
 };
 use reqwest::Client;
-use std::sync::Mutex;
-use std::time::Duration;
+use std::sync::{Arc, Mutex};
 
 /// API client for provider-related operations
 pub struct ProvidersApi {
-    client: Client,
-    config: crate::client::ApiConfig,
-    cache: Mutex<Cache<String, ProvidersResponse>>,
+    pub(crate) client: Client,
+    pub(crate) config: crate::client::ApiConfig,
+    pub(crate) cache: Arc<Mutex<Cache<String, ProvidersResponse>>>,
 }
 
 impl ProvidersApi {
-    /// Creates a new ProvidersApi with the given reqwest client and configuration.
+    /// Creates a new ProvidersApi with the given reqwest client, configuration, and shared cache.
+    ///
+    /// The cache is shared across calls so that repeated requests hit the cache
+    /// instead of the network. Callers should retain the same `Arc<Mutex<Cache<...>>>`
+    /// instance across multiple `ProvidersApi` lifetimes.
     #[must_use = "returns an API client that should be used for API calls"]
-    pub fn new(client: Client, config: &crate::client::ClientConfig) -> Result<Self> {
+    pub fn new(
+        client: Client,
+        config: &crate::client::ClientConfig,
+        cache: Arc<Mutex<Cache<String, ProvidersResponse>>>,
+    ) -> Result<Self> {
         Ok(Self {
             client,
             config: config.to_api_config()?,
-            cache: Mutex::new(Cache::new(Duration::from_secs(300))), // 5 minutes cache
+            cache,
         })
     }
 
@@ -77,17 +84,21 @@ impl ProvidersApi {
             }
         }
 
-        // Build the URL handling base_url that may or may not end with /
-        let url = if self.config.base_url.path().ends_with('/') {
-            format!("{}providers", self.config.base_url)
-        } else {
-            format!("{}/providers", self.config.base_url)
-        };
+        // Build the URL for the providers endpoint
+        let url = self
+            .config
+            .base_url
+            .join("providers")
+            .map_err(|e| Error::ApiError {
+                code: 400,
+                message: format!("Invalid URL: {e}"),
+                metadata: None,
+            })?;
 
         // Execute request with retry logic
         let response = execute_with_retry_builder(&self.config.retry_config, GET_PROVIDERS, || {
             self.client
-                .get(&url)
+                .get(url.clone())
                 .headers((*self.config.headers).clone())
         })
         .await?;
@@ -402,27 +413,20 @@ impl ProvidersApi {
 mod tests {
     use super::*;
     use crate::client::{ClientConfig, RetryConfig, SecureApiKey};
+    use crate::tests::test_helpers::test_client_config;
     use reqwest::Client;
+    use std::time::Duration;
+
+    fn default_providers_cache() -> Arc<Mutex<Cache<String, ProvidersResponse>>> {
+        Arc::new(Mutex::new(Cache::new(Duration::from_secs(300))))
+    }
 
     #[test]
     fn test_providers_api_new() {
-        let config = ClientConfig {
-            api_key: Some(SecureApiKey::new("sk-test123456789012345678901234567890").unwrap()),
-            base_url: url::Url::parse("https://openrouter.ai/api/v1/").unwrap(),
-            timeout: std::time::Duration::from_secs(30),
-            http_referer: None,
-            site_title: None,
-            user_id: None,
-            retry_config: RetryConfig::default(),
-            max_response_bytes: 10 * 1024 * 1024,
-        };
+        let config = test_client_config();
         let http_client = Client::new();
 
-        let _providers_api = ProvidersApi::new(http_client, &config);
-
-        // Test that the API was created successfully
-        // We can't test actual API calls without a real server
-        // API creation successful if we reach this point
+        let _providers_api = ProvidersApi::new(http_client, &config, default_providers_cache());
     }
 
     #[tokio::test]
@@ -439,7 +443,8 @@ mod tests {
             max_response_bytes: 10 * 1024 * 1024,
         };
         let http_client = Client::new();
-        let providers_api = ProvidersApi::new(http_client, &config).unwrap();
+        let providers_api =
+            ProvidersApi::new(http_client, &config, default_providers_cache()).unwrap();
 
         // Test that network errors are properly handled
         let result = providers_api.get_providers().await;
@@ -452,7 +457,6 @@ mod tests {
                 // Expected - network or rate limit error
             }
             other => {
-                println!("Got error: {:?}", other);
                 panic!(
                     "Expected HttpError or RateLimitExceeded for network failure, got: {:?}",
                     other
@@ -467,14 +471,11 @@ mod tests {
             api_key: Some(SecureApiKey::new("sk-test123456789012345678901234567890").unwrap()),
             base_url: url::Url::parse("http://localhost:0/api/v1/").unwrap(),
             timeout: std::time::Duration::from_secs(1),
-            http_referer: None,
-            site_title: None,
-            user_id: None,
-            retry_config: RetryConfig::default(),
-            max_response_bytes: 10 * 1024 * 1024,
+            ..test_client_config()
         };
         let http_client = Client::new();
-        let providers_api = ProvidersApi::new(http_client, &config).unwrap();
+        let providers_api =
+            ProvidersApi::new(http_client, &config, default_providers_cache()).unwrap();
 
         // All convenience methods should handle network errors gracefully
         assert!(providers_api.get_provider_by_slug("openai").await.is_err());
@@ -493,5 +494,66 @@ mod tests {
             .is_err());
         assert!(providers_api.get_provider_slugs().await.is_err());
         assert!(providers_api.get_provider_names().await.is_err());
+    }
+
+    /// E2E test: verifies that a shared cache actually prevents duplicate network calls.
+    /// Two ProvidersApi instances sharing the same Arc<Mutex<Cache>> should only hit
+    /// the server once — the second call returns the cached value.
+    #[tokio::test]
+    async fn test_shared_cache_prevents_duplicate_network_calls() {
+        use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
+
+        let mock_server = MockServer::start().await;
+
+        // Respond with a minimal valid ProvidersResponse
+        Mock::given(matchers::method("GET"))
+            .and(matchers::path("/api/v1/providers"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "data": [{
+                    "name": "TestProvider",
+                    "slug": "test-provider",
+                    "url": "https://test.example.com",
+                    "privacy_policy_url": null,
+                    "terms_of_service_url": null,
+                    "status_page_url": null,
+                    "context_length": 4096,
+                    "max_completion_tokens": 2048
+                }]
+            })))
+            .expect(1) // Assert mock is called exactly once
+            .mount(&mock_server)
+            .await;
+
+        let config = ClientConfig {
+            api_key: Some(SecureApiKey::new("sk-test123456789012345678901234567890").unwrap()),
+            base_url: url::Url::parse(&format!("{}/api/v1/", mock_server.uri())).unwrap(),
+            timeout: std::time::Duration::from_secs(5),
+            ..test_client_config()
+        };
+
+        // Shared cache
+        let cache = default_providers_cache();
+
+        let http_client_1 = Client::new();
+        let api1 = ProvidersApi::new(http_client_1, &config, cache.clone()).unwrap();
+
+        let http_client_2 = Client::new();
+        let api2 = ProvidersApi::new(http_client_2, &config, cache).unwrap();
+
+        // First call hits the server
+        let result1 = api1.get_providers().await;
+        assert!(result1.is_ok(), "First call should succeed: {:?}", result1);
+        assert_eq!(result1.unwrap().count(), 1);
+
+        // Second call (different api instance, same cache) should use cache
+        let result2 = api2.get_providers().await;
+        assert!(
+            result2.is_ok(),
+            "Second call should succeed from cache: {:?}",
+            result2
+        );
+        assert_eq!(result2.unwrap().count(), 1);
+
+        // MockServer's .expect(1) will panic on drop if the mock was called more than once
     }
 }
