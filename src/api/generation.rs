@@ -9,8 +9,8 @@ use reqwest::Client;
 /// API endpoint for generation management.
 /// API endpoint for generation information.
 pub struct GenerationApi {
-    pub client: Client,
-    pub config: crate::client::ApiConfig,
+    pub(crate) client: Client,
+    pub(crate) config: crate::client::ApiConfig,
 }
 
 impl GenerationApi {
@@ -127,21 +127,9 @@ mod tests {
 
     #[test]
     fn test_generation_api_new() {
-        use crate::client::{ClientConfig, RetryConfig, SecureApiKey};
-        use reqwest::Client;
-        use url::Url;
+        use crate::tests::test_helpers::test_client_config;
 
-        let config = ClientConfig {
-            api_key: Some(SecureApiKey::new("sk-test123456789012345678901234567890").unwrap()),
-            base_url: Url::parse("https://openrouter.ai/api/v1").unwrap(),
-            timeout: std::time::Duration::from_secs(30),
-            http_referer: None,
-            site_title: None,
-            user_id: None,
-            retry_config: RetryConfig::default(),
-            max_response_bytes: 10 * 1024 * 1024,
-        };
-
+        let config = test_client_config();
         let client = Client::new();
         let generation_api = GenerationApi::new(client, &config).unwrap();
 
@@ -154,20 +142,9 @@ mod tests {
 
     #[test]
     fn test_generation_id_validation() {
-        use crate::client::{ClientConfig, RetryConfig, SecureApiKey};
-        use reqwest::Client;
+        use crate::tests::test_helpers::test_client_config;
 
-        let config = ClientConfig {
-            api_key: Some(SecureApiKey::new("sk-test123456789012345678901234567890").unwrap()),
-            base_url: url::Url::parse("https://openrouter.ai/api/v1/").unwrap(),
-            timeout: std::time::Duration::from_secs(30),
-            http_referer: None,
-            site_title: None,
-            user_id: None,
-            retry_config: RetryConfig::default(),
-            max_response_bytes: 10 * 1024 * 1024,
-        };
-
+        let config = test_client_config();
         let client = Client::new();
         let generation_api = GenerationApi::new(client, &config).unwrap();
 

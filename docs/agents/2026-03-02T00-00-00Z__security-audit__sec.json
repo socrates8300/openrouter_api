@@ -1,0 +1,84 @@
+{
+  "metadata": {
+    "task_short": "security-audit",
+    "agent_abbr": "sec",
+    "datetime_utc": "2026-03-02T00:00:00Z",
+    "filename": "2026-03-02T00-00-00Z__security-audit__sec.json",
+    "supersedes": null,
+    "version": "1.0"
+  },
+  "state": {
+    "objectives": [
+      "Full security audit of openrouter_api v0.4.0",
+      "Check OWASP Top 10, auth, input validation, dependency vulns"
+    ],
+    "constraints": [
+      "Library code only, no deployment/infra review"
+    ],
+    "important_facts": [
+      "bytes 1.10.1 has RUSTSEC-2026-0007 (integer overflow in BytesMut::reserve)",
+      "SecureApiKey has proper zeroize/no-clone/no-serialize but is accessible via pub fields on OpenRouterClient",
+      "No HTTPS enforcement on base_url or MCP server_url",
+      "MCP client error path leaks raw server response without redaction",
+      "elide() and redact_sensitive_content() can panic on multi-byte UTF-8",
+      "ApiConfig.headers correctly uses pub(crate)"
+    ],
+    "decisions_made": [],
+    "artifacts": [
+      "Security audit report (inline in conversation)",
+      "/Volumes/BugsBunny/Development/openrouter_api/docs/agents/2026-03-02T00-00-00Z__security-audit__sec.json"
+    ],
+    "dependencies": [],
+    "risks_issues": [
+      "SEC-001 CRITICAL: bytes CVE RUSTSEC-2026-0007",
+      "SEC-002 HIGH: pub fields expose SecureApiKey",
+      "SEC-003 HIGH: no HTTPS enforcement",
+      "SEC-004 HIGH: MCP error leaks raw response",
+      "SEC-005/006 MEDIUM: UTF-8 panic in elide/redact",
+      "SEC-007/008 MEDIUM: stderr logging in production",
+      "SEC-009 MEDIUM: no retry config validation",
+      "SEC-010 MEDIUM: auth validation mismatch",
+      "SEC-011-015 LOW: various hardening items"
+    ]
+  },
+  "iteration": {
+    "summary": "Completed comprehensive security audit of openrouter_api v0.4.0 on feat/api-gap-phase1 branch. Found 15 security findings across all severity levels. The codebase shows good security awareness (SecureApiKey with zeroize, content redaction, streaming safety limits, MCP rate limiting) but has several actionable issues including a critical dependency vulnerability (bytes CVE), exposure of SecureApiKey through pub fields, missing HTTPS enforcement, and potential UTF-8 panics in string truncation. Priority remediation order provided.",
+    "inputs_consulted": [
+      "src/client.rs",
+      "src/error.rs",
+      "src/lib.rs",
+      "src/utils/security.rs",
+      "src/utils/auth.rs",
+      "src/utils/retry.rs",
+      "src/utils/validation/chat.rs",
+      "src/utils/validation/common.rs",
+      "src/utils/validation/mod.rs",
+      "src/api/chat.rs",
+      "src/api/embeddings.rs",
+      "src/api/key_info.rs",
+      "src/api/structured.rs",
+      "src/api/mod.rs",
+      "src/types/chat.rs",
+      "src/types/embeddings.rs",
+      "src/types/key_info.rs",
+      "src/mcp/client.rs",
+      "src/mcp/types.rs",
+      "src/client/tests.rs",
+      "Cargo.toml",
+      "cargo audit output"
+    ],
+    "outputs_produced": [
+      "Security audit report with 15 findings",
+      "Priority remediation table"
+    ],
+    "next_actions": [
+      "Fix SEC-001: Upgrade bytes/reqwest",
+      "Fix SEC-003: Add HTTPS enforcement",
+      "Fix SEC-002: Change pub to pub(crate) on client fields",
+      "Fix SEC-004: Add redaction to MCP error path"
+    ]
+  },
+  "cross_agent_notes": {
+    "mentions": []
+  }
+}

@@ -14,8 +14,8 @@ use serde_json::Value;
 
 /// API endpoint for structured output generation.
 pub struct StructuredApi {
-    client: Client,
-    config: crate::client::ApiConfig,
+    pub(crate) client: Client,
+    pub(crate) config: crate::client::ApiConfig,
 }
 
 impl StructuredApi {
@@ -57,31 +57,7 @@ impl StructuredApi {
                     },
                 },
             }),
-            tools: None,
-            tool_choice: None,
-            provider: None,
-            models: None,
-            transforms: None,
-            route: None,
-            user: None,
-            max_tokens: None,
-            temperature: None,
-            top_p: None,
-            top_k: None,
-            frequency_penalty: None,
-            presence_penalty: None,
-            repetition_penalty: None,
-            min_p: None,
-            top_a: None,
-            seed: None,
-            stop: None,
-            logit_bias: None,
-            logprobs: None,
-            top_logprobs: None,
-            prediction: None,
-            parallel_tool_calls: None,
-            verbosity: None,
-            plugins: None,
+            ..Default::default()
         };
 
         // Build the complete URL for the chat completions endpoint.
@@ -121,19 +97,20 @@ impl StructuredApi {
             handle_response_json::<ChatCompletionResponse>(response, STRUCTURED_GENERATE).await?;
 
         // Extract the content from the response
-        if chat_response.choices.is_empty() {
-            return Err(Error::ApiError {
-                code: 200,
+        let choice = chat_response
+            .choices
+            .first()
+            .ok_or_else(|| Error::ApiError {
+                code: 500,
                 message: "No choices returned in response".into(),
                 metadata: None,
-            });
-        }
+            })?;
 
-        let content_str = match &chat_response.choices[0].message.content {
+        let content_str = match &choice.message.content {
             MessageContent::Text(content) => content,
             MessageContent::Parts(_) => {
                 return Err(Error::ApiError {
-                    code: 200,
+                    code: 500,
                     message: "Unexpected multimodal content in structured response".into(),
                     metadata: None,
                 });

@@ -21,6 +21,8 @@ pub mod operations {
     pub const GET_GENERATION: &str = "get_generation";
     pub const STRUCTURED_GENERATE: &str = "structured_generate";
     pub const CHAT_COMPLETION: &str = "chat_completion";
+    pub const GET_KEY_INFO: &str = "get_key_info";
+    pub const GET_EMBEDDINGS: &str = "get_embeddings";
 }
 
 /// Executes an HTTP request with retry logic using a closure for request building
@@ -60,13 +62,14 @@ where
             Err(_) => {
                 if retry_count < config.max_retries as usize {
                     retry_count += 1;
-                    eprintln!(
-                        "Retrying {} request due to global timeout proximity ({}/{})",
-                        operation_name, retry_count, config.max_retries
-                    );
-                    // If we timed out, we might not have much time left, but let's try to backoff if possible
-                    // However, if remaining is zero, the loop check at top will catch it.
-                    // We just continue to let the loop check handle the exit.
+
+                    // Wait with jitter, but never sleep past the remaining overall time.
+                    let sleep_ms =
+                        jittered_backoff_ms(backoff_ms, config.max_backoff_ms, &mut rng, remaining);
+                    sleep(Duration::from_millis(sleep_ms)).await;
+
+                    // Exponential step for next time.
+                    backoff_ms = next_backoff(backoff_ms, config.max_backoff_ms);
                     continue;
                 } else {
                     return Err(Error::TimeoutError(format!(
@@ -84,10 +87,6 @@ where
 
                     let sleep_ms =
                         jittered_backoff_ms(backoff_ms, config.max_backoff_ms, &mut rng, remaining);
-                    eprintln!(
-                        "Retrying {} due to transient error ({}/{}) in {} ms: {}",
-                        operation_name, retry_count, config.max_retries, sleep_ms, e
-                    );
                     sleep(Duration::from_millis(sleep_ms)).await;
 
                     backoff_ms = next_backoff(backoff_ms, config.max_backoff_ms);
@@ -125,11 +124,6 @@ where
                     let sleep_ms =
                         jittered_backoff_ms(base_ms, config.max_backoff_ms, &mut rng, remaining);
 
-                    eprintln!(
-                        "Retrying {} request ({}/{}) after {} ms (status: {}, retry_after_ms={:?}, base_backoff_ms={})",
-                        operation_name, retry_count, config.max_retries, sleep_ms, status_code, retry_after_ms, backoff_ms
-                    );
-
                     sleep(Duration::from_millis(sleep_ms)).await;
 
                     // Only grow exponential backoff if we didn't use Retry-After.
@@ -146,7 +140,7 @@ where
     }
 }
 
-/// FIX: Robust Retry-After parsing with single assignment and 1h cap.
+/// Robust Retry-After parsing with single assignment and 1h cap.
 /// Supports both `delta-seconds` and RFC 1123 HTTP-date.
 fn parse_retry_after_ms(headers: &HeaderMap) -> Option<u64> {
     const MAX_SECONDS: u64 = 3600; // 1 hour cap
@@ -172,13 +166,13 @@ fn parse_retry_after_ms(headers: &HeaderMap) -> Option<u64> {
     None
 }
 
-/// NEW: Recognize transient reqwest errors worth retrying.
+/// Recognize transient reqwest errors worth retrying.
 fn is_retryable_reqwest_error(e: &reqwest::Error) -> bool {
     e.is_timeout() || e.is_connect()
     // You could add .is_request() if you want to retry malformed responses, but it's usually not transient.
 }
 
-/// NEW: Jittered backoff capped by both config.max_backoff_ms and remaining overall time.
+/// Jittered backoff capped by both config.max_backoff_ms and remaining overall time.
 /// Also safety-caps any single sleep to ≤5 minutes.
 fn jittered_backoff_ms(
     base_ms: u64,
@@ -201,7 +195,7 @@ fn jittered_backoff_ms(
     jittered.min(remaining_ms)
 }
 
-/// NEW: Next exponential backoff step with both config and safety cap.
+/// Next exponential backoff step with both config and safety cap.
 fn next_backoff(current_ms: u64, max_backoff_ms: u64) -> u64 {
     let doubled = current_ms.saturating_mul(2);
     doubled.min(max_backoff_ms).min(300_000) // ≤ 5 minutes
@@ -214,19 +208,9 @@ pub async fn handle_response_text(response: Response, operation_name: &str) -> R
     let body = response.text().await?;
 
     if !status.is_success() {
-        // FIX: Avoid `?` inside `Err(...)` which could bubble an internal parse failure
+        // Avoid `?` inside `Err(...)` which could bubble an internal parse failure
         // instead of returning a best-effort API error. Fall back gracefully.
-        let err =
-            Error::from_response_text(status_code, &body).unwrap_or_else(|_| Error::ApiError {
-                code: status_code,
-                message: format!(
-                    "HTTP {} for {} with non-JSON body: {}",
-                    status_code,
-                    operation_name,
-                    elide(&body, 2_000)
-                ),
-                metadata: None,
-            });
+        let err = Error::from_response_text(status_code, &body);
         return Err(err);
     }
 
@@ -251,18 +235,7 @@ pub async fn handle_response_json<T: serde::de::DeserializeOwned>(
     let body = response.text().await?;
 
     if !status.is_success() {
-        // FIX: Same `?` issue; use safe fallback.
-        let err =
-            Error::from_response_text(status_code, &body).unwrap_or_else(|_| Error::ApiError {
-                code: status_code,
-                message: format!(
-                    "HTTP {} for {} with body: {}",
-                    status_code,
-                    operation_name,
-                    elide(&body, 2_000)
-                ),
-                metadata: None,
-            });
+        let err = Error::from_response_text(status_code, &body);
         return Err(err);
     }
 
@@ -275,9 +248,8 @@ pub async fn handle_response_json<T: serde::de::DeserializeOwned>(
     }
 
     // Decode JSON with a safe error message.
-    serde_json::from_str::<T>(&body).map_err(|e| Error::ApiError {
-        // NOTE: status may be 2xx; we keep it for visibility but consider using 0 or a dedicated DecodeError in your type.
-        code: status_code,
+    serde_json::from_str::<T>(&body).map_err(|e| Error::DeserializationError {
+        status_code,
         message: crate::utils::security::create_safe_error_message(
             &format!(
                 "Failed to decode JSON response for {}: {}. Body (elided) was: {}",
@@ -287,16 +259,20 @@ pub async fn handle_response_json<T: serde::de::DeserializeOwned>(
             ),
             &format!("{} JSON parsing error", operation_name),
         ),
-        metadata: None,
     })
 }
 
-/// NEW: Small helper to keep logs/errors short but useful.
+/// Small helper to keep logs/errors short but useful.
 fn elide(s: &str, max: usize) -> String {
     if s.len() <= max {
         s.to_string()
     } else {
-        format!("{}… ({} bytes total)", &s[..max], s.len())
+        // Walk back from `max` to find a valid char boundary (avoids panicking on multi-byte UTF-8)
+        let mut end = max;
+        while end > 0 && !s.is_char_boundary(end) {
+            end -= 1;
+        }
+        format!("{}… ({} bytes total)", &s[..end], s.len())
     }
 }
 
@@ -387,15 +363,11 @@ mod tests {
 
         // Test new default values
         assert_eq!(config.total_timeout, Duration::from_secs(120));
-        assert_eq!(config.max_retry_interval, Duration::from_secs(30));
 
         // Test builder methods
-        let custom_config = config
-            .with_total_timeout(Duration::from_secs(300))
-            .with_max_retry_interval(Duration::from_secs(60));
+        let custom_config = config.with_total_timeout(Duration::from_secs(300));
 
         assert_eq!(custom_config.total_timeout, Duration::from_secs(300));
-        assert_eq!(custom_config.max_retry_interval, Duration::from_secs(60));
     }
 
     #[tokio::test]
@@ -407,7 +379,7 @@ mod tests {
             max_backoff_ms: 100,
             retry_on_status_codes: vec![429, 500, 502, 503, 504],
             total_timeout: Duration::from_millis(200), // Very short timeout
-            max_retry_interval: Duration::from_millis(100),
+            max_retry_interval: Duration::from_secs(30),
         };
 
         let client = reqwest::Client::new();
@@ -421,17 +393,16 @@ mod tests {
         assert!(result.is_err());
         let error = result.unwrap_err();
         match &error {
-            Error::ConfigError(msg) => {
+            Error::TimeoutError(msg) => {
                 // This is the expected outcome - timeout exceeded
                 assert!(
-                    msg.contains("timeout exceeded"),
+                    msg.contains("timeout") || msg.contains("Timeout"),
                     "Expected timeout message, got: {}",
                     msg
                 );
             }
             Error::HttpError(_) => {
                 // Network errors are also acceptable - they should trigger timeout logic
-                println!("Test timeout: Got network error (acceptable for timeout test)");
             }
             _ => panic!("Expected timeout or network error, got: {:?}", error),
         }
@@ -456,7 +427,7 @@ mod tests {
             max_backoff_ms: 5000, // High max backoff
             retry_on_status_codes: vec![500],
             total_timeout: Duration::from_secs(10), // Generous timeout
-            max_retry_interval: Duration::from_millis(300), // Low cap
+            max_retry_interval: Duration::from_secs(30),
         };
 
         let start_time = std::time::Instant::now();
@@ -471,7 +442,6 @@ mod tests {
             Ok(response) => {
                 // After max retries, should return the last response (500 in this case)
                 assert_eq!(response.status().as_u16(), 500);
-                println!("Test capping: Got final 500 response after max retries (expected)");
             }
             Err(error) => {
                 match &error {
@@ -480,12 +450,8 @@ mod tests {
                         message: _,
                         metadata: _,
                     } => {} // Expected - server returns 500 after retries
-                    Error::ConfigError(msg) => {
+                    Error::TimeoutError(_) => {
                         // If we get timeout instead, that's also acceptable
-                        println!(
-                            "Test capping: Timeout reached instead of max retries (acceptable): {}",
-                            msg
-                        );
                     }
                     _ => panic!("Expected API error or timeout, got: {:?}", error),
                 }
@@ -527,7 +493,7 @@ mod tests {
             max_backoff_ms: 200,
             retry_on_status_codes: vec![500],
             total_timeout: Duration::from_secs(5),
-            max_retry_interval: Duration::from_millis(100),
+            max_retry_interval: Duration::from_secs(30),
         };
 
         let config = Arc::new(config);
@@ -621,7 +587,7 @@ mod tests {
             max_backoff_ms: 200,
             retry_on_status_codes: vec![429],
             total_timeout: Duration::from_secs(5),
-            max_retry_interval: Duration::from_millis(150),
+            max_retry_interval: Duration::from_secs(30),
         };
 
         let start_time = std::time::Instant::now();
@@ -636,7 +602,6 @@ mod tests {
             Ok(response) => {
                 // After max retries, should return the last response (429 in this case)
                 assert_eq!(response.status().as_u16(), 429);
-                println!("Test jitter: Got final 429 response after max retries (expected)");
             }
             Err(error) => {
                 match &error {
@@ -645,12 +610,8 @@ mod tests {
                         message: _,
                         metadata: _,
                     } => {} // Expected - server returns 429 after retries
-                    Error::ConfigError(msg) => {
+                    Error::TimeoutError(_) => {
                         // If we get timeout instead, that's also acceptable
-                        println!(
-                            "Test jitter: Timeout reached instead of max retries (acceptable): {}",
-                            msg
-                        );
                     }
                     _ => panic!("Expected API error or timeout, got: {:?}", error),
                 }

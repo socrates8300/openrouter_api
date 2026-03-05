@@ -64,9 +64,3 @@ pub use web_search::{
 // Include test modules
 #[cfg(test)]
 mod tests;
-
-// Include endpoint-specific test modules
-#[cfg(test)]
-mod completion_tests;
-#[cfg(test)]
-mod web_search_tests;

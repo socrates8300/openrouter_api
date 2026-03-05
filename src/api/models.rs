@@ -7,8 +7,8 @@ use reqwest::Client;
 /// API endpoint for model management.
 /// API endpoint for model information.
 pub struct ModelsApi {
-    pub client: Client,
-    pub config: crate::client::ApiConfig,
+    pub(crate) client: Client,
+    pub(crate) config: crate::client::ApiConfig,
 }
 
 impl ModelsApi {
