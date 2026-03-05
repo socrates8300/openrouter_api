@@ -1,5 +1,5 @@
 use openrouter_api::{OpenRouterClient, utils, ModelGroups, PredefinedModelCoverageProfile};
-use openrouter_api::types::chat::Message;
+use openrouter_api::types::chat::{ChatRole, Message};
 use openrouter_api::models::structured::JsonSchemaConfig;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -29,12 +29,7 @@ async fn main() -> Result<(), openrouter_api::Error> {
         .with_api_key(api_key)?;
 
     // Create a simple chat message
-    let messages = vec![Message {
-        role: "user".to_string(),
-        content: "Recommend a sci-fi movie from the 1980s".to_string(),
-        name: None,
-        tool_calls: None,
-    }];
+    let messages = vec![Message::text(ChatRole::User, "Recommend a sci-fi movie from the 1980s")];
 
     // Define JSON schema for structured output
     let schema = JsonSchemaConfig {

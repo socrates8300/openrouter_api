@@ -77,36 +77,26 @@ Ensure that you have Rust installed (tested with Rust v1.83.0) and that you're u
 
 ```rust
 use openrouter_api::{OpenRouterClient, Result};
-use openrouter_api::types::chat::{ChatCompletionRequest, Message};
+use openrouter_api::types::chat::{ChatCompletionRequest, ChatRole, Message};
 
 #[tokio::main]
 async fn main() -> Result<()> {
     // Quick setup from environment variable (OPENROUTER_API_KEY)
     let client = OpenRouterClient::from_env()?;
-    
+
     // Or directly from API key
     // let client = OpenRouterClient::from_api_key("sk-or-v1-...")?;
 
     let request = ChatCompletionRequest {
         model: "openai/gpt-4o".to_string(),
-        messages: vec![Message {
-            role: "user".to_string(),
-            content: "Hello, world!".to_string(),
-            name: None,
-            tool_calls: None,
-        }],
-        stream: None,
-        response_format: None,
-        tools: None,
-        provider: None,
-        models: None,
-        transforms: None,
+        messages: vec![Message::text(ChatRole::User, "Hello, world!")],
+        ..Default::default()
     };
 
     let response = client.chat()?.chat_completion(request).await?;
-    
+
     if let Some(choice) = response.choices.first() {
-        println!("Response: {}", choice.message.content);
+        println!("Response: {:?}", choice.message.content);
     }
     Ok(())
 }
@@ -116,7 +106,10 @@ async fn main() -> Result<()> {
 
 ```rust
 use openrouter_api::{OpenRouterClient, Result};
-use openrouter_api::types::chat::{ChatCompletionRequest, Message, ContentPart, AudioContent, AudioUrl, FileContent, FileUrl};
+use openrouter_api::types::chat::{
+    ChatCompletionRequest, ChatRole, Message, MessageContent, ContentPart,
+    TextContent, AudioContent, AudioUrl, FileContent, FileUrl, ContentType,
+};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -125,19 +118,19 @@ async fn main() -> Result<()> {
     let request = ChatCompletionRequest {
         model: "openai/gpt-4o".to_string(),
         messages: vec![Message {
-            role: "user".to_string(),
-            content: openrouter_api::types::chat::MessageContent::Parts(vec![
-                ContentPart::Text(openrouter_api::types::chat::TextContent {
+            role: ChatRole::User,
+            content: MessageContent::Parts(vec![
+                ContentPart::Text(TextContent {
                     text: "Analyze this audio and document".to_string(),
                 }),
                 ContentPart::Audio(AudioContent {
-                    content_type: "audio_url".to_string(),
+                    content_type: ContentType::AudioUrl,
                     audio_url: AudioUrl {
                         url: "https://example.com/audio.mp3".to_string(),
                     },
                 }),
                 ContentPart::File(FileContent {
-                    content_type: "file_url".to_string(),
+                    content_type: ContentType::FileUrl,
                     file_url: FileUrl {
                         url: "https://example.com/document.pdf".to_string(),
                     },
@@ -157,7 +150,7 @@ async fn main() -> Result<()> {
 
 ```rust
 use openrouter_api::{OpenRouterClient, Result, client::{ROUTING_NITRO, ROUTING_ONLINE}};
-use openrouter_api::types::chat::{ChatCompletionRequest, Message};
+use openrouter_api::types::chat::{ChatCompletionRequest, ChatRole, Message};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -168,7 +161,7 @@ async fn main() -> Result<()> {
 
     let request = ChatCompletionRequest {
         model,
-        messages: vec![Message::text("user", "Search for latest Rust news")],
+        messages: vec![Message::text(ChatRole::User, "Search for latest Rust news")],
         // Enable web search plugin
         plugins: Some(vec!["web".to_string()]),
         ..Default::default()
