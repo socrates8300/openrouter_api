@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased] - 2026-03-29
+## [0.6.0] - 2026-03-29
 
 ### ✨ New Features
 - **Guardrails API**: Full `POST|GET|PATCH|DELETE /api/v1/guardrails` management implementation
