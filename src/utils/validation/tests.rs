@@ -81,6 +81,7 @@ mod validation_tests {
             verbosity: None,
             debug: None,
             plugins: None,
+            reasoning: None,
         };
 
         assert!(validate_chat_request(&request).is_ok());
@@ -164,6 +165,7 @@ mod validation_tests {
                 verbosity: None,
                 debug: None,
                 plugins: None,
+                reasoning: None,
             };
             let _ = validate_chat_request(&request);
         }

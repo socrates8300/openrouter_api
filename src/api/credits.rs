@@ -65,7 +65,7 @@ impl CreditsApi {
         let url = self
             .config
             .base_url
-            .join("api/v1/credits")
+            .join("credits")
             .map_err(|e| Error::ApiError {
                 code: 400,
                 message: format!("Invalid URL for credits endpoint: {e}"),
@@ -102,5 +102,26 @@ mod tests {
         // headers is now Arc<HeaderMap>, but Arc implements Deref so methods work the same
         assert!(!credits_api.config.headers.is_empty());
         assert!(credits_api.config.headers.contains_key("authorization"));
+    }
+
+    #[test]
+    fn test_credits_api_base_url_resolves_correct_path() {
+        use crate::tests::test_helpers::test_client_config;
+
+        let config = test_client_config();
+        let client = Client::new();
+        let credits_api = CreditsApi::new(client, &config).unwrap();
+        let url = credits_api.config.base_url.join("credits").unwrap();
+
+        assert!(
+            url.path().ends_with("/credits"),
+            "Expected path ending with /credits, got: {}",
+            url.path()
+        );
+        assert!(
+            !url.path().contains("/api/v1/api/v1/"),
+            "credits endpoint must not duplicate /api/v1/: {}",
+            url.path()
+        );
     }
 }

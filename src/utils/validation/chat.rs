@@ -469,6 +469,7 @@ mod tests {
             verbosity: None,
             debug: None,
             plugins: None,
+            reasoning: None,
         }
     }
 

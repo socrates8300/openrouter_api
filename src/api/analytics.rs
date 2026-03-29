@@ -99,7 +99,7 @@ impl AnalyticsApi {
         let url = self
             .config
             .base_url
-            .join("api/v1/activity")
+            .join("activity")
             .map_err(|e| Error::ApiError {
                 code: 400,
                 message: format!("Invalid URL for activity endpoint: {e}"),
@@ -427,5 +427,26 @@ mod tests {
             Some("model with spaces & symbols".to_string())
         );
         assert_eq!(request.provider, Some("provider/test".to_string()));
+    }
+
+    #[test]
+    fn test_analytics_api_base_url_resolves_correct_path() {
+        use crate::tests::test_helpers::test_client_config;
+
+        let config = test_client_config();
+        let client = Client::new();
+        let analytics_api = AnalyticsApi::new(client, &config).unwrap();
+        let url = analytics_api.config.base_url.join("activity").unwrap();
+
+        assert!(
+            url.path().ends_with("/activity"),
+            "Expected path ending with /activity, got: {}",
+            url.path()
+        );
+        assert!(
+            !url.path().contains("/api/v1/api/v1/"),
+            "activity endpoint must not duplicate /api/v1/: {}",
+            url.path()
+        );
     }
 }

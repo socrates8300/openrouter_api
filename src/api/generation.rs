@@ -99,7 +99,7 @@ impl GenerationApi {
         let url = self
             .config
             .base_url
-            .join("api/v1/generation")
+            .join("generation")
             .map_err(|e| Error::ApiError {
                 code: 400,
                 message: format!("Invalid URL for generation endpoint: {e}"),
@@ -142,6 +142,7 @@ mod tests {
 
     #[test]
     fn test_generation_id_validation() {
+        use crate::error::Error;
         use crate::tests::test_helpers::test_client_config;
 
         let config = test_client_config();
@@ -156,9 +157,30 @@ mod tests {
         // Test whitespace-only ID
         let result = rt.block_on(async { generation_api.get_generation("   ").await });
         assert!(result.is_err());
+        assert!(matches!(
+            result,
+            Err(Error::ConfigError(message)) if message == "Generation ID cannot be empty"
+        ));
+    }
 
-        // Test valid ID (this will fail with network error, but not validation error)
-        let result = rt.block_on(async { generation_api.get_generation("gen-valid123").await });
-        assert!(result.is_err()); // Network error, not validation error
+    #[test]
+    fn test_generation_api_base_url_resolves_correct_path() {
+        use crate::tests::test_helpers::test_client_config;
+
+        let config = test_client_config();
+        let client = Client::new();
+        let generation_api = GenerationApi::new(client, &config).unwrap();
+        let url = generation_api.config.base_url.join("generation").unwrap();
+
+        assert!(
+            url.path().ends_with("/generation"),
+            "Expected path ending with /generation, got: {}",
+            url.path()
+        );
+        assert!(
+            !url.path().contains("/api/v1/api/v1/"),
+            "generation endpoint must not duplicate /api/v1/: {}",
+            url.path()
+        );
     }
 }

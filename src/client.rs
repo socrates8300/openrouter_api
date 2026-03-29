@@ -483,6 +483,12 @@ impl OpenRouterClient<Ready> {
         Ok(crate::api::generation::GenerationApi { client, config })
     }
 
+    /// Provides access to the guardrails management endpoints.
+    pub fn guardrails(&self) -> Result<crate::api::guardrails::GuardrailsApi> {
+        let (client, config) = self.get_client_and_config()?;
+        Ok(crate::api::guardrails::GuardrailsApi { client, config })
+    }
+
     /// Returns a new request builder for chat completions that supports MCP.
     pub fn chat_request_builder(
         &self,

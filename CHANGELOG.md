@@ -1,5 +1,37 @@
 # Changelog
 
+## [Unreleased] - 2026-03-29
+
+### ✨ New Features
+- **Guardrails API**: Full `POST|GET|PATCH|DELETE /api/v1/guardrails` management implementation
+  - `client.guardrails()` returns a `GuardrailsApi` with `list`, `create`, `get`, `update`, `delete` methods
+  - Bulk assignment endpoints for API keys and organization members
+  - Builder-pattern `GuardrailCreateRequest` and `GuardrailUpdateRequest` with all documented fields
+- **Reasoning Config**: Control extended thinking token budgets for o1, o3, Claude extended thinking, DeepSeek R1
+  - New `ReasoningConfig` enum: `Effort { effort: ReasoningEffort }` or `MaxTokens { max_tokens: u32 }`
+  - New `ReasoningEffort` enum: `High`, `Medium`, `Low`
+  - Added `reasoning: Option<ReasoningConfig>` field to `ChatCompletionRequest`
+- **Plugin Constructors**: Typed convenience methods on `Plugin`
+  - `Plugin::response_healing()` — enables Response Healing (Dec 2025, auto-fixes malformed JSON)
+  - `Plugin::web_search()` — enables web search plugin
+  - `Plugin::file_parser()` — enables file/PDF parser plugin
+
+### 🐛 Bug Fixes
+- **Silent data loss in `Usage`**: Added `cache_discount: Option<f64>` — was present in `GenerationData` but silently dropped in chat completion responses for users using Anthropic prompt caching
+- **Silent data loss in `PromptTokensDetails`**: Added `cache_creation_input_tokens` and `cache_read_input_tokens` — Anthropic prompt cache write/read token breakdown was inaccessible
+- **Silent data loss in `ChatCompletionResponse`**: Added `provider_name: Option<String>` — OpenRouter's routing provider was dropped, making it impossible to log or analyze provider distribution
+- **Dead serde attributes**: Removed `#[serde(skip_serializing_if)]` from `Usage`, `PromptTokensDetails`, and `CompletionTokensDetails` — these structs derive only `Deserialize`, so the attributes were silently ignored
+
+### 📝 Documentation
+- Added **Guardrails API**, **Plugins**, and **Reasoning Config** sections to README with working examples
+- Updated Implementation Status table
+
+### 🧪 Testing
+- Added 7 new tests covering `ReasoningConfig` serialization (both variants), `Plugin` constructors, prompt caching field deserialization, and `provider_name` deserialization
+- Added guardrails integration test suite
+
+---
+
 ## [0.5.1] - 2025-12-27
 ### 🛡️ Security Fixes
 - **TLS Feature Configuration**: Fixed mutually exclusive `rustls` and `native-tls` features to prevent compilation errors

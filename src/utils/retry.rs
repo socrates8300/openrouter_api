@@ -112,6 +112,13 @@ where
 
                     // Consume body to free the connection.
                     if let Err(e) = response.bytes().await {
+                        #[cfg(feature = "tracing")]
+                        tracing::warn!(
+                            operation = operation_name,
+                            error = %e,
+                            "Failed to consume response body during retry"
+                        );
+                        #[cfg(not(feature = "tracing"))]
                         eprintln!(
                             "Warning: Failed to consume response body during retry for {}: {}",
                             operation_name, e
