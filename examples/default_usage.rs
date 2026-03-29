@@ -16,6 +16,7 @@ fn main() {
             tool_calls: None,
             tool_call_id: None,
             reasoning: None,
+            reasoning_details: None,
         }],
         stream: None,
         response_format: None,
@@ -45,6 +46,7 @@ fn main() {
         verbosity: None,
         debug: None,
         plugins: None,
+        reasoning: None,
     };
 
     // After Default implementation - concise:

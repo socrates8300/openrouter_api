@@ -615,6 +615,7 @@ mod tests {
             verbosity: None,
             debug: None,
             plugins: None,
+            reasoning: None,
         };
 
         let mut stream = api.chat_completion_stream(request);
@@ -696,6 +697,7 @@ mod tests {
             verbosity: None,
             debug: None,
             plugins: None,
+            reasoning: None,
         };
 
         let mut stream = api.chat_completion_stream(request);

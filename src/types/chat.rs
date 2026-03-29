@@ -1,7 +1,9 @@
 use crate::models::tool::{ToolCall, ToolCallChunk};
 use crate::types::ids::ToolCallId;
 use crate::types::status::StreamingStatus;
-use serde::{Deserialize, Serialize};
+use serde::de::Error as DeError;
+use serde::ser::SerializeMap;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::HashMap;
 
 /// Content type for multimodal message parts.
@@ -180,6 +182,9 @@ pub struct Message {
     /// Reasoning content from thinking models (o1, o3, DeepSeek R1, Claude extended thinking).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<String>,
+    /// Structured reasoning details returned by some reasoning-capable models.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning_details: Option<Vec<ReasoningDetail>>,
 }
 
 impl Default for Message {
@@ -191,6 +196,7 @@ impl Default for Message {
             tool_call_id: None,
             tool_calls: None,
             reasoning: None,
+            reasoning_details: None,
         }
     }
 }
@@ -205,6 +211,7 @@ impl Message {
             tool_calls: None,
             tool_call_id: None,
             reasoning: None,
+            reasoning_details: None,
         }
     }
 
@@ -221,6 +228,7 @@ impl Message {
             tool_calls: None,
             tool_call_id: None,
             reasoning: None,
+            reasoning_details: None,
         }
     }
 
@@ -233,6 +241,7 @@ impl Message {
             tool_calls: None,
             tool_call_id: None,
             reasoning: None,
+            reasoning_details: None,
         }
     }
 
@@ -245,6 +254,7 @@ impl Message {
             tool_calls: None,
             tool_call_id: Some(tool_call_id.into()),
             reasoning: None,
+            reasoning_details: None,
         }
     }
 
@@ -262,6 +272,7 @@ impl Message {
             tool_calls: Some(tool_calls),
             tool_call_id: None,
             reasoning: None,
+            reasoning_details: None,
         }
     }
 }
@@ -275,13 +286,258 @@ pub struct DebugConfig {
 }
 
 /// Plugin configuration for enabling OpenRouter server-side features.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Plugin {
     /// Plugin identifier (e.g., "web", "file-parser", "response-healing").
     pub id: String,
+    /// Optional explicit enable/disable flag for the plugin.
+    pub enabled: Option<bool>,
     /// Optional plugin-specific configuration.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    ///
+    /// When this is a JSON object, its keys are flattened into the plugin object
+    /// to match the OpenRouter request schema. Non-object values fall back to a
+    /// legacy nested `config` field for backwards compatibility.
     pub config: Option<serde_json::Value>,
+}
+
+impl Serialize for Plugin {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut map = serializer.serialize_map(None)?;
+        map.serialize_entry("id", &self.id)?;
+
+        if let Some(enabled) = self.enabled {
+            map.serialize_entry("enabled", &enabled)?;
+        }
+
+        if let Some(config) = &self.config {
+            match config {
+                serde_json::Value::Object(object) => {
+                    for (key, value) in object {
+                        map.serialize_entry(key, value)?;
+                    }
+                }
+                other => {
+                    map.serialize_entry("config", other)?;
+                }
+            }
+        }
+
+        map.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for Plugin {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let mut raw = serde_json::Map::<String, serde_json::Value>::deserialize(deserializer)?;
+
+        let id = match raw.remove("id") {
+            Some(serde_json::Value::String(id)) => id,
+            Some(other) => {
+                return Err(D::Error::custom(format!(
+                    "plugin id must be a string, got {other}"
+                )))
+            }
+            None => return Err(D::Error::missing_field("id")),
+        };
+
+        let enabled = match raw.remove("enabled") {
+            Some(value) => {
+                serde_json::from_value::<Option<bool>>(value).map_err(D::Error::custom)?
+            }
+            None => None,
+        };
+
+        let legacy_config = raw.remove("config");
+        let flattened_config = if raw.is_empty() {
+            None
+        } else {
+            Some(serde_json::Value::Object(raw))
+        };
+
+        let config = match (legacy_config, flattened_config) {
+            (None, None) => None,
+            (Some(config), None) => Some(config),
+            (None, Some(config)) => Some(config),
+            (
+                Some(serde_json::Value::Object(mut legacy)),
+                Some(serde_json::Value::Object(flattened)),
+            ) => {
+                legacy.extend(flattened);
+                Some(serde_json::Value::Object(legacy))
+            }
+            (Some(config), Some(serde_json::Value::Object(mut flattened))) => {
+                flattened.insert("config".to_string(), config);
+                Some(serde_json::Value::Object(flattened))
+            }
+            (Some(config), Some(other)) => {
+                return Err(D::Error::custom(format!(
+                    "unexpected plugin config payload combination: config={config}, extra={other}"
+                )))
+            }
+        };
+
+        Ok(Self {
+            id,
+            enabled,
+            config,
+        })
+    }
+}
+
+impl Plugin {
+    /// Create a plugin by id.
+    pub fn new(id: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            enabled: None,
+            config: None,
+        }
+    }
+
+    /// Enable the Response Healing plugin (auto-fixes malformed JSON responses, Dec 2025).
+    pub fn response_healing() -> Self {
+        Self::new("response-healing")
+    }
+
+    /// Enable the web search plugin.
+    pub fn web_search() -> Self {
+        Self::new("web")
+    }
+
+    /// Enable the file parser plugin (PDF, etc.).
+    pub fn file_parser() -> Self {
+        Self::new("file-parser")
+    }
+
+    /// Enable the context compression plugin.
+    pub fn context_compression() -> Self {
+        Self::new("context-compression")
+    }
+
+    /// Explicitly enable or disable the plugin.
+    pub fn with_enabled(mut self, enabled: bool) -> Self {
+        self.enabled = Some(enabled);
+        self
+    }
+
+    /// Attach plugin-specific configuration.
+    pub fn with_config(mut self, config: serde_json::Value) -> Self {
+        self.config = Some(config);
+        self
+    }
+}
+
+/// Effort level for reasoning models (o1, o3, Claude extended thinking, DeepSeek R1).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum ReasoningEffort {
+    XHigh,
+    High,
+    Medium,
+    Low,
+    Minimal,
+    None,
+}
+
+/// Summary verbosity for reasoning models that expose summarized thinking output.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum ReasoningSummary {
+    Auto,
+    Concise,
+    Detailed,
+}
+
+/// Reasoning configuration for models that support extended thinking.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct ReasoningConfig {
+    /// Constrains effort on reasoning-capable models.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub effort: Option<ReasoningEffort>,
+    /// Caps the reasoning token budget on models that support explicit budgets.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_tokens: Option<u32>,
+    /// Enables or disables reasoning where the provider exposes an explicit toggle.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+    /// Requests summarized reasoning details when the provider supports them.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub summary: Option<ReasoningSummary>,
+}
+
+impl ReasoningConfig {
+    /// Create a reasoning config that constrains model effort.
+    pub fn with_effort(effort: ReasoningEffort) -> Self {
+        Self {
+            effort: Some(effort),
+            ..Self::default()
+        }
+    }
+
+    /// Create a reasoning config that caps the reasoning token budget.
+    pub fn with_max_tokens(max_tokens: u32) -> Self {
+        Self {
+            max_tokens: Some(max_tokens),
+            ..Self::default()
+        }
+    }
+
+    /// Attach reasoning summary verbosity preferences.
+    pub fn with_summary(mut self, summary: ReasoningSummary) -> Self {
+        self.summary = Some(summary);
+        self
+    }
+
+    /// Explicitly enable or disable reasoning.
+    pub fn with_enabled(mut self, enabled: bool) -> Self {
+        self.enabled = Some(enabled);
+        self
+    }
+}
+
+/// Structured reasoning detail item returned by some reasoning-capable models.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "type")]
+pub enum ReasoningDetail {
+    #[serde(rename = "reasoning.summary")]
+    Summary {
+        summary: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        id: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        format: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        index: Option<u32>,
+    },
+    #[serde(rename = "reasoning.encrypted")]
+    Encrypted {
+        data: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        id: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        format: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        index: Option<u32>,
+    },
+    #[serde(rename = "reasoning.text")]
+    Text {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        text: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        signature: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        id: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        format: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        index: Option<u32>,
+    },
 }
 
 /// Chat completion request matching the OpenRouter API schema.
@@ -379,6 +635,10 @@ pub struct ChatCompletionRequest {
     /// (Optional) Plugins to enable (e.g., "web", "file-parser", "response-healing").
     #[serde(skip_serializing_if = "Option::is_none")]
     pub plugins: Option<Vec<Plugin>>,
+    /// (Optional) Reasoning configuration for models supporting extended thinking
+    /// (o1, o3, Claude extended thinking, DeepSeek R1).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning: Option<ReasoningConfig>,
 }
 
 /// A choice returned by the chat API.
@@ -421,6 +681,9 @@ pub struct ServerToolUse {
     /// Number of web search requests made by the server.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub web_search_requests: Option<u32>,
+    /// Number of server-side fetch/open-page requests made by the server.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub web_fetch_requests: Option<u32>,
 }
 
 /// Usage data returned from the API.
@@ -430,43 +693,34 @@ pub struct Usage {
     pub completion_tokens: u32,
     pub total_tokens: u32,
     /// Cost of the request in credits (USD float).
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub cost: Option<f64>,
     /// Whether the request used a user-provided API key (Bring Your Own Key).
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub is_byok: Option<bool>,
     /// Server-side tool usage counts.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub server_tool_use: Option<ServerToolUse>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub prompt_tokens_details: Option<PromptTokensDetails>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub completion_tokens_details: Option<CompletionTokensDetails>,
 }
 
 /// Details about prompt token usage.
 #[derive(Debug, Deserialize)]
 pub struct PromptTokensDetails {
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub cached_tokens: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub audio_tokens: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub text_tokens: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub image_tokens: Option<u32>,
+    /// Tokens written to cache when the provider exposes explicit cache-write accounting.
+    pub cache_write_tokens: Option<u32>,
+    /// Video input tokens when supported by the upstream provider.
+    pub video_tokens: Option<u32>,
 }
 
 /// Details about completion token usage.
 #[derive(Debug, Deserialize)]
 pub struct CompletionTokensDetails {
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning_tokens: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub audio_tokens: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub accepted_prediction_tokens: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub rejected_prediction_tokens: Option<u32>,
 }
 
@@ -507,6 +761,9 @@ pub struct StreamDelta {
     /// Reasoning content delta from thinking models.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<String>,
+    /// Structured reasoning details delta from thinking models.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning_details: Option<Vec<ReasoningDetail>>,
 }
 
 /// A streaming chunk for chat completions.

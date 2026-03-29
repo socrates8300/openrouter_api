@@ -33,10 +33,13 @@ A production-ready Rust client for the OpenRouter API with comprehensive securit
 - **Web Search:** Type-safe web search API integration
 - **Provider Preferences:** Configure model routing, fallbacks, and provider selection
 - **Analytics API:** Comprehensive activity data retrieval with filtering and pagination
+- **Guardrails Management API:** CRUD plus key/member assignment workflows for management API keys
 - **Providers API:** Provider information management with search and filtering
 - **Enhanced Models API:** Advanced model discovery with filtering, sorting, and search
 - **Multimodal Support:** Audio and File (PDF) input support
 - **Policy Controls:** Granular routing control with allow/deny lists and Zero Data Retention (ZDR)
+- **Plugins:** Response Healing, context compression, web search, and file parser
+- **Reasoning Config:** Control extended thinking effort, summaries, and token budget for reasoning-capable models
 
 ### 📡 **Model Context Protocol (MCP)**
 - **MCP Client:** Full JSON-RPC client implementation for the [Model Context Protocol](https://modelcontextprotocol.io/)
@@ -47,7 +50,7 @@ A production-ready Rust client for the OpenRouter API with comprehensive securit
 - **Secure ID Generation:** UUID v4 usage for request tracking
 
 ### 🧪 **Quality & Testing**
-- **100% Test Coverage:** 162 comprehensive unit and integration tests
+- **Extensive Test Coverage:** Unit, integration, compile-fail, and doc tests across the crate
 - **CI/CD Pipeline:** Automated quality gates with formatting, linting, security audits, and documentation checks
 - **Production Ready:** Extensive error handling, standardized retry logic, and timeout management
 
@@ -654,6 +657,111 @@ let resource = client.get_resource(GetResourceParams {
 
 See the [Model Context Protocol specification](https://spec.modelcontextprotocol.io/specification/2025-03-26/) for more details.
 
+## Plugins
+
+OpenRouter server-side plugins are enabled via `Plugin` convenience constructors on `ChatCompletionRequest`:
+
+```rust
+use openrouter_api::types::chat::{ChatCompletionRequest, Plugin};
+
+// Response Healing (Dec 2025): auto-fixes malformed JSON before it reaches your code
+let request = ChatCompletionRequest {
+    model: "openai/gpt-4o".to_string(),
+    messages: vec![/* ... */],
+    plugins: Some(vec![Plugin::response_healing()]),
+    ..Default::default()
+};
+
+// Combine plugins
+let request = ChatCompletionRequest {
+    model: "openai/gpt-4o".to_string(),
+    messages: vec![/* ... */],
+    plugins: Some(vec![Plugin::web_search(), Plugin::response_healing()]),
+    ..Default::default()
+};
+```
+
+Available constructors: `Plugin::response_healing()`, `Plugin::web_search()`, `Plugin::file_parser()`, `Plugin::context_compression()`.
+
+You can also control the plugin enable flag and send plugin-specific top-level fields:
+
+```rust
+use openrouter_api::types::chat::Plugin;
+use serde_json::json;
+
+let plugin = Plugin::web_search()
+    .with_enabled(true)
+    .with_config(json!({
+        "max_results": 5,
+        "scope": "news"
+    }));
+```
+
+## Reasoning Config
+
+Control extended thinking effort, summaries, and token budgets for reasoning-capable models:
+
+```rust
+use openrouter_api::types::chat::{
+    ChatCompletionRequest, ReasoningConfig, ReasoningEffort, ReasoningSummary,
+};
+
+// Set effort level and request a detailed reasoning summary
+let request = ChatCompletionRequest {
+    model: "openai/o3".to_string(),
+    messages: vec![/* ... */],
+    reasoning: Some(
+        ReasoningConfig::with_effort(ReasoningEffort::High)
+            .with_summary(ReasoningSummary::Detailed),
+    ),
+    ..Default::default()
+};
+
+// Or cap the token budget directly
+let request = ChatCompletionRequest {
+    model: "deepseek/deepseek-r1".to_string(),
+    messages: vec![/* ... */],
+    reasoning: Some(ReasoningConfig::with_max_tokens(4096)),
+    ..Default::default()
+};
+```
+
+## Guardrails Management
+
+OpenRouter Guardrails management endpoints are available through `client.guardrails()?` for management API keys:
+
+```rust,no_run
+use openrouter_api::OpenRouterClient;
+use openrouter_api::types::guardrails::{
+    BulkAssignKeysRequest, GuardrailCreateRequest, GuardrailResetInterval,
+};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = OpenRouterClient::from_env()?;
+
+    let created = client
+        .guardrails()?
+        .create(
+            &GuardrailCreateRequest::new("Production Guardrail")
+                .with_limit_usd(100.0)
+                .with_reset_interval(GuardrailResetInterval::Monthly)
+                .with_enforce_zdr(true),
+        )
+        .await?;
+
+    client
+        .guardrails()?
+        .bulk_assign_keys(
+            &created.data.id,
+            &BulkAssignKeysRequest::new(vec!["key-hash-123".to_string()]),
+        )
+        .await?;
+
+    Ok(())
+}
+```
+
 ## Implementation Status
 
 This is a production-ready library with comprehensive functionality:
@@ -668,14 +776,20 @@ This is a production-ready library with comprehensive functionality:
 - **Structured Outputs:** JSON Schema validation
 - **Provider Preferences:** Model routing and fallback configuration
 - **Analytics API:** Comprehensive activity data retrieval with filtering and pagination
+- **Guardrails Management API:** CRUD plus key/member assignment workflows for management API keys
 - **Providers API:** Provider information management with search and filtering
 - **Enhanced Models API:** Advanced model discovery with filtering, sorting, and search
 - **Credits API:** Account credit and usage tracking
 - **Generation API:** Generation metadata and cost tracking
 - **Model Context Protocol:** Complete MCP client implementation
+- **Plugins:** Response Healing, context compression, web search, and file parser with typed constructors
+- **Plugin Config:** Supports explicit `enabled` flags and flattened plugin-specific config payloads
+- **Reasoning Config:** Extended thinking effort, summary, and token budget controls
+- **Reasoning Details:** Structured `reasoning_details` support in chat responses
+- **Prompt Token Details:** `cache_write_tokens` and `video_tokens` support in `PromptTokensDetails`
 
 ### ✅ **Quality Infrastructure (Completed)**
-- **100% Test Coverage:** 162 comprehensive unit and integration tests
+- **Extensive Test Coverage:** Unit, integration, compile-fail, and doc tests across the crate
 - **Security Auditing:** Automated security vulnerability scanning
 - **CI/CD Pipeline:** GitHub Actions with quality gates
 - **Documentation:** Complete API documentation with examples

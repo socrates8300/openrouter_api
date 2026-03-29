@@ -55,7 +55,8 @@ tracing = ["dep:tracing"]
 allow-http = []
 
 [package.metadata.docs.rs]
-all-features = true
+features = ["tls-rustls", "tracing"]
+no-default-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [profile.release]

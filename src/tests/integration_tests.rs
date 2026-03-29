@@ -73,6 +73,7 @@ mod tests {
             verbosity: None,
             debug: None,
             plugins: None,
+            reasoning: None,
         };
 
         // For this integration test we are simulating a response.
@@ -350,6 +351,7 @@ mod tests {
             verbosity: None,
             debug: None,
             plugins: None,
+            reasoning: None,
         };
 
         // Serialize to JSON to verify the structure
@@ -1364,6 +1366,236 @@ mod tests {
         assert_eq!(request_with_default.prediction, None);
         assert_eq!(request_with_default.parallel_tool_calls, None);
         assert_eq!(request_with_default.verbosity, None);
+
+        Ok(())
+    }
+
+    // ── Item 3: ReasoningConfig serialization ────────────────────────────────
+
+    #[tokio::test]
+    async fn test_reasoning_config_effort_serialization() -> Result<(), Box<dyn std::error::Error>>
+    {
+        use crate::types::chat::{ReasoningConfig, ReasoningEffort};
+
+        let effort_high = ReasoningConfig::with_effort(ReasoningEffort::High);
+        let json = serde_json::to_string(&effort_high)?;
+        assert_eq!(json, r#"{"effort":"high"}"#);
+
+        let effort_minimal = ReasoningConfig::with_effort(ReasoningEffort::Minimal);
+        let json = serde_json::to_string(&effort_minimal)?;
+        assert_eq!(json, r#"{"effort":"minimal"}"#);
+
+        let effort_xhigh = ReasoningConfig::with_effort(ReasoningEffort::XHigh);
+        let json = serde_json::to_string(&effort_xhigh)?;
+        assert_eq!(json, r#"{"effort":"xhigh"}"#);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_reasoning_config_full_serialization() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::types::chat::{ReasoningConfig, ReasoningEffort, ReasoningSummary};
+
+        let config = ReasoningConfig {
+            effort: Some(ReasoningEffort::High),
+            max_tokens: Some(5000),
+            enabled: Some(true),
+            summary: Some(ReasoningSummary::Detailed),
+        };
+        let json: serde_json::Value = serde_json::from_str(&serde_json::to_string(&config)?)?;
+        assert_eq!(
+            json,
+            json!({
+                "effort": "high",
+                "max_tokens": 5000,
+                "enabled": true,
+                "summary": "detailed"
+            })
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_reasoning_config_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::types::chat::{ReasoningConfig, ReasoningEffort, ReasoningSummary};
+
+        let config = ReasoningConfig {
+            effort: Some(ReasoningEffort::Low),
+            max_tokens: Some(1024),
+            enabled: Some(true),
+            summary: Some(ReasoningSummary::Concise),
+        };
+        let json = serde_json::to_string(&config)?;
+        let decoded: ReasoningConfig = serde_json::from_str(&json)?;
+        assert_eq!(config, decoded);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_reasoning_details_deserialization() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::types::chat::{Message, ReasoningDetail};
+
+        let json = r#"{
+            "role": "assistant",
+            "content": "Final answer",
+            "reasoning": "internal reasoning excerpt",
+            "reasoning_details": [
+                {
+                    "type": "reasoning.summary",
+                    "summary": "Summarized chain of thought"
+                },
+                {
+                    "type": "reasoning.text",
+                    "text": "Step-by-step reasoning",
+                    "signature": "sig-123"
+                }
+            ]
+        }"#;
+
+        let message: Message = serde_json::from_str(json)?;
+        let details = message.reasoning_details.expect("reasoning details");
+        assert_eq!(details.len(), 2);
+        assert!(matches!(
+            &details[0],
+            ReasoningDetail::Summary { summary, .. } if summary == "Summarized chain of thought"
+        ));
+        assert!(matches!(
+            &details[1],
+            ReasoningDetail::Text { text, signature, .. }
+                if text.as_deref() == Some("Step-by-step reasoning")
+                    && signature.as_deref() == Some("sig-123")
+        ));
+
+        Ok(())
+    }
+
+    // ── Item 5: Plugin constructors ───────────────────────────────────────────
+
+    #[tokio::test]
+    async fn test_plugin_constructors() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::types::chat::Plugin;
+
+        let web = Plugin::web_search();
+        assert_eq!(web.id, "web");
+        assert_eq!(web.enabled, None);
+        assert!(web.config.is_none());
+
+        let healing = Plugin::response_healing();
+        assert_eq!(healing.id, "response-healing");
+        assert_eq!(healing.enabled, None);
+        assert!(healing.config.is_none());
+
+        let parser = Plugin::file_parser();
+        assert_eq!(parser.id, "file-parser");
+        assert_eq!(parser.enabled, None);
+        assert!(parser.config.is_none());
+
+        let compression = Plugin::context_compression();
+        assert_eq!(compression.id, "context-compression");
+        assert_eq!(compression.enabled, None);
+        assert!(compression.config.is_none());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_plugin_serialization() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::types::chat::Plugin;
+        use serde_json::json;
+
+        let web = Plugin::web_search()
+            .with_enabled(false)
+            .with_config(json!({ "max_results": 5, "scope": "news" }));
+        let json = serde_json::to_string(&web)?;
+        let v: serde_json::Value = serde_json::from_str(&json)?;
+        assert_eq!(v["id"], "web");
+        assert_eq!(v["enabled"], false);
+        assert_eq!(v["max_results"], 5);
+        assert_eq!(v["scope"], "news");
+        assert!(v.get("config").is_none());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_plugin_deserialization_supports_flattened_schema(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        use crate::types::chat::Plugin;
+
+        let json = r#"{
+            "id": "web",
+            "enabled": true,
+            "max_results": 10,
+            "scope": "docs"
+        }"#;
+
+        let plugin: Plugin = serde_json::from_str(json)?;
+        assert_eq!(plugin.id, "web");
+        assert_eq!(plugin.enabled, Some(true));
+        assert_eq!(
+            plugin
+                .config
+                .as_ref()
+                .and_then(|cfg| cfg.get("max_results")),
+            Some(&serde_json::Value::from(10))
+        );
+        assert_eq!(
+            plugin.config.as_ref().and_then(|cfg| cfg.get("scope")),
+            Some(&serde_json::Value::from("docs"))
+        );
+
+        Ok(())
+    }
+
+    // ── Item 1: chat usage alignment ──────────────────────────────────────────
+
+    #[tokio::test]
+    async fn test_prompt_tokens_details_cache_fields_deserialization(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        use crate::types::chat::PromptTokensDetails;
+
+        let json = r#"{
+            "cached_tokens": 100,
+            "cache_write_tokens": 200,
+            "video_tokens": 50
+        }"#;
+
+        let details: PromptTokensDetails = serde_json::from_str(json)?;
+        assert_eq!(details.cached_tokens, Some(100));
+        assert_eq!(details.cache_write_tokens, Some(200));
+        assert_eq!(details.video_tokens, Some(50));
+        assert!(details.audio_tokens.is_none());
+        assert!(details.text_tokens.is_none());
+        assert!(details.image_tokens.is_none());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_usage_server_tool_use_deserialization() -> Result<(), Box<dyn std::error::Error>>
+    {
+        use crate::types::chat::Usage;
+
+        let json = r#"{
+            "prompt_tokens": 100,
+            "completion_tokens": 50,
+            "total_tokens": 150,
+            "server_tool_use": {
+                "web_search_requests": 2,
+                "web_fetch_requests": 1
+            }
+        }"#;
+
+        let usage: Usage = serde_json::from_str(json)?;
+        assert_eq!(usage.prompt_tokens, 100);
+        assert_eq!(usage.completion_tokens, 50);
+        assert_eq!(usage.total_tokens, 150);
+        let server_tool_use = usage.server_tool_use.expect("server tool use");
+        assert_eq!(server_tool_use.web_search_requests, Some(2));
+        assert_eq!(server_tool_use.web_fetch_requests, Some(1));
+        assert!(usage.cost.is_none());
 
         Ok(())
     }
