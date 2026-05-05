@@ -22,42 +22,42 @@ fi
 
 # Lint check with rustls (default)
 echo "📝 Running clippy lints (rustls)..."
-if ! cargo clippy --all-targets --features rustls -- -D warnings; then
+if ! cargo clippy --all-targets --features tls-rustls -- -D warnings; then
     echo "❌ Clippy warnings found. Fix before proceeding."
     exit 1
 fi
 
 # Lint check with native-tls
 echo "📝 Running clippy lints (native-tls)..."
-if ! cargo clippy --all-targets --no-default-features --features native-tls -- -D warnings; then
+if ! cargo clippy --all-targets --no-default-features --features tls-native-tls -- -D warnings; then
     echo "❌ Clippy warnings found. Fix before proceeding."
     exit 1
 fi
 
 # Build check with rustls (default)
 echo "🔨 Building project (rustls)..."
-if ! cargo check --all-targets --features rustls; then
+if ! cargo check --all-targets --features tls-rustls; then
     echo "❌ Build failed. Fix compilation errors."
     exit 1
 fi
 
 # Build check with native-tls
 echo "🔨 Building project (native-tls)..."
-if ! cargo check --all-targets --no-default-features --features native-tls; then
+if ! cargo check --all-targets --no-default-features --features tls-native-tls; then
     echo "❌ Build failed. Fix compilation errors."
     exit 1
 fi
 
 # Test check with rustls (default)
 echo "🧪 Running tests (rustls)..."
-if ! cargo test --workspace --features rustls --exclude mcp; then
+if ! cargo test --workspace --features tls-rustls --exclude mcp; then
     echo "❌ Tests failed. Fix failing tests."
     exit 1
 fi
 
 # Test check with native-tls
 echo "🧪 Running tests (native-tls)..."
-if ! cargo test --workspace --no-default-features --features native-tls --exclude mcp; then
+if ! cargo test --workspace --no-default-features --features tls-native-tls --exclude mcp; then
     echo "❌ Tests failed. Fix failing tests."
     exit 1
 fi
@@ -75,14 +75,14 @@ fi
 
 # Documentation check with rustls (default)
 echo "📚 Checking documentation builds (rustls)..."
-if ! cargo doc --no-deps --features rustls; then
+if ! cargo doc --no-deps --features tls-rustls; then
     echo "❌ Documentation build failed."
     exit 1
 fi
 
 # Documentation check with native-tls
 echo "📚 Checking documentation builds (native-tls)..."
-if ! cargo doc --no-deps --no-default-features --features native-tls; then
+if ! cargo doc --no-deps --no-default-features --features tls-native-tls; then
     echo "❌ Documentation build failed."
     exit 1
 fi
