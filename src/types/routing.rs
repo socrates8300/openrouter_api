@@ -54,7 +54,7 @@ pub struct RouterConfig {
 
     /// Additional provider preferences
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub provider_preferences: Option<crate::types::provider::ProviderPreferences>,
+    pub provider_preferences: Option<crate::models::provider_preferences::ProviderPreferences>,
 }
 
 /// Predefined model groups for common tasks

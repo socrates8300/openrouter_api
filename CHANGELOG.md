@@ -36,6 +36,10 @@
 - **`bytes 1.11.0 → 1.11.1`** automatic via lockfile resolution after the above. Clears RUSTSEC-2026-0007.
 - Net: `cargo audit` reports 0 vulnerabilities, 0 unmaintained warnings.
 
+### 🧹 SemVer-Relevant Cleanup (Pre-1.0)
+- **Removed duplicate `ProviderPreferences`.** The crate previously had two distinct `ProviderPreferences` types: a stringly-typed one at `openrouter_api::types::provider::ProviderPreferences` and the strongly-typed one at `openrouter_api::models::provider_preferences::ProviderPreferences` (used by `ChatCompletionRequest` and the README examples). The duplicate was internal-only (only `OpenRouterClient::with_zdr` constructed it), so the user-facing API surface is unchanged. `with_zdr` now uses `DataCollection::Deny` (the enum) instead of `Some("deny".to_string())`.
+  - Downstream impact: code that imported `openrouter_api::types::provider::ProviderPreferences` or got it via `use openrouter_api::*` wildcard will need to switch to `openrouter_api::models::provider_preferences::ProviderPreferences`. The canonical type was always available at that path and is what the README has always used.
+
 ---
 
 ## [0.5.1] - 2025-12-27

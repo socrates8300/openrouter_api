@@ -170,6 +170,7 @@ impl RequestBuilder<Value> {
     ///
     /// let prefs = ProviderPreferences {
     ///     order: Some(vec!["OpenAI".to_string(), "Anthropic".to_string()]),
+    ///     allow: None,
     ///     allow_fallbacks: Some(true),
     ///     require_parameters: None,
     ///     data_collection: Some(DataCollection::Allow),
