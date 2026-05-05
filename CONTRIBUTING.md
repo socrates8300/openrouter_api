@@ -49,6 +49,17 @@ cargo audit            # Security audit
 cargo doc              # Documentation
 ```
 
+> **Do not use `--all-features`.** The `tls-rustls` and `tls-native-tls`
+> features are mutually exclusive at compile time (see `src/lib.rs`).
+> `cargo build --all-features` and `cargo test --all-features` are expected
+> to fail with `error: TLS features tls-rustls and tls-native-tls are
+> mutually exclusive.` Always pick one, e.g.:
+>
+> ```bash
+> cargo test --features tls-rustls,tracing,allow-http
+> cargo test --no-default-features --features tls-native-tls
+> ```
+
 ### Code Standards
 
 #### Code Style
