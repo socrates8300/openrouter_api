@@ -24,6 +24,12 @@ jobs:
   publish:
     name: Publish to crates.io
     runs-on: ubuntu-latest
+    # `contents: write` is required by softprops/action-gh-release@v2 to
+    # create the GitHub Release. Default repo permissions are read-only,
+    # which is why v0.7.0's release-creation step 403'd while the
+    # `cargo publish` step itself succeeded.
+    permissions:
+      contents: write
 
     steps:
       - uses: actions/checkout@v4
