@@ -155,40 +155,30 @@ impl StructuredApi {
         if let Some(type_val) = schema_obj.get("type") {
             if let Some(type_str) = type_val.as_str() {
                 match type_str {
-                    "object" => {
-                        if !data.is_object() {
-                            return Err(Error::SchemaValidationError(
-                                "Expected an object but received a different type".into(),
-                            ));
-                        }
+                    "object" if !data.is_object() => {
+                        return Err(Error::SchemaValidationError(
+                            "Expected an object but received a different type".into(),
+                        ));
                     }
-                    "array" => {
-                        if !data.is_array() {
-                            return Err(Error::SchemaValidationError(
-                                "Expected an array but received a different type".into(),
-                            ));
-                        }
+                    "array" if !data.is_array() => {
+                        return Err(Error::SchemaValidationError(
+                            "Expected an array but received a different type".into(),
+                        ));
                     }
-                    "string" => {
-                        if !data.is_string() {
-                            return Err(Error::SchemaValidationError(
-                                "Expected a string but received a different type".into(),
-                            ));
-                        }
+                    "string" if !data.is_string() => {
+                        return Err(Error::SchemaValidationError(
+                            "Expected a string but received a different type".into(),
+                        ));
                     }
-                    "number" | "integer" => {
-                        if !data.is_number() {
-                            return Err(Error::SchemaValidationError(
-                                "Expected a number but received a different type".into(),
-                            ));
-                        }
+                    "number" | "integer" if !data.is_number() => {
+                        return Err(Error::SchemaValidationError(
+                            "Expected a number but received a different type".into(),
+                        ));
                     }
-                    "boolean" => {
-                        if !data.is_boolean() {
-                            return Err(Error::SchemaValidationError(
-                                "Expected a boolean but received a different type".into(),
-                            ));
-                        }
+                    "boolean" if !data.is_boolean() => {
+                        return Err(Error::SchemaValidationError(
+                            "Expected a boolean but received a different type".into(),
+                        ));
                     }
                     _ => {}
                 }
