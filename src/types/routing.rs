@@ -107,3 +107,60 @@ impl ModelGroups {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn model_groups_have_non_empty_primary_and_fallbacks() {
+        for profile in [
+            ModelGroups::general(),
+            ModelGroups::code(),
+            ModelGroups::long_context(),
+        ] {
+            assert!(
+                !profile.primary.is_empty(),
+                "primary model must be non-empty",
+            );
+            let fallbacks = profile.fallbacks.expect("fallbacks should be Some");
+            assert!(
+                !fallbacks.is_empty(),
+                "fallbacks list must contain at least one model",
+            );
+            assert!(
+                fallbacks.iter().all(|m| !m.is_empty()),
+                "no fallback model name may be empty",
+            );
+            assert_eq!(profile.auto_fallback, Some(true));
+            assert!(profile.latency_threshold_ms.is_some_and(|ms| ms > 0));
+            assert_eq!(profile.fail_fast, Some(false));
+        }
+    }
+
+    #[test]
+    fn router_config_serializes_predefined_profile_as_snake_case() {
+        let cfg = RouterConfig {
+            profile: PredefinedModelCoverageProfile::LowestLatency,
+            provider_preferences: None,
+        };
+        let json = serde_json::to_value(&cfg).unwrap();
+        assert_eq!(json["profile"], "lowest_latency");
+    }
+
+    #[test]
+    fn router_config_serializes_custom_profile_as_object() {
+        let cfg = RouterConfig {
+            profile: PredefinedModelCoverageProfile::Custom(ModelGroups::general()),
+            provider_preferences: None,
+        };
+        let json = serde_json::to_value(&cfg).unwrap();
+        // Custom variant carries data, so it serializes as { "custom": {…} }
+        assert!(
+            json["profile"]["custom"].is_object(),
+            "Custom variant should serialize with nested ModelCoverageProfile object: {}",
+            json,
+        );
+        assert_eq!(json["profile"]["custom"]["primary"], "openai/gpt-4o");
+    }
+}
