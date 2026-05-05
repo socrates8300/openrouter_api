@@ -30,6 +30,12 @@
 - Added 7 new tests covering `ReasoningConfig` serialization (both variants), `Plugin` constructors, prompt caching field deserialization, and `provider_name` deserialization
 - Added guardrails integration test suite
 
+### 🛡️ Security / Dependency Updates
+- **HTTP stack: `reqwest 0.11 → 0.12`, transitively `hyper 0.14 → 1.x`, `rustls 0.21 → 0.23`, `rustls-webpki 0.101 → 0.103`.** Clears the three rustls-webpki advisories (RUSTSEC-2026-0098/0099/0104) and the unmaintained `rustls-pemfile 1.0` (RUSTSEC-2025-0134).
+- **Dev: `wiremock 0.5 → 0.6`** to align with the new HTTP stack. Side benefit: drops the unmaintained `instant` (RUSTSEC-2024-0384) and `rand 0.7` (RUSTSEC-2026-0097) transitive deps.
+- **`bytes 1.11.0 → 1.11.1`** automatic via lockfile resolution after the above. Clears RUSTSEC-2026-0007.
+- Net: `cargo audit` reports 0 vulnerabilities, 0 unmaintained warnings.
+
 ---
 
 ## [0.5.1] - 2025-12-27
