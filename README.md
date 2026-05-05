@@ -227,7 +227,7 @@ async fn main() -> Result<()> {
 ```rust
 use openrouter_api::{OpenRouterClient, utils, Result};
 use openrouter_api::models::provider_preferences::{DataCollection, ProviderPreferences, ProviderSort};
-use openrouter_api::types::chat::{ChatCompletionRequest, Message};
+use openrouter_api::types::chat::{ChatCompletionRequest, ChatRole, Message};
 use serde_json::json;
 
 #[tokio::main]
@@ -251,12 +251,7 @@ async fn main() -> Result<()> {
     
     // Create a request builder with provider preferences
     let request_builder = client.chat_request_builder(vec![
-        Message {
-            role: "user".to_string(),
-            content: "Hello with provider preferences!".to_string(),
-            name: None,
-            tool_calls: None,
-        },
+        Message::text(ChatRole::User, "Hello with provider preferences!"),
     ]);
     
     // Add provider preferences and build the payload
@@ -359,7 +354,7 @@ async fn main() -> Result<()> {
 
 ```rust
 use openrouter_api::{OpenRouterClient, utils, Result};
-use openrouter_api::types::chat::{ChatCompletionRequest, Message};
+use openrouter_api::types::chat::{ChatCompletionRequest, ChatRole, Message};
 use futures::StreamExt;
 use std::io::Write;
 
@@ -373,21 +368,12 @@ async fn main() -> Result<()> {
         .with_base_url("https://openrouter.ai/api/v1/")?
         .with_api_key(api_key)?;
 
-    // Create a chat completion request with streaming enabled
+    // Create a chat completion request. Streaming is selected by calling
+    // `chat_completion_stream` below; no need to set the `stream` field here.
     let request = ChatCompletionRequest {
         model: "openai/gpt-4o".to_string(),
-        messages: vec![Message {
-            role: "user".to_string(),
-            content: "Tell me a story.".to_string(),
-            name: None,
-            tool_calls: None,
-        }],
-        stream: Some(true),
-        response_format: None,
-        tools: None,
-        provider: None,
-        models: None,
-        transforms: None,
+        messages: vec![Message::text(ChatRole::User, "Tell me a story.")],
+        ..Default::default()
     };
 
     // Invoke the streaming chat completion endpoint
@@ -913,18 +899,8 @@ let client = OpenRouterClient::new()
 let response = client.chat()?.chat_completion(
     ChatCompletionRequest {
         model: "openai/gpt-4o".to_string(),
-        messages: vec![Message {
-            role: "user".to_string(),
-            content: "Explain quantum computing".to_string(),
-            name: None,
-            tool_calls: None,
-        }],
-        stream: None,
-        response_format: None,
-        tools: None,
-        provider: None,
-        models: None,
-        transforms: None,
+        messages: vec![Message::text(ChatRole::User, "Explain quantum computing")],
+        ..Default::default()
     }
 ).await?;
 ```
@@ -954,19 +930,9 @@ let weather_tool = Tool::Function {
 let response = client.chat()?.chat_completion(
     ChatCompletionRequest {
         model: "openai/gpt-4o".to_string(),
-        messages: vec![Message {
-            role: "user".to_string(),
-            content: "What's the weather in Boston?".to_string(),
-            name: None,
-            tool_calls: None,
-        }],
+        messages: vec![Message::text(ChatRole::User, "What's the weather in Boston?")],
         tools: Some(vec![weather_tool]),
-        // other fields...
-        stream: None,
-        response_format: None,
-        provider: None,
-        models: None,
-        transforms: None,
+        ..Default::default()
     }
 ).await?;
 ```
