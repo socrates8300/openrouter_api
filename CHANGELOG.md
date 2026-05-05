@@ -36,9 +36,13 @@
 - **`bytes 1.11.0 → 1.11.1`** automatic via lockfile resolution after the above. Clears RUSTSEC-2026-0007.
 - Net: `cargo audit` reports 0 vulnerabilities, 0 unmaintained warnings.
 
-### 🧹 SemVer-Relevant Cleanup (Pre-1.0)
-- **Removed duplicate `ProviderPreferences`.** The crate previously had two distinct `ProviderPreferences` types: a stringly-typed one at `openrouter_api::types::provider::ProviderPreferences` and the strongly-typed one at `openrouter_api::models::provider_preferences::ProviderPreferences` (used by `ChatCompletionRequest` and the README examples). The duplicate was internal-only (only `OpenRouterClient::with_zdr` constructed it), so the user-facing API surface is unchanged. `with_zdr` now uses `DataCollection::Deny` (the enum) instead of `Some("deny".to_string())`.
-  - Downstream impact: code that imported `openrouter_api::types::provider::ProviderPreferences` or got it via `use openrouter_api::*` wildcard will need to switch to `openrouter_api::models::provider_preferences::ProviderPreferences`. The canonical type was always available at that path and is what the README has always used.
+
+### ⚠️ SemVer-Relevant API Changes (Pre-1.0)
+- **`#[non_exhaustive]` applied to public response types and open enums.** This is a SemVer-minor change: downstream code that exhaustively matches these enums or uses struct-literal construction will need a catch-all arm or `..Default::default()`. The motivation is to allow future field/variant additions from the upstream OpenRouter API without forcing a major bump every time. Affected types:
+  - **Response structs:** `Choice`, `LogProbs`, `TokenLogProb`, `TopLogProb`, `ServerToolUse`, `Usage`, `PromptTokensDetails`, `CompletionTokensDetails`, `ChatCompletionResponse`, `ChoiceStream`, `StreamDelta`, `ChatCompletionChunk`, `EmbeddingData`, `EmbeddingUsage`, `EmbeddingResponse`, `ActivityData`, `ActivityResponse`, `ModelUsageStats`, `ProviderUsageStats`, `FeatureUsagePercentages`, `CreditsData`, `CreditsResponse`, `GenerationData`, `GenerationResponse`, `Guardrail`, `GuardrailResponse`, `GuardrailsListResponse`, `GuardrailKeyAssignment`, `GuardrailMemberAssignment`, `GuardrailKeyAssignmentsResponse`, `GuardrailMemberAssignmentsResponse`, `BulkAssignResponse`, `BulkUnassignResponse`, `GuardrailDeleteResponse`, `ApiErrorDetails`.
+  - **Open-ended enums:** `ContentType`, `ChatRole`, `RouteStrategy`, `ImageDetail`, `VerbosityLevel`, `ReasoningEffort`, `ReasoningSummary`, `SortOrder`, `SortField`, `GuardrailResetInterval`, `DataCollection`, `ProviderSort`, `Quantization`.
+  - User-construction structs (`Message`, `ChatCompletionRequest`, the multimodal `Content` parts, `Plugin`, `Tool`, etc.) and content-variant enums users typically pattern-match (`ContentPart`, `MessageContent`, `ReasoningDetail`, `Tool`, `ToolType`, `ToolChoice`) are intentionally NOT marked `#[non_exhaustive]` to preserve struct-literal construction.
+
 
 ---
 

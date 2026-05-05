@@ -21,12 +21,14 @@ use serde_json::{from_str, from_value, to_value};
 fn test_message_uses_chat_role_enum() {
     let msg = Message::text(ChatRole::User, "Hello, world!");
 
-    // This should compile - role is ChatRole, not String
+    // This should compile - role is ChatRole, not String. ChatRole is
+    // `#[non_exhaustive]`, so integration-test matches need a wildcard arm.
     match msg.role {
         ChatRole::User => {} // ✅ Should match
         ChatRole::Assistant => panic!("Wrong role"),
         ChatRole::System => panic!("Wrong role"),
         ChatRole::Tool => panic!("Wrong role"),
+        _ => panic!("Unknown role"),
     }
 }
 
