@@ -72,6 +72,10 @@
 - **Type Safety**: Improved type safety in schema validation with exhaustive pattern matching
 - **Test Coverage**: Added comprehensive test coverage for critical paths identified in audit
   - 424 total tests now passing (was 301 before remediation)
+- **Refactored Compiler Suppressions** (merged from misfiled duplicate entry):
+  - `src/mcp/types.rs`: Removed blanket `#![allow(unused)]` to enable compiler detection of genuinely unused code
+  - `src/api/analytics.rs`: Replaced blanket `#[allow(dead_code, unused_imports)]` with targeted `#![allow(dead_code)]` for precision
+  - `src/client.rs`: Added documentation comment explaining `crate::types` import usage in client builder pattern
 
 ### 📝 Documentation Updates
 - **Cache Behavior**: Documented that `Cache::get()` mutates data during lazy cleanup
@@ -110,18 +114,6 @@ This major release implements the comprehensive OpenRouter API updates for 2025,
 
 ### 🛡️ Security Fixes
 - **Dependency Updates**: Updated dependencies to resolve security advisory RUSTSEC-2024-0370 in `h2`.
-
-## [0.5.1] - 2025-01-18
-### 🔧 Code Quality Improvements
-- **Refactored Compiler Suppressions**:
-  - `src/mcp/types.rs`: Removed blanket `#![allow(unused)]` to enable compiler detection of genuinely unused code
-  - `src/api/analytics.rs`: Replaced blanket `#[allow(dead_code, unused_imports)]` with targeted `#![allow(dead_code)]` for precision
-  - `src/client.rs`: Added documentation comment explaining `crate::types` import usage in client builder pattern
-- **Benefits**:
-  - Enhanced code safety through improved compiler feedback
-  - Better maintainability with targeted suppressions instead of blanket allowances
-  - Clearer documentation of module dependencies and import usage
-- **Verification**: Zero compiler warnings after changes
 
 ## [0.4.3] - 2025-11-30
 
