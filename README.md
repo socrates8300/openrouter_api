@@ -75,7 +75,7 @@ cargo add openrouter_api --features tracing
 
 > The shorter aliases `rustls` and `native-tls` are kept for backward compatibility but new code should prefer `tls-rustls` / `tls-native-tls`.
 
-Ensure that you have Rust installed (tested with Rust v1.83.0) and that you're using Cargo for building and testing.
+Ensure that you have Rust installed and that you're using Cargo for building and testing. **Minimum Supported Rust Version (MSRV): 1.70.0**, verified by the `msrv` job in `.github/workflows/ci.yml`. The CI matrix also runs the test suite on stable and beta toolchains.
 
 ### Quick Start Examples
 
