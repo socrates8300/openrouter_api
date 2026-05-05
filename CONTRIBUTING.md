@@ -14,9 +14,28 @@ Thank you for your interest in contributing to the OpenRouter API Rust client li
 
 ### Prerequisites
 
-- Rust 1.70.0 or later
+- Rust 1.70.0 or later (the verified MSRV; see `.github/workflows/ci.yml`)
 - `cargo` package manager
 - Git
+
+#### Recommended Cargo subcommands
+
+The following tools are not strictly required to build, but the
+maintenance review and `pre_quality.sh` rely on them:
+
+```bash
+# Security advisories (used by pre_quality.sh and ci.yml security-audit job)
+cargo install cargo-audit --locked
+
+# Dependency drift report (used during monthly maintenance review)
+cargo install cargo-outdated --locked
+
+# Detect unused dependencies (used during monthly maintenance review)
+cargo install cargo-machete --locked
+
+# Coverage measurement (used by ci.yml coverage job)
+cargo install cargo-llvm-cov --locked
+```
 
 ### Setting Up Development Environment
 
