@@ -1,6 +1,35 @@
 # Changelog
 
-## [Unreleased] - 2026-03-29
+## [Unreleased]
+
+## [0.7.0] - 2026-05-05
+
+> **Note on versioning:** `0.6.0` was published to crates.io on 2026-03-29 from a release branch and contained the work listed under `[0.6.0]` below (PR #43 — Guardrails API, Reasoning Config, Plugin Constructors, prompt cache field additions). The version bump never made it back to `main`. The maintenance run completed in May 2026 added breaking changes (`#[non_exhaustive]` on the public response surface and the `ProviderPreferences` dedup), so the next published version is `0.7.0`, not `0.6.1`.
+
+### 🛡️ Security / Dependency Updates
+- **HTTP stack: `reqwest 0.11 → 0.12`, transitively `hyper 0.14 → 1.x`, `rustls 0.21 → 0.23`, `rustls-webpki 0.101 → 0.103`.** Clears the three rustls-webpki advisories (RUSTSEC-2026-0098/0099/0104) and the unmaintained `rustls-pemfile 1.0` (RUSTSEC-2025-0134).
+- **Dev: `wiremock 0.5 → 0.6`** to align with the new HTTP stack. Side benefit: drops the unmaintained `instant` (RUSTSEC-2024-0384) and `rand 0.7` (RUSTSEC-2026-0097) transitive deps.
+- **`bytes 1.11.0 → 1.11.1`** automatic via lockfile resolution after the above. Clears RUSTSEC-2026-0007.
+- Net: `cargo audit` reports 0 vulnerabilities, 0 unmaintained warnings.
+
+### ⚠️ SemVer-Relevant API Changes (Pre-1.0)
+- **`#[non_exhaustive]` applied to public response types and open enums.** This is a SemVer-minor change: downstream code that exhaustively matches these enums or uses struct-literal construction will need a catch-all arm or `..Default::default()`. The motivation is to allow future field/variant additions from the upstream OpenRouter API without forcing a major bump every time. Affected types:
+  - **Response structs:** `Choice`, `LogProbs`, `TokenLogProb`, `TopLogProb`, `ServerToolUse`, `Usage`, `PromptTokensDetails`, `CompletionTokensDetails`, `ChatCompletionResponse`, `ChoiceStream`, `StreamDelta`, `ChatCompletionChunk`, `EmbeddingData`, `EmbeddingUsage`, `EmbeddingResponse`, `ActivityData`, `ActivityResponse`, `ModelUsageStats`, `ProviderUsageStats`, `FeatureUsagePercentages`, `CreditsData`, `CreditsResponse`, `GenerationData`, `GenerationResponse`, `Guardrail`, `GuardrailResponse`, `GuardrailsListResponse`, `GuardrailKeyAssignment`, `GuardrailMemberAssignment`, `GuardrailKeyAssignmentsResponse`, `GuardrailMemberAssignmentsResponse`, `BulkAssignResponse`, `BulkUnassignResponse`, `GuardrailDeleteResponse`, `ApiErrorDetails`.
+  - **Open-ended enums:** `ContentType`, `ChatRole`, `RouteStrategy`, `ImageDetail`, `VerbosityLevel`, `ReasoningEffort`, `ReasoningSummary`, `SortOrder`, `SortField`, `GuardrailResetInterval`, `DataCollection`, `ProviderSort`, `Quantization`.
+  - User-construction structs (`Message`, `ChatCompletionRequest`, the multimodal `Content` parts, `Plugin`, `Tool`, etc.) and content-variant enums users typically pattern-match (`ContentPart`, `MessageContent`, `ReasoningDetail`, `Tool`, `ToolType`, `ToolChoice`) are intentionally NOT marked `#[non_exhaustive]` to preserve struct-literal construction.
+
+- **Removed duplicate `ProviderPreferences`.** The crate previously had two distinct `ProviderPreferences` types: a stringly-typed one at `openrouter_api::types::provider::ProviderPreferences` and the strongly-typed one at `openrouter_api::models::provider_preferences::ProviderPreferences` (the one used in `ChatCompletionRequest` and the README examples). The duplicate is now removed.
+  - **Migration:** code that imported `openrouter_api::types::provider::ProviderPreferences` (or got it via `use openrouter_api::*` wildcard) needs to switch to `openrouter_api::models::provider_preferences::ProviderPreferences`. The canonical type was always available at that path and is what the README has always used.
+  - The canonical type also gained an `allow: Option<Vec<String>>` field (provider allowlist), which the deleted duplicate had but the canonical did not. `OpenRouterClient::with_zdr()` now uses `DataCollection::Deny` (the enum value) instead of a magic string.
+
+### 🔧 Internal Improvements
+- **`thiserror 1.0 → 2.0`** internal upgrade. No public API impact (`thiserror::Error` is implementation-only; not re-exported).
+- **CI / release hygiene** — added `release.yml` workflow that publishes on `v*.*.*` tags, added `TAGGING.md` with tagging policy and operator runbook, deleted stale `.github/workflows/rust.yml`, deduped duplicate `[0.5.1]` CHANGELOG headers, fixed 5 `collapsible_match` clippy errors and 1 `trybuild` `.stderr` fixture for Rust 1.95 compatibility, added smoke tests for `types/routing.rs` (was 0% covered).
+- **Documentation** — fixed 4 broken `Message`-API examples in README (closes follow-up to #40), updated MSRV reference (1.83 → 1.70 to match CI), led with canonical TLS feature names (`tls-rustls`/`tls-native-tls`), dropped stale `Version: 0.1.6` footer, added `--all-features is unsupported` note, added recommended cargo subcommand list to `CONTRIBUTING.md`. Added `MAINTENANCE_REPORT_2026-05.md`, `docs/maint/2026-05-blocked.md`, and `docs/maint/2026-05-followups.md`.
+
+---
+
+## [0.6.0] - 2026-03-29
 
 ### ✨ New Features
 - **Guardrails API**: Full `POST|GET|PATCH|DELETE /api/v1/guardrails` management implementation
@@ -29,20 +58,6 @@
 ### 🧪 Testing
 - Added 7 new tests covering `ReasoningConfig` serialization (both variants), `Plugin` constructors, prompt caching field deserialization, and `provider_name` deserialization
 - Added guardrails integration test suite
-
-### 🛡️ Security / Dependency Updates
-- **HTTP stack: `reqwest 0.11 → 0.12`, transitively `hyper 0.14 → 1.x`, `rustls 0.21 → 0.23`, `rustls-webpki 0.101 → 0.103`.** Clears the three rustls-webpki advisories (RUSTSEC-2026-0098/0099/0104) and the unmaintained `rustls-pemfile 1.0` (RUSTSEC-2025-0134).
-- **Dev: `wiremock 0.5 → 0.6`** to align with the new HTTP stack. Side benefit: drops the unmaintained `instant` (RUSTSEC-2024-0384) and `rand 0.7` (RUSTSEC-2026-0097) transitive deps.
-- **`bytes 1.11.0 → 1.11.1`** automatic via lockfile resolution after the above. Clears RUSTSEC-2026-0007.
-- Net: `cargo audit` reports 0 vulnerabilities, 0 unmaintained warnings.
-
-
-### ⚠️ SemVer-Relevant API Changes (Pre-1.0)
-- **`#[non_exhaustive]` applied to public response types and open enums.** This is a SemVer-minor change: downstream code that exhaustively matches these enums or uses struct-literal construction will need a catch-all arm or `..Default::default()`. The motivation is to allow future field/variant additions from the upstream OpenRouter API without forcing a major bump every time. Affected types:
-  - **Response structs:** `Choice`, `LogProbs`, `TokenLogProb`, `TopLogProb`, `ServerToolUse`, `Usage`, `PromptTokensDetails`, `CompletionTokensDetails`, `ChatCompletionResponse`, `ChoiceStream`, `StreamDelta`, `ChatCompletionChunk`, `EmbeddingData`, `EmbeddingUsage`, `EmbeddingResponse`, `ActivityData`, `ActivityResponse`, `ModelUsageStats`, `ProviderUsageStats`, `FeatureUsagePercentages`, `CreditsData`, `CreditsResponse`, `GenerationData`, `GenerationResponse`, `Guardrail`, `GuardrailResponse`, `GuardrailsListResponse`, `GuardrailKeyAssignment`, `GuardrailMemberAssignment`, `GuardrailKeyAssignmentsResponse`, `GuardrailMemberAssignmentsResponse`, `BulkAssignResponse`, `BulkUnassignResponse`, `GuardrailDeleteResponse`, `ApiErrorDetails`.
-  - **Open-ended enums:** `ContentType`, `ChatRole`, `RouteStrategy`, `ImageDetail`, `VerbosityLevel`, `ReasoningEffort`, `ReasoningSummary`, `SortOrder`, `SortField`, `GuardrailResetInterval`, `DataCollection`, `ProviderSort`, `Quantization`.
-  - User-construction structs (`Message`, `ChatCompletionRequest`, the multimodal `Content` parts, `Plugin`, `Tool`, etc.) and content-variant enums users typically pattern-match (`ContentPart`, `MessageContent`, `ReasoningDetail`, `Tool`, `ToolType`, `ToolChoice`) are intentionally NOT marked `#[non_exhaustive]` to preserve struct-literal construction.
-
 
 ---
 
