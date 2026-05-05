@@ -7,6 +7,7 @@ use crate::utils::security::create_safe_error_message;
 
 /// OpenRouter API error details
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct ApiErrorDetails {
     /// Error code (e.g., "insufficient_quota")
     pub code: Option<String>,

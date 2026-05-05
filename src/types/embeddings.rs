@@ -37,6 +37,7 @@ pub struct EmbeddingRequest {
 
 /// A single embedding result.
 #[derive(Debug, Clone, Deserialize)]
+#[non_exhaustive]
 pub struct EmbeddingData {
     /// The embedding vector.
     pub embedding: Vec<f64>,
@@ -49,6 +50,7 @@ pub struct EmbeddingData {
 
 /// Usage information for an embedding request.
 #[derive(Debug, Clone, Deserialize)]
+#[non_exhaustive]
 pub struct EmbeddingUsage {
     /// Number of tokens in the input.
     pub prompt_tokens: u32,
@@ -58,6 +60,7 @@ pub struct EmbeddingUsage {
 
 /// Response from `POST /api/v1/embeddings`.
 #[derive(Debug, Clone, Deserialize)]
+#[non_exhaustive]
 pub struct EmbeddingResponse {
     /// Object type — "list".
     pub object: String,

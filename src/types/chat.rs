@@ -13,6 +13,7 @@ use std::collections::HashMap;
 /// invalid content types unrepresentable at compile time.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum ContentType {
     /// Plain text content.
     Text,
@@ -38,6 +39,7 @@ impl std::fmt::Display for ContentType {
 /// Defines the role of a chat message (user, assistant, or system).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum ChatRole {
     User,
     Assistant,
@@ -75,6 +77,7 @@ pub struct PredictionConfig {
 /// Verbosity level for model responses.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum VerbosityLevel {
     Low,
     Medium,
@@ -84,6 +87,7 @@ pub enum VerbosityLevel {
 /// Route strategy for model routing.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum RouteStrategy {
     Fallback,
 }
@@ -91,6 +95,7 @@ pub enum RouteStrategy {
 /// Image detail level for vision models.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum ImageDetail {
     Auto,
     Low,
@@ -436,6 +441,7 @@ impl Plugin {
 /// Effort level for reasoning models (o1, o3, Claude extended thinking, DeepSeek R1).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum ReasoningEffort {
     XHigh,
     High,
@@ -448,6 +454,7 @@ pub enum ReasoningEffort {
 /// Summary verbosity for reasoning models that expose summarized thinking output.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum ReasoningSummary {
     Auto,
     Concise,
@@ -643,6 +650,7 @@ pub struct ChatCompletionRequest {
 
 /// A choice returned by the chat API.
 #[derive(Debug, Deserialize)]
+#[non_exhaustive]
 pub struct Choice {
     pub message: Message,
     pub finish_reason: Option<String>,
@@ -654,12 +662,14 @@ pub struct Choice {
 
 /// Log probabilities information.
 #[derive(Debug, Deserialize)]
+#[non_exhaustive]
 pub struct LogProbs {
     pub content: Option<Vec<TokenLogProb>>,
 }
 
 /// Token log probability information.
 #[derive(Debug, Deserialize)]
+#[non_exhaustive]
 pub struct TokenLogProb {
     pub token: String,
     pub logprob: f32,
@@ -669,6 +679,7 @@ pub struct TokenLogProb {
 
 /// Top log probability information.
 #[derive(Debug, Deserialize)]
+#[non_exhaustive]
 pub struct TopLogProb {
     pub token: String,
     pub logprob: f32,
@@ -677,6 +688,7 @@ pub struct TopLogProb {
 
 /// Server-side tool usage counts (e.g., web search requests).
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[non_exhaustive]
 pub struct ServerToolUse {
     /// Number of web search requests made by the server.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -688,6 +700,7 @@ pub struct ServerToolUse {
 
 /// Usage data returned from the API.
 #[derive(Debug, Deserialize)]
+#[non_exhaustive]
 pub struct Usage {
     pub prompt_tokens: u32,
     pub completion_tokens: u32,
@@ -704,6 +717,7 @@ pub struct Usage {
 
 /// Details about prompt token usage.
 #[derive(Debug, Deserialize)]
+#[non_exhaustive]
 pub struct PromptTokensDetails {
     pub cached_tokens: Option<u32>,
     pub audio_tokens: Option<u32>,
@@ -717,6 +731,7 @@ pub struct PromptTokensDetails {
 
 /// Details about completion token usage.
 #[derive(Debug, Deserialize)]
+#[non_exhaustive]
 pub struct CompletionTokensDetails {
     pub reasoning_tokens: Option<u32>,
     pub audio_tokens: Option<u32>,
@@ -726,6 +741,7 @@ pub struct CompletionTokensDetails {
 
 /// Chat completion response.
 #[derive(Debug, Deserialize)]
+#[non_exhaustive]
 pub struct ChatCompletionResponse {
     pub id: String,
     pub choices: Vec<Choice>,
@@ -740,6 +756,7 @@ pub struct ChatCompletionResponse {
 /// A choice returned by the streaming chat API.
 /// Different from regular Choice as it contains deltas instead of complete messages.
 #[derive(Debug, Deserialize)]
+#[non_exhaustive]
 pub struct ChoiceStream {
     pub index: u32,
     pub delta: StreamDelta,
@@ -751,6 +768,7 @@ pub struct ChoiceStream {
 
 /// Delta content for streaming responses.
 #[derive(Debug, Deserialize)]
+#[non_exhaustive]
 pub struct StreamDelta {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub role: Option<String>,
@@ -768,6 +786,7 @@ pub struct StreamDelta {
 
 /// A streaming chunk for chat completions.
 #[derive(Debug, Deserialize)]
+#[non_exhaustive]
 pub struct ChatCompletionChunk {
     pub id: String,
     pub object: String,

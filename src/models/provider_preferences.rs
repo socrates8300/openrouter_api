@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 /// Defines the data collection policy when selecting providers.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum DataCollection {
     Allow,
     Deny,
@@ -18,6 +19,7 @@ pub enum DataCollection {
 /// Defines provider sort preferences.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum ProviderSort {
     Price,
     Throughput,
@@ -26,6 +28,7 @@ pub enum ProviderSort {
 /// Defines quantization filtering options.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum Quantization {
     Int4,
     Int8,

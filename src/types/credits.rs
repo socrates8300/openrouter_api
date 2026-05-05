@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 /// Credits data returned by the OpenRouter API.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[non_exhaustive]
 pub struct CreditsData {
     /// Total credits purchased by the user
     pub total_credits: f64,
@@ -37,6 +38,7 @@ impl CreditsData {
 
 /// Response from the credits endpoint.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[non_exhaustive]
 pub struct CreditsResponse {
     /// Credits data
     pub data: CreditsData,

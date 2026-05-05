@@ -36,6 +36,12 @@
 - **`bytes 1.11.0 → 1.11.1`** automatic via lockfile resolution after the above. Clears RUSTSEC-2026-0007.
 - Net: `cargo audit` reports 0 vulnerabilities, 0 unmaintained warnings.
 
+### ⚠️ SemVer-Relevant API Changes (Pre-1.0)
+- **`#[non_exhaustive]` applied to public response types and open enums.** This is a SemVer-minor change: downstream code that exhaustively matches these enums or uses struct-literal construction will need a catch-all arm or `..Default::default()`. The motivation is to allow future field/variant additions from the upstream OpenRouter API without forcing a major bump every time. Affected types:
+  - **Response structs:** `Choice`, `LogProbs`, `TokenLogProb`, `TopLogProb`, `ServerToolUse`, `Usage`, `PromptTokensDetails`, `CompletionTokensDetails`, `ChatCompletionResponse`, `ChoiceStream`, `StreamDelta`, `ChatCompletionChunk`, `EmbeddingData`, `EmbeddingUsage`, `EmbeddingResponse`, `ActivityData`, `ActivityResponse`, `ModelUsageStats`, `ProviderUsageStats`, `FeatureUsagePercentages`, `CreditsData`, `CreditsResponse`, `GenerationData`, `GenerationResponse`, `Guardrail`, `GuardrailResponse`, `GuardrailsListResponse`, `GuardrailKeyAssignment`, `GuardrailMemberAssignment`, `GuardrailKeyAssignmentsResponse`, `GuardrailMemberAssignmentsResponse`, `BulkAssignResponse`, `BulkUnassignResponse`, `GuardrailDeleteResponse`, `ApiErrorDetails`.
+  - **Open-ended enums:** `ContentType`, `ChatRole`, `RouteStrategy`, `ImageDetail`, `VerbosityLevel`, `ReasoningEffort`, `ReasoningSummary`, `SortOrder`, `SortField`, `GuardrailResetInterval`, `DataCollection`, `ProviderSort`, `Quantization`.
+  - User-construction structs (`Message`, `ChatCompletionRequest`, the multimodal `Content` parts, `Plugin`, `Tool`, etc.) and content-variant enums users typically pattern-match (`ContentPart`, `MessageContent`, `ReasoningDetail`, `Tool`, `ToolType`, `ToolChoice`) are intentionally NOT marked `#[non_exhaustive]` to preserve struct-literal construction.
+
 ---
 
 ## [0.5.1] - 2025-12-27

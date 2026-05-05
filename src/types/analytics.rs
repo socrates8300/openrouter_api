@@ -28,6 +28,7 @@ pub mod constants {
 
 /// Sort order for activity queries
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum SortOrder {
     Ascending,
     Descending,
@@ -44,6 +45,7 @@ impl SortOrder {
 
 /// Sort field for activity queries
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum SortField {
     CreatedAt,
     Cost,
@@ -64,6 +66,7 @@ impl SortField {
 
 /// Activity data for a specific request
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[non_exhaustive]
 pub struct ActivityData {
     /// Unique identifier for the request
     pub id: ActivityId,
@@ -284,6 +287,7 @@ impl ActivityRequest {
 
 /// Response from the activity endpoint
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[non_exhaustive]
 pub struct ActivityResponse {
     /// List of activity data entries
     pub data: Vec<ActivityData>,
@@ -496,6 +500,7 @@ impl ActivityResponse {
 
 /// Usage statistics for a specific model
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct ModelUsageStats {
     pub model: String,
     pub request_count: usize,
@@ -507,6 +512,7 @@ pub struct ModelUsageStats {
 
 /// Usage statistics for a specific provider
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct ProviderUsageStats {
     pub provider: String,
     pub request_count: usize,
@@ -518,6 +524,7 @@ pub struct ProviderUsageStats {
 
 /// Feature usage percentages
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct FeatureUsagePercentages {
     pub web_search: f64,
     pub media: f64,
