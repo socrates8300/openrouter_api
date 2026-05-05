@@ -1,0 +1,75 @@
+name: Release
+
+# Triggered when a tag matching v*.*.* (e.g. v0.5.2, v1.0.0-rc.1) is pushed.
+# Builds, tests, and publishes to crates.io.
+#
+# To cut a release:
+#   1. Bump version in Cargo.toml.
+#   2. Update CHANGELOG.md (move [Unreleased] to a versioned section).
+#   3. Commit on main, push.
+#   4. git tag -a v0.5.2 -m "release v0.5.2" && git push origin v0.5.2
+#
+# The CARGO_REGISTRY_TOKEN secret must be set on the repository.
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  publish:
+    name: Publish to crates.io
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+
+      - name: Verify tag matches Cargo.toml version
+        run: |
+          tag="${GITHUB_REF##*/}"          # e.g. v0.5.2
+          tag_version="${tag#v}"           # strip leading 'v'
+          cargo_version=$(grep -m 1 '^version' Cargo.toml | sed -E 's/version\s*=\s*"([^"]+)".*/\1/')
+          echo "tag=$tag_version cargo=$cargo_version"
+          if [ "$tag_version" != "$cargo_version" ]; then
+            echo "::error::tag $tag (version $tag_version) does not match Cargo.toml version $cargo_version"
+            exit 1
+          fi
+
+      - name: Run tests (rustls)
+        run: cargo test --features tls-rustls,tracing,allow-http
+
+      - name: Run tests (native-tls)
+        run: cargo test --no-default-features --features tls-native-tls
+
+      - name: Verify package builds and validates
+        run: cargo publish --dry-run
+
+      - name: Publish to crates.io
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          body: |
+            See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
