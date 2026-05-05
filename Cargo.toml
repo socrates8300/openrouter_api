@@ -43,9 +43,16 @@ trybuild = "1.0"
 
 [features]
 default = ["tls-rustls"]
-# TLS features - exactly one must be chosen
-# Use --features "tls-rustls" for rustls-tls (default)
-# Use --features "tls-native-tls" for native-tls
+# TLS features - exactly one must be chosen.
+# Use --features "tls-rustls" for rustls-tls (default).
+# Use --features "tls-native-tls" for native-tls.
+#
+# NOTE: `cargo build --all-features` and `cargo test --all-features` are
+# UNSUPPORTED for this crate: enabling both `tls-rustls` and `tls-native-tls`
+# at once trips the compile-time `compile_error!` block in `src/lib.rs` and
+# fails the build. Use one TLS feature at a time, e.g.
+#   cargo test --features tls-rustls,tracing,allow-http
+#   cargo test --no-default-features --features tls-native-tls
 tls-rustls = ["reqwest/rustls-tls"]
 tls-native-tls = ["reqwest/native-tls"]
 # Legacy aliases for compatibility (deprecated)
