@@ -1,11 +1,11 @@
 use openrouter_api::client::{
     OpenRouterClient, Unconfigured, ROUTING_FLOOR, ROUTING_NITRO, ROUTING_ONLINE,
 };
+use openrouter_api::models::provider_preferences::{DataCollection, ProviderPreferences};
 use openrouter_api::types::chat::{
     AudioContent, AudioUrl, ChatCompletionRequest, ChatRole, ContentPart, ContentType, FileContent,
     FileUrl, Message, Plugin,
 };
-use openrouter_api::types::provider::ProviderPreferences;
 
 #[test]
 fn test_multimodal_serialization() {
@@ -54,13 +54,13 @@ fn test_routing_shortcuts() {
 fn test_policy_controls() {
     let prefs = ProviderPreferences {
         allow: Some(vec!["OpenAI".to_string(), "Anthropic".to_string()]),
-        data_collection: Some("deny".to_string()), // ZDR
+        data_collection: Some(DataCollection::Deny), // ZDR
         ..ProviderPreferences::default()
     };
 
     let json_prefs = serde_json::to_value(&prefs).unwrap();
     assert_eq!(json_prefs["allow"][0], "OpenAI");
-    assert_eq!(json_prefs["data_collection"], "deny");
+    assert_eq!(json_prefs["dataCollection"], "deny");
 }
 
 #[test]

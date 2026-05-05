@@ -47,6 +47,10 @@ pub struct ProviderPreferences {
     /// Ordered list of provider names to prefer.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub order: Option<Vec<String>>,
+    /// Explicit allowlist of providers. When set, only these providers are
+    /// considered (intersection with `order` if both are provided).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub allow: Option<Vec<String>>,
     /// Whether fallback providers are allowed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allow_fallbacks: Option<bool>,
@@ -80,6 +84,7 @@ impl ProviderPreferences {
     pub fn new() -> Self {
         Self {
             order: None,
+            allow: None,
             allow_fallbacks: None,
             require_parameters: None,
             data_collection: None,
@@ -120,6 +125,12 @@ impl ProviderPreferences {
     /// Sets the order of providers.
     pub fn with_order(mut self, order: Vec<String>) -> Self {
         self.order = Some(order);
+        self
+    }
+
+    /// Sets the explicit allowlist of providers.
+    pub fn with_allow(mut self, allow: Vec<String>) -> Self {
+        self.allow = Some(allow);
         self
     }
 

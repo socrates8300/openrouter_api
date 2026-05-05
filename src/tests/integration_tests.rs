@@ -235,6 +235,7 @@ mod tests {
         // Build a provider preferences configuration.
         let preferences = crate::models::provider_preferences::ProviderPreferences {
             order: Some(vec!["OpenAI".to_string(), "Anthropic".to_string()]),
+            allow: None,
             allow_fallbacks: Some(false),
             require_parameters: Some(true),
             data_collection: Some(crate::models::provider_preferences::DataCollection::Deny),
@@ -308,6 +309,7 @@ mod tests {
         // Create provider preferences
         let preferences = ProviderPreferences {
             order: Some(vec!["OpenAI".to_string(), "Anthropic".to_string()]),
+            allow: None,
             allow_fallbacks: Some(true),
             require_parameters: Some(false),
             data_collection: Some(DataCollection::Deny),

@@ -354,15 +354,16 @@ impl OpenRouterClient<NoAuth> {
     /// Enables Zero Data Retention (ZDR) by setting data collection to "deny".
     #[must_use = "returns updated client that should be used for API calls"]
     pub fn with_zdr(mut self) -> Self {
+        use crate::models::provider_preferences::{DataCollection, ProviderPreferences};
         let router_config = self.router_config.get_or_insert(RouterConfig {
             profile: PredefinedModelCoverageProfile::LowestCost,
-            provider_preferences: Some(crate::types::provider::ProviderPreferences::new()),
+            provider_preferences: Some(ProviderPreferences::new()),
         });
 
         let prefs = router_config
             .provider_preferences
-            .get_or_insert(crate::types::provider::ProviderPreferences::new());
-        prefs.data_collection = Some("deny".to_string());
+            .get_or_insert(ProviderPreferences::new());
+        prefs.data_collection = Some(DataCollection::Deny);
         self
     }
 
