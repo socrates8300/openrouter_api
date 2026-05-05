@@ -68,9 +68,12 @@ cargo add openrouter_api --features tracing
 ```
 
 **Available Features:**
-- `rustls` (default): Use rustls for TLS
-- `native-tls`: Use system TLS
+- `tls-rustls` (default): Use rustls for TLS
+- `tls-native-tls`: Use system TLS (mutually exclusive with `tls-rustls`)
 - `tracing`: Enhanced error logging with tracing support
+- `allow-http`: Permit non-HTTPS base URLs (off by default)
+
+> The shorter aliases `rustls` and `native-tls` are kept for backward compatibility but new code should prefer `tls-rustls` / `tls-native-tls`.
 
 Ensure that you have Rust installed (tested with Rust v1.83.0) and that you're using Cargo for building and testing.
 
