@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 /// Interval at which a guardrail spending limit resets.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum GuardrailResetInterval {
     Daily,
     Weekly,
@@ -13,6 +14,7 @@ pub enum GuardrailResetInterval {
 
 /// A configured guardrail.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[non_exhaustive]
 pub struct Guardrail {
     /// Unique identifier for the guardrail.
     pub id: String,
@@ -48,6 +50,7 @@ pub struct Guardrail {
 
 /// Response wrapper for a single guardrail.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[non_exhaustive]
 pub struct GuardrailResponse {
     /// Guardrail payload.
     pub data: Guardrail,
@@ -55,6 +58,7 @@ pub struct GuardrailResponse {
 
 /// Response wrapper for a list of guardrails.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[non_exhaustive]
 pub struct GuardrailsListResponse {
     /// Guardrails in the current page.
     pub data: Vec<Guardrail>,
@@ -272,6 +276,7 @@ impl GuardrailUpdateRequest {
 
 /// API key assignment entry for a guardrail.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct GuardrailKeyAssignment {
     /// Unique assignment ID.
     pub id: String,
@@ -292,6 +297,7 @@ pub struct GuardrailKeyAssignment {
 
 /// Organization member assignment entry for a guardrail.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct GuardrailMemberAssignment {
     /// Unique assignment ID.
     pub id: String,
@@ -310,6 +316,7 @@ pub struct GuardrailMemberAssignment {
 
 /// Response wrapper for guardrail key assignments.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[non_exhaustive]
 pub struct GuardrailKeyAssignmentsResponse {
     /// Assignment page data.
     pub data: Vec<GuardrailKeyAssignment>,
@@ -319,6 +326,7 @@ pub struct GuardrailKeyAssignmentsResponse {
 
 /// Response wrapper for guardrail member assignments.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[non_exhaustive]
 pub struct GuardrailMemberAssignmentsResponse {
     /// Assignment page data.
     pub data: Vec<GuardrailMemberAssignment>,
@@ -358,6 +366,7 @@ impl BulkAssignMembersRequest {
 
 /// Response for successful bulk assignment operations.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct BulkAssignResponse {
     /// Number of entities assigned.
     pub assigned_count: u32,
@@ -365,6 +374,7 @@ pub struct BulkAssignResponse {
 
 /// Response for successful bulk unassignment operations.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct BulkUnassignResponse {
     /// Number of entities unassigned.
     pub unassigned_count: u32,
@@ -372,6 +382,7 @@ pub struct BulkUnassignResponse {
 
 /// Response for guardrail deletion.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct GuardrailDeleteResponse {
     /// Whether the guardrail was deleted.
     pub deleted: bool,

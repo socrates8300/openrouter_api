@@ -7,6 +7,7 @@ use crate::types::status::{CancellationStatus, StreamingStatus};
 
 /// Generation data returned by the OpenRouter API.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[non_exhaustive]
 pub struct GenerationData {
     /// Unique identifier for the generation
     pub id: GenerationId,
@@ -142,6 +143,7 @@ impl GenerationData {
 
 /// Response from the generation endpoint.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[non_exhaustive]
 pub struct GenerationResponse {
     /// Generation data
     pub data: GenerationData,
