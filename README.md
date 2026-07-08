@@ -75,7 +75,7 @@ cargo add openrouter_api --features tracing
 
 > The shorter aliases `rustls` and `native-tls` are kept for backward compatibility but new code should prefer `tls-rustls` / `tls-native-tls`.
 
-Ensure that you have Rust installed and that you're using Cargo for building and testing. **Minimum Supported Rust Version (MSRV): 1.70.0**, verified by the `msrv` job in `.github/workflows/ci.yml`. The CI matrix also runs the test suite on stable and beta toolchains.
+Ensure that you have Rust installed and that you're using Cargo for building and testing. **Minimum Supported Rust Version (MSRV): 1.85**, declared via `rust-version` in `Cargo.toml` and checked by the `msrv` job in `.github/workflows/ci.yml`. The CI matrix also runs the test suite on stable and beta toolchains.
 
 ### Quick Start Examples
 
@@ -972,16 +972,29 @@ All API endpoints automatically retry failed requests with:
 - **Configurable Limits:** Customizable maximum retries and backoff settings
 
 ```rust
-use openrouter_api::{OpenRouterClient, Result};
+use openrouter_api::{client::RetryConfig, OpenRouterClient};
+use std::time::Duration;
 
-// Custom retry configuration
-let client = OpenRouterClient::from_env()?
-    .with_retry_config(RetryConfig {
-        max_retries: 5,
-        initial_backoff_ms: 1000,
-        max_backoff_ms: 30000,
-        retry_on_status_codes: vec![429, 500, 502, 503, 504],
-    })?;
+// Custom retry configuration. `RetryConfig::default()` is a sensible base;
+// apply only the fields you want to override.
+let retry = RetryConfig {
+    max_retries: 5,
+    initial_backoff_ms: 1000,
+    max_backoff_ms: 30000,
+    retry_on_status_codes: vec![429, 500, 502, 503, 504],
+    total_timeout: Duration::from_secs(120),
+    max_retry_interval: Duration::from_secs(30),
+};
+
+// Retry config is set on the NoAuth state, BEFORE the final transition to
+// Ready. `with_retry_config` consumes self and returns Self (no `?`);
+// `with_base_url` and `with_api_key` are the state transitions and return
+// Result. (If you just want defaults, `OpenRouterClient::from_env()?` returns
+// a Ready client directly — but it cannot be re-configured afterwards.)
+let client = OpenRouterClient::new()
+    .with_base_url("https://openrouter.ai/api/v1")?
+    .with_retry_config(retry)
+    .with_api_key(std::env::var("OPENROUTER_API_KEY")?)?;
 
 // Automatic retries happen transparently
 let response = client.chat()?.chat_completion(request).await?;
@@ -1038,11 +1051,24 @@ Retrying chat_completion request (2/3) after 1250 ms (base: 1000 ms, jitter: 25.
    Let the compiler ensure your client is properly configured.
 
 2. **Configure Retry Behavior:**
-   Adjust retry settings based on your application's needs:
+   Adjust retry settings based on your application's needs. Retry config is
+   set on the `NoAuth` state, before the final `with_api_key` transition to
+   `Ready` (once `Ready`, the client is immutable):
    ```rust
-   let client = OpenRouterClient::from_env()?
-       .with_retries(5)?  // More retries for resilience
-       .without_retries()?; // Disable for testing
+   use openrouter_api::OpenRouterClient;
+   use std::env;
+
+   // with_retries(max_retries, initial_backoff_ms); returns Self (no `?`)
+   let client = OpenRouterClient::new()
+       .skip_url_configuration()        // -> NoAuth
+       .with_retries(5, 1000)           // 5 retries, 1s initial backoff
+       .with_api_key(env::var("OPENROUTER_API_KEY")?)?;  // -> Ready
+
+   // To disable retries entirely:
+   let client = OpenRouterClient::new()
+       .skip_url_configuration()
+       .without_retries()
+       .with_api_key(env::var("OPENROUTER_API_KEY")?)?;
    ```
 
 3. **Set Appropriate Timeouts & Headers:**

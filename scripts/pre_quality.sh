@@ -50,14 +50,14 @@ fi
 
 # Test check with rustls (default)
 echo "🧪 Running tests (rustls)..."
-if ! cargo test --workspace --features tls-rustls --exclude mcp; then
+if ! cargo test --features tls-rustls; then
     echo "❌ Tests failed. Fix failing tests."
     exit 1
 fi
 
 # Test check with native-tls
 echo "🧪 Running tests (native-tls)..."
-if ! cargo test --workspace --no-default-features --features tls-native-tls --exclude mcp; then
+if ! cargo test --no-default-features --features tls-native-tls; then
     echo "❌ Tests failed. Fix failing tests."
     exit 1
 fi
