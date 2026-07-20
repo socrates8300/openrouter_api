@@ -1,0 +1,44 @@
+# Dependabot configuration.
+#
+# Keeps Cargo dependencies and GitHub Actions up to date and surfaces RustSec
+# advisories as version-security PRs. The crate pins a single TLS backend at a
+# time (tls-rustls xor tls-native-tls); both are incompatible by design, so
+# Dependabot updates are scoped per-ecosystem and never enable --all-features.
+#
+# Frequency is weekly to batch updates and keep CI noise low. Reviewers should
+# run the local gate (see CONTRIBUTING.md) against BOTH TLS matrices before
+# merging, since `cargo build --all-features` intentionally fails.
+version: 2
+updates:
+  # Cargo dependencies (crate + dev-deps).
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    groups:
+      # Patch/minor bumps ride together to reduce PR volume.
+      cargo-minor:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # GitHub Actions used by .github/workflows/*.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    groups:
+      actions:
+        update-types:
+          - "minor"
+          - "patch"
