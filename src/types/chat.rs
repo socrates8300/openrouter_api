@@ -172,10 +172,41 @@ pub enum MessageContent {
     Parts(Vec<ContentPart>),
 }
 
+impl Default for MessageContent {
+    /// Defaults to empty text content.
+    ///
+    /// OpenRouter (and OpenAI) return `"content": null` on assistant messages
+    /// that emit `tool_calls` — there is no textual content alongside the call.
+    /// Deserializing such a message into [`Message`] relies on this default so
+    /// the field stays non-`Option` for ergonomic pattern-matching at read
+    /// sites. See issue #65.
+    fn default() -> Self {
+        MessageContent::Text(String::new())
+    }
+}
+
+/// Deserialize `null` (or a missing field) as [`MessageContent::default`].
+///
+/// `#[serde(default)]` alone only substitutes the default when the field is
+/// absent from the input; an explicit `"content": null` still invokes the
+/// `MessageContent` deserializer, which fails because the untagged enum has no
+/// null variant. This helper closes that gap by mapping explicit `null` to the
+/// default empty-text content and delegating everything else to the derived
+/// deserializer.
+fn deserialize_content_optional_null<'de, D>(deserializer: D) -> Result<MessageContent, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Option::<MessageContent>::deserialize(deserializer).map(|opt| opt.unwrap_or_default())
+}
+
 /// Represents a chat message with a role and content.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Message {
     pub role: ChatRole,
+    /// Message content. Defaults to empty text when the API omits the field or
+    /// sends `null` (e.g. assistant messages whose only payload is `tool_calls`).
+    #[serde(default, deserialize_with = "deserialize_content_optional_null")]
     pub content: MessageContent,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
