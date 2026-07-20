@@ -14,7 +14,7 @@ Thank you for your interest in contributing to the OpenRouter API Rust client li
 
 ### Prerequisites
 
-- Rust 1.70.0 or later (the verified MSRV; see `.github/workflows/ci.yml`)
+- Rust 1.85 or later (the MSRV, declared via `rust-version` in `Cargo.toml` and checked by the `msrv` CI job)
 - `cargo` package manager
 - Git
 
