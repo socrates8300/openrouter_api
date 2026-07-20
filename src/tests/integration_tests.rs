@@ -163,6 +163,54 @@ mod tests {
         Ok(())
     }
 
+    /// Regression for issue #65: when an assistant message carries `tool_calls`,
+    /// OpenRouter returns `"content": null`. The non-`Option` `Message::content`
+    /// field used to reject this; it now deserializes to empty text via
+    /// `#[serde(default)]`.
+    #[tokio::test]
+    async fn test_tool_call_response_with_null_content() {
+        // Verbatim payload shape reported in issue #65 (extra fields trimmed).
+        let simulated_response_json = r#"
+        {
+            "id": "gen-null-content-tool",
+            "choices": [{
+                "message": {
+                    "role": "assistant",
+                    "content": null,
+                    "refusal": null,
+                    "reasoning": null,
+                    "tool_calls": [{
+                        "type": "function",
+                        "index": 0,
+                        "id": "call_xxxxxxxxxxxxx",
+                        "function": {
+                            "name": "weather_tool",
+                            "arguments": "{\"city\": \"London\"}"
+                        }
+                    }]
+                },
+                "finish_reason": "tool_calls",
+                "native_finish_reason": "tool_calls"
+            }],
+            "created": 1234567890,
+            "model": "openai/gpt-4o",
+            "object": "chat.completion"
+        }
+        "#;
+        let response = deserialize_chat_response(simulated_response_json);
+
+        assert!(!response.choices.is_empty(), "should deserialize at all");
+        let message = &response.choices[0].message;
+        assert_eq!(message.role, ChatRole::Assistant);
+        // null content resolves to empty text, not a deserialization error.
+        assert_eq!(message.content, MessageContent::Text(String::new()));
+        assert!(message.tool_calls.is_some());
+        assert_eq!(
+            message.tool_calls.as_ref().unwrap()[0].function_call.name,
+            "weather_tool"
+        );
+    }
+
     #[tokio::test]
     async fn test_text_completion_response_deserialization(
     ) -> Result<(), Box<dyn std::error::Error>> {
