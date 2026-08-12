@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-08-12
+
 ### 🐛 Bug Fixes
 - **`content: null` on assistant tool-call messages no longer fails deserialization (fixes #65).** OpenRouter (and OpenAI) send `"content": null` on assistant messages that carry `tool_calls`. `MessageContent` now owns the full wire union (`string | array | null`) via a hand-written `Deserialize` impl: `null` maps to `MessageContent::Text(String::new())`, and `Message.content` gains `#[serde(default)]` so an omitted `content` field also yields empty text instead of an error. The field stays non-`Option`.
   - **Behavior change:** resending a received null-content message serializes `"content": ""` rather than `null` — identical to what `Message::assistant_with_tools(None, …)` already emitted, and accepted by both OpenAI and OpenRouter.

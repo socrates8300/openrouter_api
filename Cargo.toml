@@ -1,6 +1,6 @@
 [package]
 name = "openrouter_api"
-version = "0.7.0"
+version = "0.7.1"
 edition = "2021"
 # MSRV: enforced here and by the `msrv` CI job. The floor is set by
 # dev-dependencies (wiremock 0.6 and the edition-2024 crate graph); see
