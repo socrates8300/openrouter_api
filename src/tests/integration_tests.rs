@@ -163,10 +163,8 @@ mod tests {
         Ok(())
     }
 
-    /// Regression for issue #65: when an assistant message carries `tool_calls`,
-    /// OpenRouter returns `"content": null`. The non-`Option` `Message::content`
-    /// field used to reject this; it now deserializes to empty text via
-    /// `#[serde(default)]`.
+    /// Regression for issue #65: assistant tool-call messages arrive with
+    /// `"content": null`. MessageContent maps that to empty text.
     #[tokio::test]
     async fn test_tool_call_response_with_null_content() {
         // Verbatim payload shape reported in issue #65 (extra fields trimmed).

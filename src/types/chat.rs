@@ -165,7 +165,12 @@ pub enum ContentPart {
 }
 
 /// Enhanced message content supporting both string and multimodal content.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+///
+/// OpenRouter (and OpenAI) send `"content": null` on assistant tool-call
+/// messages. That deserializes as empty text so [`Message::content`] can stay
+/// non-`Option`. Stream deltas keep `Option<MessageContent>` and still see
+/// `null` as `None` because `Option` intercepts it first.
+#[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(untagged)]
 pub enum MessageContent {
     Text(String),
@@ -173,40 +178,38 @@ pub enum MessageContent {
 }
 
 impl Default for MessageContent {
-    /// Defaults to empty text content.
-    ///
-    /// OpenRouter (and OpenAI) return `"content": null` on assistant messages
-    /// that emit `tool_calls` — there is no textual content alongside the call.
-    /// Deserializing such a message into [`Message`] relies on this default so
-    /// the field stays non-`Option` for ergonomic pattern-matching at read
-    /// sites. See issue #65.
     fn default() -> Self {
-        MessageContent::Text(String::new())
+        Self::Text(String::new())
     }
 }
 
-/// Deserialize `null` (or a missing field) as [`MessageContent::default`].
-///
-/// `#[serde(default)]` alone only substitutes the default when the field is
-/// absent from the input; an explicit `"content": null` still invokes the
-/// `MessageContent` deserializer, which fails because the untagged enum has no
-/// null variant. This helper closes that gap by mapping explicit `null` to the
-/// default empty-text content and delegating everything else to the derived
-/// deserializer.
-fn deserialize_content_optional_null<'de, D>(deserializer: D) -> Result<MessageContent, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    Option::<MessageContent>::deserialize(deserializer).map(|opt| opt.unwrap_or_default())
+impl<'de> Deserialize<'de> for MessageContent {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum Wire {
+            Text(String),
+            Parts(Vec<ContentPart>),
+        }
+
+        Ok(Option::<Wire>::deserialize(deserializer)?
+            .map(|wire| match wire {
+                Wire::Text(text) => Self::Text(text),
+                Wire::Parts(parts) => Self::Parts(parts),
+            })
+            .unwrap_or_default())
+    }
 }
 
 /// Represents a chat message with a role and content.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Message {
     pub role: ChatRole,
-    /// Message content. Defaults to empty text when the API omits the field or
-    /// sends `null` (e.g. assistant messages whose only payload is `tool_calls`).
-    #[serde(default, deserialize_with = "deserialize_content_optional_null")]
+    /// Empty text when the API omits the field or sends `null`.
+    #[serde(default)]
     pub content: MessageContent,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
@@ -227,7 +230,7 @@ impl Default for Message {
     fn default() -> Self {
         Self {
             role: ChatRole::User,
-            content: MessageContent::Text("".to_string()),
+            content: MessageContent::default(),
             name: None,
             tool_call_id: None,
             tool_calls: None,
@@ -303,7 +306,7 @@ impl Message {
             role: ChatRole::Assistant,
             content: content
                 .map(|c| MessageContent::Text(c.into()))
-                .unwrap_or(MessageContent::Text("".to_string())),
+                .unwrap_or_default(),
             name: None,
             tool_calls: Some(tool_calls),
             tool_call_id: None,

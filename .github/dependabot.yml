@@ -1,13 +1,5 @@
-# Dependabot configuration.
-#
-# Keeps Cargo dependencies and GitHub Actions up to date and surfaces RustSec
-# advisories as version-security PRs. The crate pins a single TLS backend at a
-# time (tls-rustls xor tls-native-tls); both are incompatible by design, so
-# Dependabot updates are scoped per-ecosystem and never enable --all-features.
-#
-# Frequency is weekly to batch updates and keep CI noise low. Reviewers should
-# run the local gate (see CONTRIBUTING.md) against BOTH TLS matrices before
-# merging, since `cargo build --all-features` intentionally fails.
+# Weekly cargo + Actions updates. Review both TLS backends before merge;
+# `--all-features` is unsupported (tls-rustls xor tls-native-tls).
 version: 2
 updates:
   # Cargo dependencies (crate + dev-deps).
