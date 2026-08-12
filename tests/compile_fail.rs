@@ -4,8 +4,44 @@
 //! guarantees fail to compile. If any of these tests start passing,
 //! it indicates a regression in our type safety enforcement.
 
+/// trybuild compares stderr exactly, and rustc's diagnostic rendering drifts
+/// between release channels and depends on whether `rust-src` is installed
+/// (std source snippets only render with the component present). The `.stderr`
+/// fixtures are blessed for stable + `rust-src`, matching CI's stable job, so
+/// skip anywhere else instead of failing on rendering noise.
+fn trybuild_environment_supported() -> bool {
+    let rustc = std::env::var("RUSTC").unwrap_or_else(|_| "rustc".to_string());
+
+    let Ok(output) = std::process::Command::new(&rustc).arg("--version").output() else {
+        return false;
+    };
+    let version = String::from_utf8_lossy(&output.stdout);
+    if version.contains("beta") || version.contains("nightly") || version.contains("-dev") {
+        return false;
+    }
+
+    let Ok(output) = std::process::Command::new(&rustc)
+        .args(["--print", "sysroot"])
+        .output()
+    else {
+        return false;
+    };
+    let sysroot = String::from_utf8_lossy(&output.stdout);
+    std::path::Path::new(sysroot.trim())
+        .join("lib/rustlib/src")
+        .exists()
+}
+
 #[test]
 fn compile_fail_tests() {
+    if !trybuild_environment_supported() {
+        eprintln!(
+            "skipping compile_fail tests: .stderr fixtures require stable rustc with \
+             the rust-src component (rustup component add rust-src)"
+        );
+        return;
+    }
+
     let t = trybuild::TestCases::new();
 
     // ============================================================================

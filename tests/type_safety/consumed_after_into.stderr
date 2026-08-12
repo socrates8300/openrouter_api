@@ -12,6 +12,9 @@ error[E0382]: borrow of moved value: `id`
    |
 note: `into` takes ownership of the receiver `self`, which moves `id`
   --> $RUST/core/src/convert/mod.rs
+   |
+   |     fn into(self) -> T;
+   |             ^^^^
 help: you can `clone` the value and consume it, but this might not be your desired behavior
    |
 14 |     let _s: String = id.clone().into();
