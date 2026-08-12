@@ -165,17 +165,51 @@ pub enum ContentPart {
 }
 
 /// Enhanced message content supporting both string and multimodal content.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+///
+/// OpenRouter (and OpenAI) send `"content": null` on assistant tool-call
+/// messages. That deserializes as empty text so [`Message::content`] can stay
+/// non-`Option`. Stream deltas keep `Option<MessageContent>` and still see
+/// `null` as `None` because `Option` intercepts it first.
+#[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(untagged)]
 pub enum MessageContent {
     Text(String),
     Parts(Vec<ContentPart>),
 }
 
+impl Default for MessageContent {
+    fn default() -> Self {
+        Self::Text(String::new())
+    }
+}
+
+impl<'de> Deserialize<'de> for MessageContent {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum Wire {
+            Text(String),
+            Parts(Vec<ContentPart>),
+        }
+
+        Ok(Option::<Wire>::deserialize(deserializer)?
+            .map(|wire| match wire {
+                Wire::Text(text) => Self::Text(text),
+                Wire::Parts(parts) => Self::Parts(parts),
+            })
+            .unwrap_or_default())
+    }
+}
+
 /// Represents a chat message with a role and content.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Message {
     pub role: ChatRole,
+    /// Empty text when the API omits the field or sends `null`.
+    #[serde(default)]
     pub content: MessageContent,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
@@ -196,7 +230,7 @@ impl Default for Message {
     fn default() -> Self {
         Self {
             role: ChatRole::User,
-            content: MessageContent::Text("".to_string()),
+            content: MessageContent::default(),
             name: None,
             tool_call_id: None,
             tool_calls: None,
@@ -272,7 +306,7 @@ impl Message {
             role: ChatRole::Assistant,
             content: content
                 .map(|c| MessageContent::Text(c.into()))
-                .unwrap_or(MessageContent::Text("".to_string())),
+                .unwrap_or_default(),
             name: None,
             tool_calls: Some(tool_calls),
             tool_call_id: None,

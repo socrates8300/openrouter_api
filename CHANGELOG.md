@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-08-12
+
+### 🐛 Bug Fixes
+- **`content: null` on assistant tool-call messages no longer fails deserialization (fixes #65).** OpenRouter (and OpenAI) send `"content": null` on assistant messages that carry `tool_calls`. `MessageContent` now owns the full wire union (`string | array | null`) via a hand-written `Deserialize` impl: `null` maps to `MessageContent::Text(String::new())`, and `Message.content` gains `#[serde(default)]` so an omitted `content` field also yields empty text instead of an error. The field stays non-`Option`.
+  - **Behavior change:** resending a received null-content message serializes `"content": ""` rather than `null` — identical to what `Message::assistant_with_tools(None, …)` already emitted, and accepted by both OpenAI and OpenRouter.
+  - Streaming is unchanged: `StreamDelta.content` stays `Option<MessageContent>`, so `"content": null` in stream deltas still deserializes as `None`.
+  - `MessageContent` gains an additive `Default` impl (`Text(String::new())`).
+
+### 🛡️ Security / Dependency Updates
+- **Dev: `serial_test 3.0 → 3.5`** to clear RUSTSEC-2026-0205. Dev-dependency only; no downstream impact.
+
+### 🔧 Internal Improvements
+- **Added Dependabot** (`.github/dependabot.yml`): weekly grouped minor/patch updates for Cargo and GitHub Actions; majors arrive as individual PRs.
+- **trybuild hygiene:** re-blessed `consumed_after_into.stderr` for Rust 1.97 with `rust-src` installed (std source snippets only render with the component present, which is why CI disagreed with the previous blessing), and the compile-fail suite now skips itself on beta/nightly or when `rust-src` is missing instead of failing on diagnostic-rendering drift. Documented `TRYBUILD=overwrite` and the stable + `rust-src` requirement in `tests/type_safety/README.md`.
+
 ## [0.7.0] - 2026-05-05
 
 > **Note on versioning:** `0.6.0` was published to crates.io on 2026-03-29 from a release branch and contained the work listed under `[0.6.0]` below (PR #43 — Guardrails API, Reasoning Config, Plugin Constructors, prompt cache field additions). The version bump never made it back to `main`. The maintenance run completed in May 2026 added breaking changes (`#[non_exhaustive]` on the public response surface and the `ProviderPreferences` dedup), so the next published version is `0.7.0`, not `0.6.1`.

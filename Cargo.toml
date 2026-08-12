@@ -1,6 +1,6 @@
 [package]
 name = "openrouter_api"
-version = "0.7.0"
+version = "0.7.1"
 edition = "2021"
 # MSRV: enforced here and by the `msrv` CI job. The floor is set by
 # dev-dependencies (wiremock 0.6 and the edition-2024 crate graph); see
@@ -43,7 +43,7 @@ tracing = { version = "0.1", optional = true }
 tokio-test = "0.4"
 wiremock = "0.6"
 test-case = "3.3"
-serial_test = "3.0"
+serial_test = "3.5"
 trybuild = "1.0"
 
 [features]

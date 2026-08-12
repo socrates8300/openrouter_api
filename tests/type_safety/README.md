@@ -205,6 +205,24 @@ If the compiler error output changes (e.g., due to Rust version update), you may
 2. Review the new errors to ensure they still reflect the same underlying issue
 3. Replace the old `.stderr` with the new one
 
+Or bless the new output in place:
+
+```bash
+TRYBUILD=overwrite cargo test --test compile_fail
+```
+
+The `.stderr` fixtures are blessed for **stable rustc with the `rust-src`
+component installed** — that is what CI's stable job runs. rustc renders std
+source snippets (e.g., the `fn into(self) -> T;` excerpt in
+`consumed_after_into.stderr`) only when `rust-src` is present, and diagnostic
+wording drifts between channels, so the suite skips itself on beta/nightly or
+when `rust-src` is missing. To reproduce CI locally:
+
+```bash
+rustup component add rust-src
+cargo test --test compile_fail
+```
+
 ### Test File Has Unclosed Delimiter
 
 Ensure all test files have complete `fn main()` functions and all braces are closed:

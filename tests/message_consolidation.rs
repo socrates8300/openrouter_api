@@ -10,7 +10,7 @@
 use openrouter_api::models::tool::ToolType;
 use openrouter_api::types::chat::{
     AudioContent, AudioUrl, ChatRole, ContentPart, ContentType, FileContent, FileUrl, ImageContent,
-    ImageUrl, Message, MessageContent, TextContent,
+    ImageUrl, Message, MessageContent, StreamDelta, TextContent,
 };
 
 use openrouter_api::types::ids::ToolCallId;
@@ -287,6 +287,55 @@ fn test_assistant_with_tools_no_content() {
 
     assert_eq!(msg.role, ChatRole::Assistant);
     assert!(msg.tool_calls.is_some());
+    assert_eq!(msg.content, MessageContent::Text(String::new()));
+}
+
+/// Explicit `"content": null` deserializes as empty text (issue #65).
+#[test]
+fn test_null_content_deserializes_to_empty_text() {
+    let json = r#"{
+        "role": "assistant",
+        "content": null
+    }"#;
+
+    let msg: Message = from_str(json).unwrap();
+    assert_eq!(msg.role, ChatRole::Assistant);
+    assert_eq!(msg.content, MessageContent::Text(String::new()));
+}
+
+/// Omitted `content` also deserializes as empty text.
+#[test]
+fn test_omitted_content_deserializes_to_empty_text() {
+    let json = r#"{
+        "role": "assistant"
+    }"#;
+
+    let msg: Message = from_str(json).unwrap();
+    assert_eq!(msg.role, ChatRole::Assistant);
+    assert_eq!(msg.content, MessageContent::Text(String::new()));
+}
+
+/// Multimodal array content still deserializes after the custom impl.
+#[test]
+fn test_parts_content_still_deserializes() {
+    let json = r#"{
+        "role": "user",
+        "content": [{"type": "text", "text": "hello"}]
+    }"#;
+
+    let msg: Message = from_str(json).unwrap();
+    match msg.content {
+        MessageContent::Parts(parts) => assert_eq!(parts.len(), 1),
+        MessageContent::Text(_) => panic!("Should be Parts, not Text"),
+    }
+}
+
+/// Stream deltas keep `Option<MessageContent>`, so `"content": null` is `None`.
+#[test]
+fn test_stream_delta_null_content_stays_none() {
+    let json = r#"{"content": null}"#;
+    let delta: StreamDelta = from_str(json).unwrap();
+    assert_eq!(delta.content, None);
 }
 
 /// Test Message default implementation

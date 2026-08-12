@@ -1,0 +1,36 @@
+# Weekly cargo + Actions updates. Review both TLS backends before merge;
+# `--all-features` is unsupported (tls-rustls xor tls-native-tls).
+version: 2
+updates:
+  # Cargo dependencies (crate + dev-deps).
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    groups:
+      # Patch/minor bumps ride together to reduce PR volume.
+      cargo-minor:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # GitHub Actions used by .github/workflows/*.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    groups:
+      actions:
+        update-types:
+          - "minor"
+          - "patch"
