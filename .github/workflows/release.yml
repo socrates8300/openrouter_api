@@ -68,10 +68,31 @@ jobs:
       - name: Verify package builds and validates
         run: cargo publish --dry-run
 
+      # Idempotency: if the version is already on the index (manual publish,
+      # or a re-run of this workflow after a partial failure), skip the upload
+      # instead of failing on crates.io's 403/409 for an existing version.
+      - name: Check if version is already published
+        id: published
+        run: |
+          version=$(grep -m 1 '^version' Cargo.toml | sed -E 's/version\s*=\s*"([^"]+)".*/\1/')
+          status=$(curl -s -o /dev/null -w '%{http_code}' \
+            "https://crates.io/api/v1/crates/openrouter_api/$version")
+          echo "crates.io status for $version: $status"
+          if [ "$status" = "200" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish to crates.io
+        if: steps.published.outputs.exists == 'false'
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: cargo publish
+
+      - name: Skip notice
+        if: steps.published.outputs.exists == 'true'
+        run: echo "::notice::version already on crates.io; skipping cargo publish"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
